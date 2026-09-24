@@ -53,3 +53,5 @@ Node.js, pnpm, Vite and Turbo are development tools; they are not intended to ru
 ## Next milestone
 
 Resolve microphone capture and validate a non-focusing overlay on the target machine. Then implement single-instance shortcut IPC, session tests, keyring settings, automatic paste, launch-at-login and release packaging. These are deliberately not represented as completed by this prototype.
+
+A CI workflow template is in `docs/ci-check.yml`. To enable GitHub Actions, move it to `.github/workflows/check.yml` using a GitHub login with workflow-write permission. The login used for this implementation cannot publish workflow files.
