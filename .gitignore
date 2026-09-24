@@ -1,0 +1,10 @@
+node_modules/
+.turbo/
+dist/
+.env*
+!.env.example
+apps/desktop/bin/
+apps/desktop/.tmp/
+apps/desktop/.storage/
+apps/desktop/neutralinojs.log
+

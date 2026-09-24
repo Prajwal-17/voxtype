@@ -1,0 +1,35 @@
+{
+  "applicationId": "com.prajwal.flow.probe",
+  "version": "0.0.0",
+  "defaultMode": "window",
+  "port": 0,
+  "documentRoot": "/dist/",
+  "url": "/",
+  "enableServer": true,
+  "enableNativeAPI": true,
+  "tokenSecurity": "one-time",
+  "nativeAllowList": [
+    "app.exit",
+    "window.*",
+    "os.execCommand",
+    "os.spawnProcess",
+    "os.updateSpawnedProcess"
+  ],
+  "modes": {
+    "window": {
+      "title": "Flow \u2014 feasibility probe",
+      "width": 640,
+      "height": 700,
+      "minWidth": 400,
+      "minHeight": 200,
+      "enableInspector": false
+    }
+  },
+  "cli": {
+    "binaryName": "flow",
+    "resourcesPath": "/dist/",
+    "extensionsPath": "/extensions/",
+    "binaryVersion": "6.9.0",
+    "clientVersion": "6.9.0"
+  }
+}
