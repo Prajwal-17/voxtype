@@ -2,7 +2,7 @@
 
 ## Decision
 
-**Hold full MVP implementation at the agreed gate.** Keep the stock-Neutralino architecture unchanged until the microphone integration is revisited. The diagnostic build is available for reproducing the result on the target desktop.
+**Capture alternative approved and implemented.** The user reproduced `NotAllowedError` on their desktop and authorized replacing web microphone capture with an installed Linux utility. Flow now uses `parec` through Neutralino process APIs. Overlay focus remains an independent gate; it has not been verified here.
 
 ## Evidence
 
@@ -22,13 +22,14 @@ This implementation environment is a headless VM (`XDG_SESSION_TYPE=tty`, no DIS
 | TypeScript checks for desktop and core | Passed |
 | Production web bundle | Passed |
 | Pinned runtime download | Passed |
-| Native microphone and live Deepgram | Not run; microphone source-level blocker above |
+| Native microphone and live Deepgram | New parec adapter implemented; physical input and live Deepgram still require user desktop/key |
+| PCM transport and helper cleanup | 9 automated tests passed, including shell integration with a test-only fake audio source |
 | Overlay preserves focus | Not run; local graphical session required |
 | Clipboard/paste into target apps | Not run; local graphical session required |
 | Global shortcut / single-instance IPC | Deferred behind gate |
 | Aggregate idle/recording memory | Not measured; local graphical session required |
 
-No production session tests or finished installer are claimed. The prototype only provides manual probes; its transcript handling is not the final tested core state machine.
+Transport and process lifecycle now have automated tests. No finished installer or completed product session state machine is claimed. Tests use a synthetic audio source, not a physical microphone.
 
 ## Local result sheet
 
@@ -42,12 +43,13 @@ Run the README steps in both your browser and editor. Record:
 
 Do not include credentials or sensitive transcript content in reports.
 
-## Integration choices requiring a revised decision
+## Integration decision
 
-1. Keep stock Neutralino and use an installed Linux audio capture utility through its process APIs. This changes the agreed web-audio capture path; streaming binary transport and helper lifecycle must be designed and verified. It does not by itself solve overlay focus.
-2. Maintain a small patched Neutralino native runtime that handles microphone permission and exposes focus behavior. This introduces native framework maintenance, contrary to the current preference for stock Neutralino and TypeScript-only application work.
+The user selected stock Neutralino plus Linux audio capture. Implemented with `parec` from `pulseaudio-utils`, Bash, and GNU coreutils. Audio is signed little-endian 16-bit PCM, mono, 16 kHz. Newline-delimited base64 safely crosses Neutralino's UTF-8 process event channel; TypeScript decodes it before sending binary WebSocket frames to Deepgram with explicit encoding/sample rate/channel parameters.
 
-Neither option has been silently implemented. No switch to Rust, Electron, another framework, or a custom Node runtime has been made.
+The capture process waits for an application handshake, accepts stop via stdin, drains the encoder before acknowledging completion, and terminates on EOF, signals, or a safety timeout. Tests cover chunk splitting, non-UTF8 samples, stop-tail draining, cancel during startup, late events, duplicate stop, and audio-server failure. The native window close handler now waits for cancellation before exiting.
+
+No framework patch, Rust service, or custom Node runtime was added. Deepgram credentials never reach the shell command or process environment. This resolves the implementation of the alternative capture route, but does not establish on-device performance or overlay compatibility.
 
 ## Remaining implementation after the gate
 
