@@ -1,0 +1,12 @@
+/* Compact instrument panel: graphite, silver, muted blue; native Ubuntu type. */
+:root { font: 15px/1.5 Ubuntu, Cantarell, sans-serif; color: #eef0f4; background: #202229; color-scheme: dark; }
+* { box-sizing: border-box; } body { margin: 0; } main { max-width: 640px; margin: auto; padding: 28px; }
+h1 { font-size: 30px; margin: 0; letter-spacing: -.8px; } p { color: #b5bac6; } label { display: block; margin: 14px 0; }
+input { display: block; width: 100%; margin-top: 6px; padding: 10px; border: 1px solid #555b68; border-radius: 7px; background: #292d36; }
+button { padding: 9px 13px; border: 1px solid #636c7e; border-radius: 8px; background: #343e50; color: inherit; cursor: pointer; }
+button:disabled { opacity: .45; cursor: default; } button:focus-visible, input:focus-visible { outline: 2px solid #aec8ef; outline-offset: 3px; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0; } output { display: block; white-space: pre-wrap; overflow-wrap: anywhere; }
+#status { padding: 12px; background: #2a2e37; border-radius: 8px; } #transcript { margin-top: 12px; } small { color: #b5bac6; }
+body.overlay main { padding: 16px; } body.overlay #panel { display: none; } #pill { display: none; } body.overlay #pill { display: flex; align-items: center; gap: 12px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; background: #aec8ef; } #pill button { margin-left: auto; }
+
