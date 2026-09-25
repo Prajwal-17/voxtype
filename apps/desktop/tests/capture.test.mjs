@@ -35,7 +35,8 @@ for (const action of ['stop', 'eof']) {
     const result = await run(t, 'audio', action);
     assert.equal(result.code, 0, result.stderr);
     assert.ok(result.output.endsWith('FLOW_END\n'));
-    assert.deepEqual(Buffer.from(result.output.replace('FLOW_END\n', ''), 'base64'), Buffer.concat([Buffer.alloc(61440, 255), Buffer.from([0,128])]));
+    const pcm = Buffer.concat(result.output.replace('FLOW_END\n', '').split("\n").filter(Boolean).map(frame => Buffer.from(frame, 'base64')));
+    assert.deepEqual(pcm, Buffer.concat([Buffer.alloc(61440, 255), Buffer.from([0,128])]));
     assert.ok(result.pid); assert.throws(() => process.kill(result.pid, 0), {code: 'ESRCH'});
   });
 }

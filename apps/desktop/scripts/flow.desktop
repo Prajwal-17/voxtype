@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=Flow
+Comment=Fast Linux voice dictation
+Exec=flow settings
+Terminal=false
+Type=Application
+Categories=Utility;AudioVideo;

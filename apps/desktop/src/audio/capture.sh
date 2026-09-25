@@ -18,14 +18,20 @@ trap 'exit 130' INT TERM HUP
 IFS= read -r command || exit 0
 if [[ "$command" == stop ]]; then printf 'FLOW_END\n'; exit 0; fi
 [[ "$command" == start ]] || exit 2
-for tool in parec base64 stdbuf; do
+for tool in parec base64 dd; do
   command -v "$tool" >/dev/null 2>&1 || { printf 'Missing %s. Install pulseaudio-utils and coreutils.\n' "$tool" >&2; exit 127; }
 done
 coproc MICROPHONE { exec parec --raw --format=s16le --rate=16000 --channels=1 --latency-msec=50 --client-name=Flow --stream-name=Dictation; }
 capture_pid=$MICROPHONE_PID
 # Duplicate the coprocess descriptor before launching an asynchronous encoder.
 exec {audio_fd}<&"${MICROPHONE[0]}" || exit 1
-stdbuf -oL base64 --wrap=4096 <&"$audio_fd" &
+(
+  while true; do
+    encoded=$(dd bs=1024 count=1 iflag=fullblock status=none <&"$audio_fd" | base64 --wrap=0) || exit 1
+    [[ -z "$encoded" ]] && break
+    printf "%s\n" "$encoded"
+  done
+) &
 encoder_pid=$!
 exec {audio_fd}<&-
 started=$SECONDS

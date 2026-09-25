@@ -1,68 +1,88 @@
 # Flow
 
-Lightweight Ubuntu dictation, built with Neutralino.js and TypeScript in a pnpm/Turborepo workspace.
+Flow is a lightweight Linux voice dictation app built with Neutralino.js and TypeScript. It stays hidden in the background, exposes one tray icon, records through Ubuntu's PulseAudio/PipeWire compatibility layer, streams to Deepgram, and pastes the final transcript into the application that had focus.
 
-**Status: Linux capture prototype; full desktop integration is still in progress.** Microphone audio now comes from `parec`, bypassing the blocked WebKit permission path. Overlay focus still needs verification on the target desktop. See [the feasibility report](docs/feasibility.md).
+This milestone is Linux desktop only. The future Android/Expo workspace is intentionally not included yet.
 
-## Run the diagnostic on Ubuntu 24.04
+## Install and run on Ubuntu 24.04
 
-Prerequisites: Node.js 22.12+ (Node 24 recommended), pnpm 10.30.3, and a local graphical desktop session. Run these from the repository root:
+Install the runtime tools once:
 
-```sh
-sudo apt install pulseaudio-utils
+~~~sh
+sudo apt update
+sudo apt install pulseaudio-utils coreutils wl-clipboard ydotool libsecret-tools libayatana-appindicator3-1
+~~~
+
+Neutralino also needs these desktop libraries on a minimal Ubuntu install:
+
+~~~sh
+sudo apt install libgtk-3-0t64 libwebkit2gtk-4.1-0 libxtst6
+~~~
+
+Install the workspace and download the pinned Neutralino runtime:
+
+~~~sh
 pnpm install --frozen-lockfile
 pnpm runtime:download
 pnpm probe
-```
+~~~
 
-If native libraries are missing:
+Flow starts hidden and should appear in the GNOME tray/app-indicator area. Open **Settings** from the tray to save a Deepgram key in GNOME Keyring. The key is never written to a Flow settings file, shell command, or log. If the key is blank, the microphone can still be tested but there is no transcript to paste.
 
-```sh
-sudo apt install libgtk-3-0t64 libwebkit2gtk-4.1-0 libxtst6
-```
+ydotool may require its user service and /dev/uinput access on the target machine. Flow does not install a privileged daemon. If the dependency check reports ydotool but paste fails, configure the helper according to the Ubuntu package instructions and rerun the check.
 
-Optional tools for the paste/dependency diagnostics:
+## Shortcut and tray behavior
 
-```sh
-sudo apt install wl-clipboard ydotool libsecret-tools
-```
+The bundled flow launcher sends commands to the existing app through a user-private FIFO. It does not start a second Neutralino window:
 
-Installing ydotool alone may not configure its daemon or `/dev/uinput` access. This prototype does not change device permissions, install a privileged service, or register global shortcuts. A failed paste test may indicate missing daemon access rather than a transcription problem.
+~~~sh
+flow toggle
+flow cancel
+flow settings
+~~~
 
-1. Click **Test microphone** with the key blank. Speak and check the level meter. Capture uses the default input selected in Ubuntu Settings → Sound (including PipeWire through its PulseAudio compatibility server). No browser permission dialog is expected. Finish releases the microphone.
-2. If microphone access succeeds, optionally enter your own Deepgram key and repeat. Speaking streams audio to Deepgram; Finish flushes the stream. Recording automatically stops after 60 seconds.
-3. Click **Test overlay focus**, focus a browser/editor text field during the delay, and keep typing. Note whether showing the overlay takes focus. Repeat in each target app.
-4. Click **Test paste**, then focus a disposable field. This replaces the clipboard with `Flow paste test` and attempts Ctrl+V. It never presses Enter.
+Add flow toggle as a GNOME custom shortcut, with Ctrl+Alt+Space as the default suggestion. Install the launcher and binary from the release archive onto the same directory, for example:
 
-The key is used only in memory and cleared from the input when a session starts. Do not commit keys. No audio or transcript history is saved. This diagnostic intentionally does not auto-paste Deepgram transcripts.
+~~~sh
+mkdir -p ~/.local/bin
+install -Dm755 flow-linux_x64 ~/.local/bin/flow-linux_x64
+install -Dm755 flow ~/.local/bin/flow
+~~~
 
-`pnpm dev` is a browser-only UI preview. Native capture requires `pnpm probe`; it is unavailable in the browser-only preview.
+The tray menu has the same toggle, cancel, settings, and quit actions. Flow hides its window and skips the taskbar while idle. During dictation it shows a compact always-on-top panel; after finishing it hides the panel before clipboard delivery.
 
-## Workspace
+## Fast startup and reliable cleanup
 
-- `apps/desktop`: Neutralino runtime configuration, Vite, diagnostic UI and platform probes.
-- `packages/core`: platform-independent dictation contracts; session implementation is pending the gate.
-- `packages/config`: shared strict TypeScript configuration.
+Each session starts parec immediately and opens the Deepgram WebSocket at the same time. PCM chunks are held in a bounded 512 KB in-memory queue until the socket is open, then sent in order. The queue protects the desktop from unbounded memory growth if the network is unavailable. A connection timeout, microphone timeout, or Deepgram error stops the helper and leaves any received transcript visible for manual copying; incomplete text is never pasted automatically.
 
-```sh
+Finish drains the last microphone bytes, sends Deepgram CloseStream, waits for the final metadata response, copies the complete text with wl-copy through standard input, and triggers paste with ydotool. The transcript remains on the clipboard for recovery. Cancel discards the current session and releases the microphone.
+
+No recordings or transcript history are saved. Idle and recording memory/CPU still need measurement on the target GNOME Wayland desktop.
+
+## Build, test, and package
+
+~~~sh
 pnpm typecheck
 pnpm test
 pnpm build
-```
+pnpm package:linux
+~~~
 
-Node.js, pnpm, Vite and Turbo are development tools; they are not intended to run in the installed desktop app. No Expo app, Rust service, or Node.js background service is included.
+The last command creates apps/desktop/dist/flow-linux-x86_64.tar.gz containing:
 
-## Next milestone
+- flow-linux_x64 — the Neutralino Linux binary
+- resources.neu — the bundled web UI, capture helper, tray icon, and configuration
+- flow — the launcher used by GNOME custom shortcuts
+- flow.desktop — an optional application entry
 
-Verify the new Linux capture path and a non-focusing overlay on the target machine. Then implement single-instance shortcut IPC, session tests, keyring settings, automatic paste, launch-at-login and release packaging. These are deliberately not represented as completed by this prototype.
+Development tools (Node.js, pnpm, Vite, and Turbo) are not required by the packaged app. There is no Rust service or custom Node background server.
 
-A CI workflow template is in `docs/ci-check.yml`. To enable GitHub Actions, move it to `.github/workflows/check.yml` using a GitHub login with workflow-write permission. The login used for this implementation cannot publish workflow files.
+## Troubleshooting
 
-## Linux capture troubleshooting
+- Missing parec: install pulseaudio-utils, run Flow as the logged-in desktop user, and choose the correct input in Settings → Sound.
+- NotAllowedError: the Linux WebKit microphone permission path is not used; Flow captures with parec.
+- Missing tray icon: Ubuntu needs an app-indicator library for Neutralino's tray API. The settings window and launcher still work while that dependency is repaired.
+- Deepgram timeout: check network access and the key in Settings. Flow will record while connecting, but it stops safely if the bounded startup buffer fills.
+- Paste failure: the final transcript stays in the app and clipboard. Check wl-copy, ydotool, and the target app's focus.
 
-- `Missing parec`: run `sudo apt install pulseaudio-utils`.
-- `Connection refused` or audio-server errors: run Flow as your normal desktop user, not with sudo or from SSH. Check `pactl info` and Ubuntu Sound input.
-- A flat meter: choose the correct default microphone in Ubuntu Sound and check mute/input volume.
-- The key is still entered in the app for each Deepgram test; no `.env` is needed.
-
-The capture wrapper is bundled as text with the app. It starts `parec` and a base64 encoder only during recording, decodes 16 kHz mono signed PCM in TypeScript, and sends binary audio to Deepgram. Finish drains the final audio before closing the stream; Cancel discards it. Closing the window waits for cleanup. EOF and a 65-second safety limit also release the helper processes. No custom Node or Rust runtime is used.
+pnpm dev is only a browser UI preview; native microphone, tray, keyring, launcher, and paste features require pnpm probe in the graphical Ubuntu session.

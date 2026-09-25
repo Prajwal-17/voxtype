@@ -1,56 +1,45 @@
-# Feasibility gate — 2026-09-24
+# Flow Linux desktop status — 2026-09-25
 
-## Decision
+## Implemented
 
-**Capture alternative approved and implemented.** The user reproduced `NotAllowedError` on their desktop and authorized replacing web microphone capture with an installed Linux utility. Flow now uses `parec` through Neutralino process APIs. Overlay focus remains an independent gate; it has not been verified here.
+The Linux desktop app now runs as a single hidden Neutralino process with:
 
-## Evidence
+- a GNOME tray menu for toggle, cancel, settings, and quit;
+- a private FIFO launcher bridge for flow toggle, flow cancel, and flow settings;
+- immediate parec microphone startup in parallel with the Deepgram WebSocket;
+- a bounded 512 KB PCM queue that flushes in order when Deepgram connects;
+- final-result gating: Flow waits for capture drain and Deepgram metadata before paste;
+- stdin-based wl-copy delivery followed by the existing ydotool paste helper;
+- GNOME Keyring storage through secret-tool;
+- manual copy recovery when credentials, network, microphone, or paste fail;
+- no recording files, transcript history, API keys in logs, or custom Node/Rust service.
 
-- Pinned runtime: Neutralino **v6.9.0**, client library **6.9.0**, CLI **11.7.2**.
-- The [release's Linux webview implementation](https://github.com/neutralinojs/neutralinojs/blob/v6.9.0/lib/webview/webview.h) creates a WebKit webview and configures settings but contains no `permission-request` signal handler or user-media permission grant. Search the pinned source for `permission-request` and `user_media` to reproduce the inspection.
-- [WebKitGTK documents](https://webkitgtk.org/reference/webkit2gtk/2.41.2/class.UserMediaPermissionRequest.html) that unhandled microphone/camera permission requests are denied by default.
-- Therefore, the proposed `getUserMedia` capture path is not supported by this stock Linux integration as inspected. This is a source-level finding, **not a claimed live result on the user's machine**.
-- [Neutralino window APIs](https://neutralino.js.org/docs/api/window/) expose show/hide, borderless and always-on-top controls, but no explicit accept-focus/focus-on-map control. Non-focusing overlay behavior remains unverified on GNOME Wayland. Exact screen placement and fullscreen behavior also require local validation.
+Neutralino 6.9.0's tray API supports a PNG icon and menu items. The configuration uses a hidden window and skipTaskbar so the idle process does not appear as a normal taskbar application. Ubuntu needs an app-indicator library for the native tray; Neutralino reports NE_OS_TRAYIER if it is unavailable.
 
-## Environment and validation
+## Automated validation
 
-This implementation environment is a headless VM (`XDG_SESSION_TYPE=tty`, no DISPLAY or WAYLAND_DISPLAY), with missing GTK libraries. It cannot stand in for the user's Ubuntu GNOME Wayland desktop. No Deepgram credentials were supplied.
+~~~text
+pnpm typecheck   passed
+pnpm test        13 tests passed
+pnpm build       passed
+pnpm package:linux passed
+~~~
 
-| Check | Result |
-| --- | --- |
-| Frozen dependency installation | Passed |
-| TypeScript checks for desktop and core | Passed |
-| Production web bundle | Passed |
-| Pinned runtime download | Passed |
-| Native microphone and live Deepgram | New parec adapter implemented; physical input and live Deepgram still require user desktop/key |
-| PCM transport and helper cleanup | 9 automated tests passed, including shell integration with a test-only fake audio source |
-| Overlay preserves focus | Not run; local graphical session required |
-| Clipboard/paste into target apps | Not run; local graphical session required |
-| Global shortcut / single-instance IPC | Deferred behind gate |
-| Aggregate idle/recording memory | Not measured; local graphical session required |
+The tests cover PCM transport, malformed frames, helper cleanup, stop-tail draining, cancellation during spawn, queue order and queue bounds, and launcher command parsing. The release archive is apps/desktop/dist/flow-linux-x86_64.tar.gz.
 
-Transport and process lifecycle now have automated tests. No finished installer or completed product session state machine is claimed. Tests use a synthetic audio source, not a physical microphone.
+## Required validation on the user's GNOME Wayland desktop
 
-## Local result sheet
+This environment is headless and cannot prove the following:
 
-Run the README steps in both your browser and editor. Record:
+1. The tray icon renders with the installed Ubuntu app-indicator implementation.
+2. Showing the always-on-top recording panel does not steal the browser/editor focus.
+3. The hidden-panel transition leaves the intended target focused for ydotool.
+4. The installed ydotool service and /dev/uinput permissions work for the user.
+5. Deepgram connection and first-result timings on the user's network.
+6. Idle and recording memory across the Neutralino/WebKit child process tree.
 
-- GNOME version (`gnome-shell --version`), target app names/versions.
-- Microphone probe result and whether any permission prompt appears.
-- Whether all typed characters remain in the target field as the overlay appears.
-- Whether the overlay stays above the target, and whether it can be positioned as desired.
-- Whether paste lands in the intended field.
+Run pnpm probe, open Settings from the tray, save a key, and test a browser and editor. Configure a GNOME custom shortcut with flow toggle. If focus is stolen by the overlay under Wayland, record the exact GNOME version and target application; Neutralino's stock window APIs do not expose an explicit non-focusing flag.
 
-Do not include credentials or sensitive transcript content in reports.
+## Capture decision
 
-## Integration decision
-
-The user selected stock Neutralino plus Linux audio capture. Implemented with `parec` from `pulseaudio-utils`, Bash, and GNU coreutils. Audio is signed little-endian 16-bit PCM, mono, 16 kHz. Newline-delimited base64 safely crosses Neutralino's UTF-8 process event channel; TypeScript decodes it before sending binary WebSocket frames to Deepgram with explicit encoding/sample rate/channel parameters.
-
-The capture process waits for an application handshake, accepts stop via stdin, drains the encoder before acknowledging completion, and terminates on EOF, signals, or a safety timeout. Tests cover chunk splitting, non-UTF8 samples, stop-tail draining, cancel during startup, late events, duplicate stop, and audio-server failure. The native window close handler now waits for cancellation before exiting.
-
-No framework patch, Rust service, or custom Node runtime was added. Deepgram credentials never reach the shell command or process environment. This resolves the implementation of the alternative capture route, but does not establish on-device performance or overlay compatibility.
-
-## Remaining implementation after the gate
-
-Single-instance `flow toggle/cancel/settings` IPC; tested session lifecycle and transcript assembly; production overlay; keyring-backed settings; microphone/language choices; automatic paste and recovery; autostart; dependency setup/uninstall; Ubuntu x86-64 release archive; performance measurement across the complete WebKit process tree. The 150 MB idle figure remains an optimization target, not a measured result.
+The original WebKit getUserMedia route is not used. Neutralino's pinned Linux webview has no microphone permission handler, and WebKitGTK denies unhandled user-media requests. parec is the approved Linux capture adapter. Audio is raw signed little-endian 16-bit PCM, mono, 16 kHz; base64 only transports it through Neutralino's UTF-8 process events, and TypeScript sends decoded binary frames to Deepgram.

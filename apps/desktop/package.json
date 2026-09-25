@@ -8,6 +8,7 @@
     "build": "vite build",
     "typecheck": "tsc -p tsconfig.json",
     "runtime:download": "neu update",
+    "package:linux": "pnpm build && neu build --release && cp scripts/flow scripts/flow.desktop dist/flow/ && chmod +x dist/flow/flow && tar -C dist/flow -czf dist/flow-linux-x86_64.tar.gz flow-linux_x64 resources.neu flow flow.desktop",
     "probe": "pnpm build && neu run",
     "test": "node --experimental-transform-types --test tests/*.test.ts tests/*.test.mjs"
   },
