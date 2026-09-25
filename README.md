@@ -81,7 +81,7 @@ Development tools (Node.js, pnpm, Vite, and Turbo) are not required by the packa
 
 - Missing parec: install pulseaudio-utils, run Flow as the logged-in desktop user, and choose the correct input in Settings → Sound.
 - NotAllowedError: the Linux WebKit microphone permission path is not used; Flow captures with parec.
-- Missing tray icon: Ubuntu needs an app-indicator library for Neutralino's tray API. The settings window and launcher still work while that dependency is repaired.
+- Missing tray icon or a native crash during startup: Ubuntu needs an app-indicator library for Neutralino's tray API. Flow now checks for `libayatana-appindicator3-1` after Neutralino is ready and falls back to the settings window if it is absent. To isolate the tray path while diagnosing a machine-specific issue, run `pnpm --filter @flow/desktop exec neu run -- --flow-no-tray`; the launcher and dictation logic still work without the tray.
 - Deepgram timeout: check network access and the key in Settings. Flow will record while connecting, but it stops safely if the bounded startup buffer fills.
 - Paste failure: the final transcript stays in the app and clipboard. Check wl-copy, ydotool, and the target app's focus.
 

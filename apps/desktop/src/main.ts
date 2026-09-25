@@ -107,8 +107,12 @@ function trayLabel() {
 }
 let trayUpdate = Promise.resolve();
 let trayFailureNotified = false;
+let trayEnabled = true;
+function trayWasDisabledOnLaunch() {
+  return window.NL_ARGS?.includes('--flow-no-tray') ?? false;
+}
 function updateTray() {
-  if (!native) return;
+  if (!native || !trayEnabled || trayWasDisabledOnLaunch()) return;
   trayUpdate = trayUpdate.then(() => os.setTray({
     icon: '/dist/flow.png',
     menuItems: [
@@ -124,6 +128,25 @@ function updateTray() {
       void showSettings().catch(() => {});
     }
   });
+}
+async function initializeTray() {
+  if (!native || trayWasDisabledOnLaunch()) {
+    trayEnabled = false;
+    return;
+  }
+  // Neutralino dynamically loads either AppIndicator or Ayatana AppIndicator
+  // on Linux. Avoid calling into its GTK tray code when neither library is
+  // installed; older builds could segfault before returning NE_OS_TRAYIER.
+  const probe = await os.execCommand(
+    'ldconfig -p 2>/dev/null | grep -Eq "lib(ayatana-)?appindicator3\\.so(\\.1)?"',
+  );
+  if (probe.exitCode !== 0) {
+    trayEnabled = false;
+    show('Tray disabled: install libayatana-appindicator3-1, then restart Flow.');
+    await showSettings();
+    return;
+  }
+  updateTray();
 }
 function renderState(next: DictationState) {
   state = next;
@@ -485,13 +508,8 @@ button('quit').onclick = () => { void quit().catch(report); };
 window.addEventListener('beforeunload', () => { void cleanup().catch(() => {}); });
 
 if ('NL_OS' in window) {
-  init();
   native = true;
-  launcher = new LauncherBridge();
   const initialCommand = parseLauncherCommand(window.NL_ARGS.find(argument => argument.startsWith('--flow-command=')));
-  void launcher.start(handleLauncherCommand).then(() => {
-    if (initialCommand) setTimeout(() => handleLauncherCommand(initialCommand), 150);
-  }).catch(error => show(error instanceof Error ? error.message : 'Launcher channel unavailable.'));
   void events.on('trayMenuItemClicked', event => {
     const id = (event.detail as { id?: string } | undefined)?.id;
     if (id === 'toggle') void (state === 'listening' ? stop() : start()).catch(report);
@@ -503,8 +521,23 @@ if ('NL_OS' in window) {
     // Closing the settings window hides Flow; only the tray Quit item exits.
     if (!exiting) void hideOverlay().catch(report);
   });
-  updateTray();
-  void loadKey();
+  // Native requests made before the websocket is ready are queued by the
+  // client, but continuations can then race one another on Neutralino's GTK
+  // server thread. Wait for ready and initialize the Linux adapters in order.
+  const ready = new Promise<void>(resolve => {
+    void events.on('ready', () => resolve());
+  });
+  init();
+  void ready.then(async () => {
+    launcher = new LauncherBridge();
+    await launcher.start(handleLauncherCommand);
+    await loadKey();
+    await initializeTray();
+    if (initialCommand) setTimeout(() => handleLauncherCommand(initialCommand), 150);
+  }).catch(error => {
+    show(error instanceof Error ? error.message : 'Native startup failed.');
+    void showSettings().catch(() => {});
+  });
 } else {
   show('Browser preview only. Run pnpm probe inside your Ubuntu desktop session.');
 }
