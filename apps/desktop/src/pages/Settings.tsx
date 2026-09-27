@@ -17,26 +17,24 @@ import {
   Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import clsx from 'clsx';
 import { api, native, useRecording, useSession } from '../lib/api';
 import { parseVocabulary, settingsSchema, type Bootstrap, type Settings } from '../lib/types';
 import { Button, IconButton, Shortcut, Toggle } from '../components/ui';
 import { Waveform } from '../components/waveform';
-import { ui } from '../design-system/classes';
 
 export function SettingsPage({ boot, active }: { boot: Bootstrap; active: boolean }) {
   return (
     <>
-      <div className={ui.pageHeading}>
+      <div className="mb-7 flex items-center justify-between gap-5 [&_h1]:text-heading [&_h1]:font-semibold [&_h1]:tracking-[-.035em] [&_h1]:text-balance [&_p]:mt-2 [&_p]:text-ui [&_p]:text-muted max-[700px]:flex-wrap max-[700px]:items-start max-[700px]:gap-3 max-[700px]:[&_h1]:text-[26px]">
         <div>
           <h1>Settings</h1>
           <p>Audio, transcription, and desktop integration.</p>
         </div>
-        <span className={ui.localBadge}>
+        <span className="flex shrink-0 items-center gap-1.5 text-caption text-muted max-[1050px]:hidden">
           <ShieldCheck size={14} /> On this device
         </span>
       </div>
-      <div className={ui.settingsLayout}>
+      <div className="max-w-4xl">
         <ApiKey boot={boot} active={active} />
         <ApiKey boot={boot} active={active} provider="deepseek" />
         <Preferences key={JSON.stringify(boot.settings)} settings={boot.settings} active={active} />
@@ -84,8 +82,8 @@ function ApiKey({
     },
   });
   return (
-    <section className={ui.settingsSection}>
-      <div className={ui.sectionTitle}>
+    <section className="mb-7 border-b border-line pb-7">
+      <div className="mb-5 [&_h2]:text-title [&_h2]:font-semibold [&_h2]:tracking-[-.02em] [&_p]:mt-1 [&_p]:text-ui [&_p]:text-muted">
         <h2>{cleanup ? 'Text cleanup' : 'Deepgram connection'}</h2>
         <p>
           {cleanup
@@ -94,7 +92,7 @@ function ApiKey({
         </p>
       </div>
       {hasKey && !editing ? (
-        <div className={ui.keyConnected}>
+        <div className="flex items-center gap-3 rounded-control bg-surface p-4 [&>div]:min-w-0 [&>div]:flex-1 [&_strong]:text-ui [&_strong]:font-medium [&_p]:mt-1 [&_p]:text-caption [&_p]:text-muted max-[1050px]:flex-wrap">
           <span className="text-success">
             <KeyRound size={19} />
           </span>
@@ -119,15 +117,15 @@ function ApiKey({
         </div>
       ) : (
         <form
-          className={ui.keyForm}
+          className="[&>label]:mb-2 [&>label]:block [&>label]:text-ui [&>label]:font-medium"
           onSubmit={(e) => {
             e.preventDefault();
             save.mutate(key.trim());
           }}
         >
           <label htmlFor={inputId}>{name} API key</label>
-          <div className={ui.keyInputRow}>
-            <div className={ui.secretInput}>
+          <div className="flex items-center gap-2 max-[700px]:flex-wrap">
+            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-control border border-line-strong bg-surface py-1 pr-1 pl-3 text-muted focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent max-[700px]:basis-full [&_input]:w-full [&_input]:min-w-0 [&_input]:border-0 [&_input]:bg-transparent [&_input]:py-1.5 [&_input]:text-ui [&_input]:text-ink [&_input]:outline-none [&_input]:placeholder:text-muted">
               <KeyRound size={16} />
               <input
                 id={inputId}
@@ -168,26 +166,26 @@ function ApiKey({
               </Button>
             )}
           </div>
-          <p className={ui.fieldHint}>
+          <p className="mt-2 flex items-center gap-1.5 text-caption text-muted">
             <LockKeyhole size={12} /> Saved to GNOME Keyring, never to your settings file.
           </p>
         </form>
       )}
       {keyError && (
-        <p className={ui.inlineError} role="alert">
+        <p className="mt-2 text-ui text-danger" role="alert">
           {keyError}
         </p>
       )}
       {cleanup ? (
-        <p className={ui.sectionFootnote}>
+        <p className="mt-4 text-caption text-muted">
           Only the finished transcript is sent to DeepSeek. You can view and copy the original
           transcript. If cleanup fails, Flow uses the original.
         </p>
       ) : (
-        <p className={ui.sectionFootnote}>
+        <p className="mt-4 text-caption text-muted">
           Use a key with transcription permission and available account credit.{' '}
           <button
-            className={ui.textLink}
+            className="inline-flex items-center gap-1 border-0 bg-transparent p-0 text-caption text-accent hover:text-accent-hover hover:underline hover:underline-offset-[3px]"
             type="button"
             onClick={() => void api.openDeepgram().catch((error) => toast.error(String(error)))}
           >
@@ -230,18 +228,18 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
         save.mutate(parsed.data);
       }}
     >
-      <section className={ui.settingsSection}>
-        <div className={ui.sectionTitle}>
+      <section className="mb-7 border-b border-line pb-7">
+        <div className="mb-5 [&_h2]:text-title [&_h2]:font-semibold [&_h2]:tracking-[-.02em] [&_p]:mt-1 [&_p]:text-ui [&_p]:text-muted">
           <h2>Voice & language</h2>
           <p>Choose your input device and transcription language.</p>
         </div>
-        <div className={ui.settingRow}>
+        <div className="flex items-center justify-between gap-6 border-b border-line py-4 last:border-b-0 last:pb-0 [&>div:first-child]:min-w-0 [&_label]:text-ui [&_label]:font-medium [&_p]:mt-1 [&_p]:max-w-lg [&_p]:text-ui [&_p]:text-muted max-[1050px]:gap-4 max-[700px]:flex-wrap">
           <div>
             <label htmlFor="microphone">Microphone</label>
             <p>Choose the input you use for dictation.</p>
           </div>
-          <div className={ui.selectWithAction}>
-            <span className={ui.selectWrap}>
+          <div className="flex shrink-0 items-center gap-1.5 max-[700px]:w-full max-[700px]:max-w-full [&>span]:max-[700px]:flex-1">
+            <span className="relative inline-flex max-w-full items-center [&_select]:w-48 [&_select]:max-w-full [&_select]:appearance-none [&_select]:truncate [&_select]:rounded-control [&_select]:border [&_select]:border-line-strong [&_select]:bg-surface [&_select]:py-2 [&_select]:pr-8 [&_select]:pl-3 [&_select]:text-ui [&_select]:text-ink [&>svg]:pointer-events-none [&>svg]:absolute [&>svg]:right-3 [&>svg]:text-muted max-[1050px]:[&_select]:w-42 max-[700px]:w-full max-[700px]:[&_select]:w-full">
               <select
                 id="microphone"
                 value={draft.microphone}
@@ -270,8 +268,10 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
             </IconButton>
           </div>
         </div>
-        {microphones.isError && <p className={ui.inlineError}>{String(microphones.error)}</p>}
-        <div className={ui.microphoneTest}>
+        {microphones.isError && (
+          <p className="mt-2 text-ui text-danger">{String(microphones.error)}</p>
+        )}
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-control bg-surface px-3 py-2 [&>div:first-child]:mr-auto [&>div:first-child]:flex [&>div:first-child]:items-center [&>div:first-child]:gap-2 [&>div:first-child]:text-caption [&>div:first-child]:text-muted">
           <div>
             <Mic size={16} />
             <span>
@@ -298,18 +298,22 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
         </div>
         {session.isTest && session.message && (
           <p
-            className={session.phase === 'error' ? ui.inlineError : ui.fieldHint}
+            className={
+              session.phase === 'error'
+                ? 'mt-2 text-ui text-danger'
+                : 'mt-2 flex items-center gap-1.5 text-caption text-muted'
+            }
             role={session.phase === 'error' ? 'alert' : 'status'}
           >
             {session.message}
           </p>
         )}
-        <div className={ui.settingRow}>
+        <div className="flex items-center justify-between gap-6 border-b border-line py-4 last:border-b-0 last:pb-0 [&>div:first-child]:min-w-0 [&_label]:text-ui [&_label]:font-medium [&_p]:mt-1 [&_p]:max-w-lg [&_p]:text-ui [&_p]:text-muted max-[1050px]:gap-4 max-[700px]:flex-wrap">
           <div>
             <label htmlFor="language">Language</label>
             <p>Use multilingual for supported mixed-language speech.</p>
           </div>
-          <span className={ui.selectWrap}>
+          <span className="relative inline-flex max-w-full items-center [&_select]:w-48 [&_select]:max-w-full [&_select]:appearance-none [&_select]:truncate [&_select]:rounded-control [&_select]:border [&_select]:border-line-strong [&_select]:bg-surface [&_select]:py-2 [&_select]:pr-8 [&_select]:pl-3 [&_select]:text-ui [&_select]:text-ink [&>svg]:pointer-events-none [&>svg]:absolute [&>svg]:right-3 [&>svg]:text-muted max-[1050px]:[&_select]:w-42 max-[700px]:w-full max-[700px]:[&_select]:w-full">
             <select
               id="language"
               value={draft.language}
@@ -337,8 +341,8 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
           </span>
         </div>
       </section>
-      <section className={ui.settingsSection}>
-        <div className={ui.sectionTitle}>
+      <section className="mb-7 border-b border-line pb-7">
+        <div className="mb-5 [&_h2]:text-title [&_h2]:font-semibold [&_h2]:tracking-[-.02em] [&_p]:mt-1 [&_p]:text-ui [&_p]:text-muted">
           <h2>Recording preferences</h2>
           <p>Control text insertion and local storage.</p>
         </div>
@@ -371,8 +375,8 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
           disabled={active}
         />
       </section>
-      <section className={ui.settingsSection}>
-        <div className={ui.sectionTitle}>
+      <section className="mb-7 border-b border-line pb-7">
+        <div className="mb-5 [&_h2]:text-title [&_h2]:font-semibold [&_h2]:tracking-[-.02em] [&_p]:mt-1 [&_p]:text-ui [&_p]:text-muted">
           <h2>Personal vocabulary</h2>
           <p>Help Deepgram recognize names, projects, and technical terms.</p>
         </div>
@@ -381,19 +385,19 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
         </label>
         <textarea
           id="vocabulary"
-          className={ui.vocabularyInput}
+          className="block min-h-[108px] max-h-[260px] w-full resize-y rounded-control border border-line-strong bg-surface px-4 py-3 text-ui placeholder:text-muted"
           rows={4}
           placeholder={'One word or phrase per line\nFor example: Cloudflare Workers'}
           value={vocabulary}
           onChange={(e) => setVocabulary(e.target.value)}
           disabled={active}
         />
-        <div className={ui.vocabularyFooter}>
+        <div className="mt-2 flex justify-between gap-3 text-caption text-muted max-[700px]:flex-col max-[700px]:gap-1">
           <span>Recognition hints, not automatic replacements.</span>
           <span>{value.vocabulary.length} / 100 terms</span>
         </div>
       </section>
-      <div className={ui.savePreferences}>
+      <div className="sticky bottom-0 z-10 mb-7 flex items-center justify-between gap-3 border-t border-line bg-canvas py-4 text-caption text-muted max-[700px]:items-start max-[700px]:[&>span]:max-w-[45%]">
         <span>
           {active
             ? 'Finish recording to change preferences.'
@@ -431,8 +435,8 @@ function DesktopSetup({ registered, active }: { registered: boolean; active: boo
     staleTime: 60_000,
   });
   return (
-    <section className={clsx(ui.settingsSection, 'border-b-0')}>
-      <div className={ui.sectionTitle}>
+    <section className="mb-7 border-b-0 border-line pb-7">
+      <div className="mb-5 [&_h2]:text-title [&_h2]:font-semibold [&_h2]:tracking-[-.02em] [&_p]:mt-1 [&_p]:text-ui [&_p]:text-muted">
         <div className="flex items-center justify-between gap-4">
           <h2>Ubuntu desktop setup</h2>
           <Button variant="ghost" onClick={() => void checks.refetch()} loading={checks.isFetching}>
@@ -441,7 +445,7 @@ function DesktopSetup({ registered, active }: { registered: boolean; active: boo
         </div>
         <p>Check the services used for shortcuts and text insertion.</p>
       </div>
-      <div className={clsx(ui.settingRow, ui.shortcutSetup)}>
+      <div className="mb-5 flex items-center justify-between gap-6 rounded-control border-0 bg-surface p-4 [&>div:first-child]:min-w-0 [&_[data-shortcut]]:mt-2 [&_label]:text-ui [&_label]:font-medium [&_p]:mt-1 [&_p]:max-w-lg [&_p]:text-ui [&_p]:text-muted max-[1050px]:gap-4 max-[700px]:flex-wrap">
         <div>
           <label>Recording shortcut</label>
           <p>
@@ -460,16 +464,19 @@ function DesktopSetup({ registered, active }: { registered: boolean; active: boo
           {registered ? 'Reapply shortcut' : 'Enable shortcut'}
         </Button>
       </div>
-      <div className={ui.diagnosticList}>
+      <div className="grid grid-cols-2 gap-x-6 gap-y-5 max-[700px]:grid-cols-1">
         {checks.isPending ? (
           <p>
             <LoaderCircle size={16} className="animate-spin" /> Checking your desktop…
           </p>
         ) : checks.isError ? (
-          <p className={ui.inlineError}>{String(checks.error)}</p>
+          <p className="mt-2 text-ui text-danger">{String(checks.error)}</p>
         ) : (
           checks.data?.map((check) => (
-            <div className={ui.diagnosticRow} key={check.name}>
+            <div
+              className="flex items-start gap-2 [&>svg]:mt-0.5 [&_strong]:text-ui [&_strong]:font-medium [&_p]:mt-1 [&_p]:text-caption [&_p]:text-muted"
+              key={check.name}
+            >
               {check.status === 'ok' ? (
                 <Check className="text-success" size={16} />
               ) : (
@@ -484,7 +491,7 @@ function DesktopSetup({ registered, active }: { registered: boolean; active: boo
         )}
       </div>
       <button
-        className={ui.setupDisclosure}
+        className="mt-6 flex w-full items-center justify-between border-0 border-t border-line bg-transparent pt-5 text-ui font-medium"
         onClick={() => setExpanded(!expanded)}
         aria-expanded={expanded}
       >
@@ -492,7 +499,7 @@ function DesktopSetup({ registered, active }: { registered: boolean; active: boo
         <ChevronDown size={16} style={{ transform: expanded ? 'rotate(180deg)' : undefined }} />
       </button>
       {expanded && (
-        <div className={ui.setupInstructions}>
+        <div className="pt-4 [&_p]:mb-3 [&_p]:text-ui [&_p]:text-muted">
           <p>
             Right Alt toggles recording. Use the cancel button in the voice overlay to discard a
             recording. Keep your cursor in the destination field while recording.

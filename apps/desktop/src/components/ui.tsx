@@ -4,8 +4,22 @@ import * as Tooltip from '@radix-ui/react-tooltip';
 import { X, LoaderCircle, AudioLines } from 'lucide-react';
 import clsx from 'clsx';
 import { useId, type ButtonHTMLAttributes, type ReactNode } from 'react';
-import { buttonRecipe, type ButtonSize, type ButtonVariant } from '../design-system/recipes';
-import { ui } from '../design-system/classes';
+
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
+type ButtonSize = 'sm' | 'md' | 'lg';
+
+const buttonVariants: Record<ButtonVariant, string> = {
+  primary: 'bg-accent text-white hover:bg-accent-hover',
+  secondary: 'border-line-strong bg-surface text-ink hover:bg-subtle',
+  ghost: 'bg-transparent text-muted hover:bg-subtle hover:text-ink',
+  danger: 'bg-danger text-white hover:brightness-90',
+};
+
+const buttonSizes: Record<ButtonSize, string> = {
+  sm: 'min-h-8 px-3 py-1.5 text-caption',
+  md: 'min-h-9 px-3.5 py-2 text-ui',
+  lg: 'min-h-11 px-5 py-2.5 text-body',
+};
 
 export function Button({
   children,
@@ -26,7 +40,12 @@ export function Button({
       {...props}
       aria-busy={loading || undefined}
       disabled={disabled || loading}
-      className={buttonRecipe(variant, size, className)}
+      className={clsx(
+        'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-control border border-transparent font-medium transition-[transform,background-color,color] duration-150 ease-out enabled:active:scale-[.97] disabled:cursor-not-allowed disabled:opacity-45 motion-reduce:transition-none motion-reduce:active:scale-100',
+        buttonVariants[variant],
+        buttonSizes[size],
+        className,
+      )}
     >
       {loading && <LoaderCircle size={15} className="animate-spin" />}
       {children}
@@ -45,13 +64,19 @@ export function IconButton({
           type="button"
           {...props}
           aria-label={label}
-          className={clsx(ui.iconButton, props.className)}
+          className={clsx(
+            'inline-flex size-8 shrink-0 items-center justify-center rounded-control border-0 bg-transparent text-current transition-[transform,background-color] duration-150 ease-out enabled:active:scale-[.97] enabled:hover:bg-line disabled:cursor-not-allowed disabled:opacity-45 motion-reduce:transition-none motion-reduce:active:scale-100',
+            props.className,
+          )}
         >
           {children}
         </button>
       </Tooltip.Trigger>
       <Tooltip.Portal>
-        <Tooltip.Content className={ui.tooltip} sideOffset={7}>
+        <Tooltip.Content
+          className="z-50 rounded-control bg-graphite px-3 py-2 text-caption text-inverse [transform-origin:var(--radix-tooltip-content-transform-origin)] [&_svg]:fill-graphite"
+          sideOffset={7}
+        >
           {label}
           <Tooltip.Arrow />
         </Tooltip.Content>
@@ -74,7 +99,7 @@ export function Toggle({
 }) {
   const id = useId();
   return (
-    <div className={clsx(ui.settingRow, '[&:has([role=switch])]:max-[700px]:flex-nowrap')}>
+    <div className="flex items-center justify-between gap-6 border-b border-line py-4 last:border-b-0 last:pb-0 [&:has([role=switch])]:max-[700px]:flex-nowrap [&>div:first-child]:min-w-0 [&_label]:text-ui [&_label]:font-medium [&_p]:mt-1 [&_p]:max-w-lg [&_p]:text-ui [&_p]:text-muted max-[1050px]:gap-4 max-[700px]:flex-wrap">
       <div>
         <label htmlFor={id}>{label}</label>
         <p id={`${id}-description`}>{description}</p>
@@ -109,8 +134,8 @@ export function Confirm({
     <Dialog.Root>
       <Dialog.Trigger asChild>{trigger}</Dialog.Trigger>
       <Dialog.Portal>
-        <Dialog.Overlay className={ui.dialogBackdrop} />
-        <Dialog.Content className={ui.dialogContent}>
+        <Dialog.Overlay className="fixed inset-0 z-30 bg-graphite/40" />
+        <Dialog.Content className="fixed top-1/2 left-1/2 z-40 w-[min(440px,calc(100vw-40px))] -translate-x-1/2 -translate-y-1/2 rounded-panel bg-surface p-7 shadow-dialog [&>p]:mt-4 [&>p]:text-body [&>p]:text-muted">
           <div className="flex items-center justify-between">
             <Dialog.Title>{title}</Dialog.Title>
             <Dialog.Close asChild>
@@ -120,7 +145,7 @@ export function Confirm({
             </Dialog.Close>
           </div>
           <Dialog.Description>{description}</Dialog.Description>
-          <div className={ui.dialogActions}>
+          <div className="mt-7 flex justify-end gap-2">
             <Dialog.Close asChild>
               <Button>Keep history</Button>
             </Dialog.Close>
@@ -147,7 +172,7 @@ export function Logo({ compact = false }: { compact?: boolean }) {
 }
 export function Shortcut() {
   return (
-    <span className={ui.shortcut} data-shortcut>
+    <span className="inline-flex items-center gap-1 align-middle" data-shortcut>
       <kbd className="inline-flex min-h-[23px] items-center justify-center rounded border border-line-strong bg-surface px-1.5 font-sans text-caption text-muted shadow-[0_1px_0_theme(colors.line)] group-[.sidebar]:border-graphite-line group-[.sidebar]:bg-graphite-raised group-[.sidebar]:text-inverse group-[.sidebar]:shadow-none">
         Right Alt
       </kbd>

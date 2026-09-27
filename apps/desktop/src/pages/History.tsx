@@ -5,7 +5,6 @@ import { toast } from 'sonner';
 import { api, useCopy, useHistory } from '../lib/api';
 import { duration } from '../lib/types';
 import { Button, Confirm, IconButton } from '../components/ui';
-import { ui } from '../design-system/classes';
 
 export function HistoryPage({ onRecord }: { onRecord: () => void }) {
   const [search, setSearch] = useState('');
@@ -28,7 +27,7 @@ export function HistoryPage({ onRecord }: { onRecord: () => void }) {
   );
   return (
     <>
-      <div className={ui.pageHeading}>
+      <div className="mb-7 flex items-center justify-between gap-5 [&_h1]:text-heading [&_h1]:font-semibold [&_h1]:tracking-[-.035em] [&_h1]:text-balance [&_p]:mt-2 [&_p]:text-ui [&_p]:text-muted max-[700px]:flex-wrap max-[700px]:items-start max-[700px]:gap-3 max-[700px]:[&_h1]:text-[26px]">
         <div>
           <h1>History</h1>
           <p>Recent transcripts saved on this device.</p>
@@ -47,8 +46,8 @@ export function HistoryPage({ onRecord }: { onRecord: () => void }) {
           />
         )}
       </div>
-      <div className={ui.historyToolbar}>
-        <label className={ui.searchField}>
+      <div className="mb-1 flex items-center justify-between gap-5 border-b border-line pb-5 [&>span]:shrink-0 [&>span]:text-caption [&>span]:text-muted max-[700px]:gap-3">
+        <label className="flex w-80 max-w-full items-center gap-2 rounded-control border border-line bg-surface px-3 text-muted focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent [&_input]:w-full [&_input]:min-w-0 [&_input]:border-0 [&_input]:bg-transparent [&_input]:py-2.5 [&_input]:text-ui [&_input]:text-ink [&_input]:outline-none [&_input]:placeholder:text-muted">
           <Search size={17} />
           <input
             type="search"
@@ -61,18 +60,18 @@ export function HistoryPage({ onRecord }: { onRecord: () => void }) {
         <span>{history.data?.length ?? 0} dictations</span>
       </div>
       {history.isPending ? (
-        <div className={ui.loadingSurface}>
+        <div className="flex flex-col gap-5 py-5 [&>div]:h-6 [&>div]:w-2/5 [&>div]:rounded-control [&>div]:bg-line [&>div:last-child]:h-72 [&>div:last-child]:w-full">
           <div />
           <div />
         </div>
       ) : history.isError ? (
-        <div className={ui.emptyState}>
+        <div className="px-5 py-16 [&_p]:mt-3 [&_p]:mb-6 [&_p]:text-muted">
           <h2>History couldn’t load.</h2>
           <p>{String(history.error)}</p>
           <Button onClick={() => void history.refetch()}>Try again</Button>
         </div>
       ) : !filtered.length ? (
-        <div className={ui.historyEmpty}>
+        <div className="flex flex-col items-center px-6 py-20 text-center [&_h2]:text-title [&_h2]:font-medium [&_p]:mt-2 [&_p]:mb-6 [&_p]:max-w-sm [&_p]:text-ui [&_p]:text-muted max-[700px]:px-0 max-[700px]:py-12 max-[700px]:[&_button]:whitespace-normal">
           <span className="mb-5 text-muted">
             <History size={30} strokeWidth={1.3} />
           </span>
@@ -93,8 +92,11 @@ export function HistoryPage({ onRecord }: { onRecord: () => void }) {
       ) : (
         <div>
           {filtered.map((item) => (
-            <article className={ui.historyItem} key={item.id}>
-              <div className={ui.historyMeta}>
+            <article
+              className="border-b border-line py-6 [&>p]:mt-3 [&>p]:whitespace-pre-wrap [&>p]:[overflow-wrap:anywhere] [&>p]:text-body [&>p]:leading-[1.85]"
+              key={item.id}
+            >
+              <div className="flex justify-between gap-3 text-caption text-muted tabular-nums [&>span_span]:px-1 max-[700px]:flex-wrap">
                 <time dateTime={new Date(item.createdAt).toISOString()}>
                   {new Intl.DateTimeFormat(undefined, {
                     month: 'short',
@@ -109,7 +111,7 @@ export function HistoryPage({ onRecord }: { onRecord: () => void }) {
               </div>
               <p>{item.text}</p>
               {item.originalText && (
-                <details className={ui.originalTranscript}>
+                <details className="my-4 text-ui text-muted [&_summary]:w-fit [&_summary]:cursor-pointer [&_summary]:py-1.5 [&_summary]:font-medium [&_p]:my-2 [&_p]:whitespace-pre-wrap [&_p]:[overflow-wrap:anywhere] [&_p]:text-body">
                   <summary>Original transcript</summary>
                   <p>{item.originalText}</p>
                   <Button variant="ghost" onClick={() => copy.mutate(item.originalText!)}>
@@ -117,7 +119,7 @@ export function HistoryPage({ onRecord }: { onRecord: () => void }) {
                   </Button>
                 </details>
               )}
-              <div className={ui.historyItemFooter}>
+              <div className="mt-3 flex items-center justify-between gap-3 [&>span]:text-caption [&>span]:text-muted [&>div]:flex [&>div]:gap-1 [&>div]:text-muted">
                 <span>
                   {item.delivery === 'pasted'
                     ? 'Paste sent'
@@ -142,7 +144,7 @@ export function HistoryPage({ onRecord }: { onRecord: () => void }) {
           ))}
         </div>
       )}
-      <footer className={ui.pageFooter}>
+      <footer className="mt-5 flex items-center justify-between gap-4 text-caption text-muted [&>span]:flex [&>span]:items-center [&>span]:gap-1.5 max-[700px]:flex-wrap max-[700px]:gap-2">
         <span>Up to 200 recent dictations. No cloud sync.</span>
         <span></span>
       </footer>
