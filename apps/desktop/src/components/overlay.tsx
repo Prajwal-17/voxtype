@@ -22,23 +22,12 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
         ? 'Cleaning up dictation'
         : 'Finishing transcription'
       : active
-        ? 'Recording'
-        : done
-          ? 'Transcript ready'
-          : 'Not recording';
-  const visibleStatus = failed
-    ? 'Recording interrupted'
-    : finishing
-      ? session.phase === 'cleaning'
-        ? 'Cleaning up'
-        : 'Finishing'
-      : active
         ? session.speechActive
           ? 'Speech detected'
           : 'Listening'
         : done
           ? 'Transcript ready'
-          : 'Ready';
+          : 'Not recording';
   const recover = () => {
     void api
       .openMain()
@@ -73,34 +62,15 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
       </button>
       <div
         className={cn(
-          'relative flex h-full min-w-0 flex-col items-center justify-center gap-0.5 overflow-hidden text-overlay-text',
+          'relative flex h-full min-w-0 items-center justify-center overflow-hidden text-overlay-text',
           failed && 'text-overlay-danger',
         )}
       >
         {finishing ? (
-          <div
-            className="flex h-7 w-24 shrink-0 items-center justify-center gap-1"
-            aria-hidden="true"
-          >
-            {Array.from({ length: 7 }, (_, index) => (
-              <motion.i
-                key={index}
-                className="w-0.5 shrink-0 rounded-[3px] bg-white"
-                style={{ height: `${6 + (1 - Math.abs(index - 3) / 3) * 8}px` }}
-                initial={false}
-                animate={
-                  reduced
-                    ? { scaleY: 0.65, opacity: 0.7 }
-                    : { scaleY: [0.35, 1, 0.35], opacity: [0.45, 1, 0.45] }
-                }
-                transition={
-                  reduced
-                    ? { duration: 0 }
-                    : { duration: 1.6, repeat: Infinity, ease: 'easeInOut', delay: index * -0.075 }
-                }
-              />
-            ))}
-          </div>
+          <ProcessingSignal
+            phase={session.phase === 'cleaning' ? 'cleaning' : 'finishing'}
+            reduced={Boolean(reduced)}
+          />
         ) : failed ? (
           <CircleAlert size={16} />
         ) : done ? (
@@ -108,12 +78,6 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
         ) : (
           <Waveform level={session.level} active={session.phase === 'listening'} overlay />
         )}
-        <span
-          className="max-w-full truncate text-caption leading-none font-medium"
-          aria-hidden="true"
-        >
-          {visibleStatus}
-        </span>
       </div>
       <button
         className="inline-flex size-8 items-center justify-center rounded-full border-0 bg-overlay-text p-0 text-navigation transition-[transform,background-color] duration-150 ease-out enabled:active:scale-[.97] enabled:hover:bg-inverse-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-overlay-text disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100"
@@ -128,6 +92,88 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
       <span className="sr-only" role={failed ? 'alert' : 'status'}>
         {status}
       </span>
+    </div>
+  );
+}
+
+function ProcessingSignal({
+  phase,
+  reduced,
+}: {
+  phase: 'finishing' | 'cleaning';
+  reduced: boolean;
+}) {
+  if (phase === 'cleaning') {
+    return (
+      <div
+        className="flex h-10 w-full max-w-44 flex-col justify-center gap-1.5"
+        data-signal="cleaning"
+        aria-hidden="true"
+      >
+        {[1, 0.82, 0.64].map((width, index) => (
+          <span
+            key={width}
+            className="relative block h-1 overflow-hidden rounded-full bg-overlay-raised"
+            style={{ width: `${width * 100}%` }}
+          >
+            <motion.i
+              className="absolute inset-y-0 left-0 block w-1/3 rounded-full bg-overlay-text"
+              initial={false}
+              animate={{ x: reduced ? '185%' : ['-110%', '310%'], opacity: reduced ? 0.7 : 1 }}
+              transition={
+                reduced
+                  ? { duration: 0 }
+                  : {
+                      duration: 1.15,
+                      repeat: Infinity,
+                      ease: [0.45, 0, 0.55, 1],
+                      delay: index * 0.12,
+                    }
+              }
+            />
+          </span>
+        ))}
+      </div>
+    );
+  }
+
+  const heights = [12, 18, 26, 34, 40, 34, 26, 18, 12];
+  return (
+    <div
+      className="flex h-10 w-full max-w-40 items-center justify-center gap-1"
+      data-signal="finishing"
+      aria-hidden="true"
+    >
+      {heights.map((height, index) => {
+        const offset = index - (heights.length - 1) / 2;
+        return (
+          <motion.i
+            key={`${height}-${index}`}
+            className="block w-1 rounded-full bg-current"
+            style={{ height }}
+            initial={false}
+            animate={
+              reduced
+                ? { scaleY: 0.62, opacity: 0.72 }
+                : {
+                    x: [offset * 1.5, 0, offset * 1.5],
+                    scaleY: [0.38, 1, 0.38],
+                    opacity: [0.34, 1, 0.34],
+                  }
+            }
+            transition={
+              reduced
+                ? { duration: 0 }
+                : {
+                    duration: 1.05,
+                    repeat: Infinity,
+                    ease: [0.45, 0, 0.55, 1],
+                    delay: Math.abs(offset) * 0.045,
+                  }
+            }
+          />
+        );
+      })}
     </div>
   );
 }

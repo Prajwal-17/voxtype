@@ -59,13 +59,14 @@ test('overlay window has transparent background and reduced motion support', asy
   await expect(page.getByRole('button', { name: 'Finish dictation' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Dismiss overlay' })).toBeVisible();
   await expect(page.getByRole('status')).toHaveText('Not recording');
-  await expect(page.getByText('Ready')).toBeVisible();
+  await expect(page.getByText('Ready')).toHaveCount(0);
   const overlay = page.getByLabel('Voice recording controls');
   await expect(overlay).toHaveCSS('width', '288px');
   await expect(overlay).toHaveCSS('height', '56px');
   await expect(overlay).toHaveClass(/rounded-full/);
   const meter = page.getByRole('meter', { name: 'Microphone level' });
   await expect(meter).toHaveCSS('width', '192px');
+  await expect(meter).toHaveCSS('height', '40px');
   await expect(meter.locator('span')).toHaveCount(23);
   await expect(page.getByRole('button', { name: 'Dismiss overlay' })).toHaveCSS('width', '32px');
   expect(await overlay.boundingBox()).toMatchObject({ x: 8, y: 8, width: 288, height: 56 });
@@ -89,10 +90,30 @@ test('overlay window has transparent background and reduced motion support', asy
       isTest: false,
     });
   });
-  await expect(page.getByText('Speech detected')).toBeVisible();
+  await expect(page.getByRole('status')).toHaveText('Speech detected');
   await expect(page.getByRole('button', { name: 'Cancel dictation' })).toBeEnabled();
   await expect(page.getByRole('button', { name: 'Finish dictation' })).toBeEnabled();
   await page.screenshot({ path: `${captures}/overlay.png` });
+
+  await page.evaluate(async () => {
+    // @ts-expect-error Vite resolves this browser-only module path during the test.
+    const { queryClient } = (await import('/src/lib/api.ts')) as ApiModule;
+    const current = queryClient.getQueryData(['session']) as Record<string, unknown>;
+    queryClient.setQueryData(['session'], { ...current, phase: 'finishing' });
+  });
+  await expect(page.getByRole('status')).toHaveText('Finishing transcription');
+  await expect(overlay.locator('[data-signal="finishing"]')).toBeVisible();
+  await page.screenshot({ path: `${captures}/overlay-finishing.png` });
+
+  await page.evaluate(async () => {
+    // @ts-expect-error Vite resolves this browser-only module path during the test.
+    const { queryClient } = (await import('/src/lib/api.ts')) as ApiModule;
+    const current = queryClient.getQueryData(['session']) as Record<string, unknown>;
+    queryClient.setQueryData(['session'], { ...current, phase: 'cleaning' });
+  });
+  await expect(page.getByRole('status')).toHaveText('Cleaning up dictation');
+  await expect(overlay.locator('[data-signal="cleaning"]')).toBeVisible();
+  await page.screenshot({ path: `${captures}/overlay-cleaning.png` });
 });
 
 test('review evidence covers compact help, filtering, and recovery states', async ({ page }) => {

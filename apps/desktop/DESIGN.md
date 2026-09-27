@@ -224,7 +224,7 @@ The palette is warm-neutral and low-noise, with mineral graphite reserved for pr
 
 **The Working Type Rule.** Reserve the timer scale for elapsed time and the transcript scale for dictated content. Ordinary interface copy stays compact.
 
-**The Explicit State Rule.** Never rely on color or iconography alone; state changes retain a concise text label.
+**The Explicit State Rule.** Never rely on color alone. Persistent application states retain a concise text label; the compact voice overlay may use distinct shape and motion when the same state is announced explicitly to assistive technology.
 
 ## Layout
 
@@ -302,7 +302,7 @@ The 40px by 24px switch uses a strong hairline fill when off, Mineral Graphite w
 
 ### Voice Overlay
 
-The system-wide overlay uses a compact 304px by 72px transparent window with a fully rounded 288px by 56px capsule, centered 24px above the active monitor work-area edge. Overlay Graphite, a quiet outline, and the floating shadow separate it from the working app without reading as a rectangular panel. Six-pixel internal padding pins the 32px cancel and finish controls to the ends while the center is given to a 192px waveform with 23 thick spring-driven bars. The explicit status label sits directly beneath it without stealing horizontal space. Motion appears only when useful and respects reduced-motion settings.
+The system-wide overlay uses a compact 304px by 72px transparent window with a fully rounded 288px by 56px capsule, centered 24px above the active monitor work-area edge. Overlay Graphite, a quiet outline, and the floating shadow separate it from the working app without reading as a rectangular panel. Six-pixel internal padding pins the 32px cancel and finish controls to the ends while the center is given to a 192px by 40px waveform with 23 thick spring-driven bars that can use almost the full capsule height. There is no visible status copy. Finishing gathers a compact set of audio bars toward the center; cleaning becomes three transcript-like tracks with a moving refinement pass. Screen-reader status remains explicit, and every motion has a reduced-motion state.
 
 ## Do's and Don'ts
 
@@ -310,7 +310,7 @@ The system-wide overlay uses a compact 304px by 72px transparent window with a f
 
 - **Do** keep the transcript visually dominant and the recorder action unambiguous.
 - **Do** reuse the centralized `--palette-*` values exposed through Tailwind theme aliases.
-- **Do** use text, iconography, and color together for recording, processing, success, warning, and error states.
+- **Do** combine text, iconography, shape, motion, and semantic color according to the surface; the textless voice overlay must keep explicit screen-reader announcements.
 - **Do** preserve visible keyboard focus, semantic controls, status announcements, and reduced-motion behavior.
 - **Do** use borders and tonal layering before reaching for elevation.
 - **Do** keep controls compact and align them to the 4px spacing foundation.
