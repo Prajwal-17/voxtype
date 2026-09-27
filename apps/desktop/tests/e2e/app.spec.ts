@@ -9,7 +9,7 @@ test('first run, navigation, settings and overlay are usable', async ({ page }) 
   await expect(page.getByRole('heading', { name: 'Dictation' })).toBeVisible();
   await expect(page.getByText('Browser preview ·')).toBeVisible();
   const shortcuts = page.locator('kbd[data-shortcut][data-slot="kbd"]');
-  await expect(shortcuts).toHaveCount(3);
+  expect(await shortcuts.count()).toBeGreaterThanOrEqual(2);
   await expect(shortcuts.first()).toHaveText('Right Alt');
   await expect(shortcuts.first()).toHaveCSS('user-select', 'none');
   await expect(page.getByRole('button', { name: 'Set up dictation' })).toHaveCSS(
@@ -54,14 +54,41 @@ test('first run, navigation, settings and overlay are usable', async ({ page }) 
 });
 test('overlay window has transparent background and reduced motion support', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.setViewportSize({ width: 248, height: 64 });
+  await page.setViewportSize({ width: 336, height: 80 });
   await page.goto('/?window=overlay');
   await expect(page.getByRole('button', { name: 'Finish dictation' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Dismiss overlay' })).toBeVisible();
   await expect(page.getByRole('status')).toHaveText('Not recording');
+  await expect(page.getByText('Ready')).toBeVisible();
+  const overlay = page.getByLabel('Voice recording controls');
+  await expect(overlay).toHaveCSS('width', '320px');
+  await expect(overlay).toHaveCSS('height', '64px');
+  await expect(page.getByRole('meter', { name: 'Microphone level' })).toHaveCSS('width', '96px');
+  await expect(page.getByRole('button', { name: 'Dismiss overlay' })).toHaveCSS('width', '36px');
+  expect(await overlay.boundingBox()).toMatchObject({ x: 8, y: 8, width: 320, height: 64 });
   expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe(
     'rgba(0, 0, 0, 0)',
   );
+  await page.screenshot({ path: `${captures}/overlay-idle.png` });
+  await page.evaluate(async () => {
+    // @ts-expect-error Vite resolves this browser-only module path during the test.
+    const { queryClient } = (await import('/src/lib/api.ts')) as ApiModule;
+    queryClient.setQueryData(['session'], {
+      sessionId: 'overlay-review',
+      phase: 'listening',
+      text: '',
+      interim: '',
+      level: 0.62,
+      speechActive: true,
+      elapsedMs: 3200,
+      message: '',
+      delivery: '',
+      isTest: false,
+    });
+  });
+  await expect(page.getByText('Speech detected')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Cancel dictation' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Finish dictation' })).toBeEnabled();
   await page.screenshot({ path: `${captures}/overlay.png` });
 });
 

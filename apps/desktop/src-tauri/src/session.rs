@@ -221,13 +221,31 @@ pub async fn start(app: AppHandle, test: bool, external: bool) -> Result<(), Str
     Ok(())
 }
 
+fn overlay_position(
+    area_position: tauri::PhysicalPosition<i32>,
+    area_size: tauri::PhysicalSize<u32>,
+    overlay_size: tauri::PhysicalSize<u32>,
+    gap: u32,
+) -> tauri::PhysicalPosition<i32> {
+    let x = area_position.x + (area_size.width.saturating_sub(overlay_size.width) / 2) as i32;
+    let y = area_position.y
+        + area_size
+            .height
+            .saturating_sub(overlay_size.height)
+            .saturating_sub(gap) as i32;
+    tauri::PhysicalPosition::new(x, y)
+}
+
 fn position_overlay(w: &tauri::WebviewWindow) {
-    if let (Ok(Some(monitor)), Ok(size)) = (w.current_monitor(), w.outer_size()) {
+    let monitor = w
+        .current_monitor()
+        .ok()
+        .flatten()
+        .or_else(|| w.primary_monitor().ok().flatten());
+    if let (Some(monitor), Ok(size)) = (monitor, w.outer_size()) {
         let area = monitor.work_area();
-        let gap = (16.0 * monitor.scale_factor()) as i32;
-        let x = area.position.x + (area.size.width as i32 - size.width as i32) / 2;
-        let y = area.position.y + area.size.height as i32 - size.height as i32 - gap;
-        let _ = w.set_position(tauri::PhysicalPosition::new(x, y));
+        let gap = (24.0 * monitor.scale_factor()).round() as u32;
+        let _ = w.set_position(overlay_position(area.position, area.size, size, gap));
     }
 }
 
@@ -645,6 +663,18 @@ async fn pump(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn overlay_is_centered_above_the_monitor_work_area_edge() {
+        let position = overlay_position(
+            tauri::PhysicalPosition::new(1920, 40),
+            tauri::PhysicalSize::new(2560, 1400),
+            tauri::PhysicalSize::new(672, 160),
+            48,
+        );
+        assert_eq!(position.x, 2864);
+        assert_eq!(position.y, 1232);
+    }
     use serde_json::json;
     fn frame(text: &str, final_: bool, start: f64) -> serde_json::Value {
         json!({"type":"Results","is_final":final_,"start":start,"duration":1.0,"channel":{"alternatives":[{"transcript":text}]}})

@@ -26,6 +26,19 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
         : done
           ? 'Transcript ready'
           : 'Not recording';
+  const visibleStatus = failed
+    ? 'Recording interrupted'
+    : finishing
+      ? session.phase === 'cleaning'
+        ? 'Cleaning up'
+        : 'Finishing'
+      : active
+        ? session.speechActive
+          ? 'Speech detected'
+          : 'Listening'
+        : done
+          ? 'Transcript ready'
+          : 'Ready';
   const recover = () => {
     void api
       .openMain()
@@ -34,9 +47,9 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
   return (
     <div
       className={cn(
-        'relative isolate m-2 grid h-9 w-30 grid-cols-[24px_minmax(0,1fr)_24px] items-center gap-1.5 rounded-floating bg-overlay p-1.5 text-white shadow-floating scheme-dark',
+        'relative isolate grid h-16 grid-cols-[36px_minmax(0,1fr)_36px] items-center gap-2 rounded-floating bg-overlay p-2 text-overlay-text shadow-floating scheme-dark',
         'before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border before:border-overlay-line before:opacity-80',
-        preview && 'mx-auto',
+        preview ? 'mx-auto mt-2 w-full' : 'm-2 w-[calc(100%-1rem)]',
       )}
       data-phase={session.phase}
       data-speaking={session.speechActive}
@@ -44,7 +57,7 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
       aria-busy={finishing}
     >
       <button
-        className="inline-flex size-6 items-center justify-center rounded-full border-0 bg-overlay-raised p-0 text-overlay-text transition-[transform,background-color] duration-150 ease-out enabled:active:scale-[.97] enabled:hover:bg-navigation-line enabled:hover:text-white disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100"
+        className="inline-flex size-9 items-center justify-center rounded-full border-0 bg-overlay-raised p-0 text-overlay-text transition-[transform,background-color] duration-150 ease-out enabled:active:scale-[.97] enabled:hover:bg-navigation-line enabled:hover:text-white focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-overlay-text disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100"
         title={active ? 'Cancel dictation' : 'Dismiss overlay'}
         aria-label={active ? 'Cancel dictation' : 'Dismiss overlay'}
         disabled={!!preview || cancel.isPending}
@@ -60,12 +73,15 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
       </button>
       <div
         className={cn(
-          'relative flex h-full min-w-0 items-center justify-center overflow-hidden text-white',
+          'relative flex h-full min-w-0 flex-col items-center justify-center gap-0.5 overflow-hidden text-overlay-text',
           failed && 'text-overlay-danger',
         )}
       >
         {finishing ? (
-          <div className="flex h-5 w-full items-center justify-center gap-0.75" aria-hidden="true">
+          <div
+            className="flex h-7 w-24 shrink-0 items-center justify-center gap-1"
+            aria-hidden="true"
+          >
             {Array.from({ length: 7 }, (_, index) => (
               <motion.i
                 key={index}
@@ -92,9 +108,15 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
         ) : (
           <Waveform level={session.level} active={session.phase === 'listening'} overlay />
         )}
+        <span
+          className="max-w-full truncate text-caption leading-none font-medium"
+          aria-hidden="true"
+        >
+          {visibleStatus}
+        </span>
       </div>
       <button
-        className="inline-flex size-6 items-center justify-center rounded-full border-0 bg-white p-0 text-navigation transition-transform duration-150 ease-out enabled:active:scale-[.97] disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100"
+        className="inline-flex size-9 items-center justify-center rounded-full border-0 bg-overlay-text p-0 text-navigation transition-[transform,background-color] duration-150 ease-out enabled:active:scale-[.97] enabled:hover:bg-inverse-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-overlay-text disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100"
         title={failed || done ? 'Open transcript' : 'Finish dictation'}
         aria-label={failed || done ? 'Open Flow to recover transcript' : 'Finish dictation'}
         disabled={!!preview || finishing || stop.isPending || (!active && !failed && !done)}
