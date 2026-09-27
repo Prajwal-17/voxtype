@@ -1,0 +1,1 @@
+VoxType app icon: original geometric voice symbol with five rounded asymmetric bars, authored in ../../public/voxtype.svg. Ivory field and graphite bars. Static 32px, 128px, and 256px PNG exports from the SVG master; the web SVG includes a brief reduced-motion-aware pulse. No stock or AI-generated imagery.

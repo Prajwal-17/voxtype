@@ -1,0 +1,125 @@
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Settings {
+    pub language: String,
+    pub microphone: String,
+    pub auto_paste: bool,
+    pub keep_history: bool,
+    pub cleanup_enabled: bool,
+    pub voice_detection: bool,
+    pub vocabulary: Vec<String>,
+}
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            language: "en".into(),
+            microphone: String::new(),
+            auto_paste: true,
+            keep_history: true,
+            cleanup_enabled: false,
+            voice_detection: true,
+            vocabulary: vec![],
+        }
+    }
+}
+impl Settings {
+    pub fn validate(&self) -> Result<(), String> {
+        if ![
+            "en", "en-US", "en-GB", "hi", "multi", "es", "fr", "de", "pt", "ja",
+        ]
+        .contains(&self.language.as_str())
+        {
+            return Err("Choose a supported transcription language.".into());
+        }
+        if self.microphone.len() > 512 || self.microphone.contains('\0') {
+            return Err("Invalid microphone name.".into());
+        }
+        if self.vocabulary.len() > 100
+            || self
+                .vocabulary
+                .iter()
+                .any(|x| x.is_empty() || x.len() > 100)
+        {
+            return Err("Use at most 100 vocabulary entries, each 1–100 characters.".into());
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HistoryItem {
+    pub id: String,
+    pub text: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub original_text: Option<String>,
+    pub created_at: u64,
+    pub duration_ms: u64,
+    pub words: usize,
+    pub delivery: String,
+}
+
+#[derive(Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Snapshot {
+    pub session_id: String,
+    pub phase: Phase,
+    pub text: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub original_text: Option<String>,
+    pub interim: String,
+    pub level: f32,
+    pub speech_active: bool,
+    pub elapsed_ms: u64,
+    pub message: String,
+    pub delivery: String,
+    pub is_test: bool,
+    pub cleanup_warning: String,
+}
+
+#[derive(Clone, Copy, Default, PartialEq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Phase {
+    #[default]
+    Idle,
+    Listening,
+    Finishing,
+    Cleaning,
+    Done,
+    Error,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Bootstrap {
+    pub settings: Settings,
+    pub has_key: bool,
+    pub key_error: Option<String>,
+    pub has_cleanup_key: bool,
+    pub cleanup_key_error: Option<String>,
+    pub snapshot: Snapshot,
+    pub shortcut_registered: bool,
+    pub version: String,
+}
+
+#[derive(Serialize)]
+pub struct Microphone {
+    pub id: String,
+    pub name: String,
+}
+
+#[derive(Serialize)]
+pub struct Diagnostic {
+    pub name: String,
+    pub status: String,
+    pub detail: String,
+}
+
+pub fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64
+}

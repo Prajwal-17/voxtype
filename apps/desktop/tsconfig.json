@@ -1,14 +1,4 @@
 {
-  "extends": "@flow/config/tsconfig.json",
-  "compilerOptions": {
-    "lib": [
-      "ES2022",
-      "DOM",
-      "DOM.Iterable"
-    ],
-    "allowImportingTsExtensions": true
-  },
-  "include": [
-    "src"
-  ]
+  "extends": "@flow/typescript-config/vite.json",
+  "include": ["src", "tests", "vite.config.ts", "vitest.config.ts", "playwright.config.ts"]
 }

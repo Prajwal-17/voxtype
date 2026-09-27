@@ -1,0 +1,47 @@
+@import 'tailwindcss';
+@import '@flow/design-system/web.css';
+
+@layer base {
+  * {
+    border-color: var(--palette-line);
+  }
+
+  html {
+    color-scheme: light;
+    scrollbar-color: var(--palette-line-strong) transparent;
+  }
+
+  body {
+    min-height: 100vh;
+  }
+
+  button,
+  a,
+  input,
+  textarea,
+  [role='button'] {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  ::selection {
+    background: var(--palette-accent-soft);
+    color: var(--palette-accent-ink);
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background: var(--palette-line-strong);
+    background-clip: padding-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--palette-faint);
+    background-clip: padding-box;
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "VoxType",
+  "version": "0.1.0",
+  "identifier": "com.flow.dictation",
+  "build": {
+    "beforeDevCommand": "pnpm dev:web",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "VoxType",
+        "visible": false,
+        "width": 1100,
+        "height": 760,
+        "minWidth": 760,
+        "minHeight": 600,
+        "center": true,
+        "backgroundColor": "#f3f4f5"
+      },
+      {
+        "label": "overlay",
+        "title": "VoxType dictation",
+        "url": "index.html?window=overlay",
+        "width": 288,
+        "height": 56,
+        "decorations": false,
+        "transparent": true,
+        "shadow": false,
+        "resizable": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "focus": false,
+        "focusable": false,
+        "visible": false,
+        "minWidth": 288,
+        "maxWidth": 288,
+        "minHeight": 56,
+        "maxHeight": 56
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost data:; font-src 'self'; connect-src ipc: http://ipc.localhost; object-src 'none'; base-uri 'self'; frame-src 'none'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["deb"],
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/icon.png"],
+    "category": "Utility",
+    "shortDescription": "Personal voice dictation",
+    "linux": {
+      "deb": {
+        "depends": [
+          "pulseaudio-utils",
+          "wl-clipboard",
+          "ydotool",
+          "ydotoold",
+          "xdotool",
+          "gnome-keyring",
+          "xclip"
+        ]
+      }
+    }
+  }
+}

@@ -1,22 +1,42 @@
 {
-  "$schema": "https://turborepo.com/schema.json",
+  "$schema": "https://turborepo.dev/schema.json",
+  "ui": "tui",
+  "globalPassThroughEnv": [
+    "DBUS_SESSION_BUS_ADDRESS",
+    "DISPLAY",
+    "GDK_BACKEND",
+    "PIPEWIRE_REMOTE",
+    "PULSE_SERVER",
+    "WAYLAND_DISPLAY",
+    "XDG_RUNTIME_DIR",
+    "XDG_SESSION_TYPE"
+  ],
   "tasks": {
     "build": {
-      "dependsOn": [
-        "^build"
-      ],
-      "outputs": [
-        "dist/**"
-      ]
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "env": ["TAURI_*", "VITE_*"],
+      "outputs": ["dist/**"]
     },
-    "typecheck": {
-      "dependsOn": [
-        "^typecheck"
-      ],
-      "outputs": []
+    "build:desktop": {
+      "dependsOn": ["build", "check-types"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "env": ["TAURI_*", "VITE_*"],
+      "outputs": ["src-tauri/target/release/bundle/**"]
+    },
+    "lint": {
+      "dependsOn": ["^lint"]
+    },
+    "check-types": {
+      "dependsOn": ["^check-types"]
     },
     "test": {
-      "outputs": []
+      "dependsOn": ["^build"],
+      "env": ["TAURI_WEBVIEW_AUTOMATION"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
     }
   }
 }
