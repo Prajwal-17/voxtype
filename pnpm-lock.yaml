@@ -138,37 +138,6 @@ importers:
 
   packages/typescript-config: {}
 
-  packages/ui:
-    dependencies:
-      react:
-        specifier: ^19.1.1
-        version: 19.3.0
-      react-dom:
-        specifier: ^19.1.1
-        version: 19.3.0(react@19.3.0)
-    devDependencies:
-      '@flow/eslint-config':
-        specifier: workspace:*
-        version: link:../eslint-config
-      '@flow/typescript-config':
-        specifier: workspace:*
-        version: link:../typescript-config
-      '@types/node':
-        specifier: ^24.0.0
-        version: 24.19.0
-      '@types/react':
-        specifier: ^19.1.0
-        version: 19.3.0
-      '@types/react-dom':
-        specifier: ^19.1.0
-        version: 19.3.0(@types/react@19.3.0)
-      eslint:
-        specifier: ^10.11.0
-        version: 10.11.0(jiti@2.7.0)
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-
 packages:
 
   '@babel/code-frame@7.29.7':

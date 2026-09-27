@@ -1,7 +1,7 @@
+import { QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { openUrl } from '@tauri-apps/plugin-opener';
-import { QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { toast } from 'sonner';
 import {
@@ -24,10 +24,12 @@ export const queryClient = new QueryClient({
     mutations: { retry: false, onError: (error) => toast.error(errorMessage(error)) },
   },
 });
+
 async function command<T>(name: string, args?: Record<string, unknown>): Promise<T> {
   if (!native) throw new Error('Open the installed Flow desktop app to use this feature.');
   return invoke<T>(name, args);
 }
+
 export const api = {
   bootstrap: () =>
     native
