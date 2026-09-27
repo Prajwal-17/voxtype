@@ -200,8 +200,7 @@
       { "name": "control", "value": "0 1px 1px rgb(34 35 31 / 0.05)", "purpose": "Minimal lift beneath secondary buttons." },
       { "name": "panel", "value": "0 1px 2px rgb(34 35 31 / 0.03), 0 8px 24px rgb(34 35 31 / 0.04)", "purpose": "Sticky save bars and restrained lifted panels." },
       { "name": "floating", "value": "0 8px 24px rgb(18 20 17 / 0.22)", "purpose": "The voice overlay, menus, tooltips, and overlay preview." },
-      { "name": "dialog", "value": "0 24px 80px rgb(18 20 17 / 0.18)", "purpose": "Modal and confirmation surfaces above a scrim." },
-      { "name": "kbd", "value": "0 1px 0 var(--palette-line-strong)", "purpose": "Minimal physical depth for keyboard shortcut keys." }
+      { "name": "dialog", "value": "0 24px 80px rgb(18 20 17 / 0.18)", "purpose": "Modal and confirmation surfaces above a scrim." }
     ],
     "motion": [
       { "name": "state-fast", "value": "150ms ease-out", "purpose": "Button, navigation, switch, and overlay state changes." },

@@ -475,7 +475,7 @@ function DesktopSetup({ registered, active }: { registered: boolean; active: boo
           <p className="mt-1 max-w-lg text-ui text-muted">
             {registered
               ? 'Press once to record. Press again to finish.'
-              : 'Enable Right Alt to start and stop dictation from any app.'}
+              : 'Enable the key below to start and stop dictation from any app.'}
           </p>
           <span className="mt-2 block">
             <Shortcut />
@@ -530,7 +530,7 @@ function DesktopSetup({ registered, active }: { registered: boolean; active: boo
       {expanded && (
         <div className="pt-4">
           <p className="mb-3 text-ui text-muted">
-            Right Alt toggles recording. Use the cancel button in the voice overlay to discard a
+            <Shortcut /> toggles recording. Use the cancel button in the voice overlay to discard a
             recording. Keep your cursor in the destination field while recording.
           </p>
           <p className="mb-3 text-ui text-muted">

@@ -91,6 +91,5 @@
   --shadow-panel: 0 1px 2px rgb(34 35 31 / 0.03), 0 8px 24px rgb(34 35 31 / 0.04);
   --shadow-floating: 0 8px 24px rgb(18 20 17 / 0.22);
   --shadow-dialog: 0 24px 80px rgb(18 20 17 / 0.18);
-  --shadow-kbd: 0 1px 0 var(--palette-line-strong);
   --ease-responsive: cubic-bezier(0.16, 1, 0.3, 1);
 }

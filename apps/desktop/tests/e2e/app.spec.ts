@@ -8,6 +8,10 @@ test('first run, navigation, settings and overlay are usable', async ({ page }) 
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Dictation' })).toBeVisible();
   await expect(page.getByText('Browser preview ·')).toBeVisible();
+  const shortcuts = page.locator('kbd[data-shortcut][data-slot="kbd"]');
+  await expect(shortcuts).toHaveCount(3);
+  await expect(shortcuts.first()).toHaveText('Right Alt');
+  await expect(shortcuts.first()).toHaveCSS('user-select', 'none');
   await expect(page.getByRole('button', { name: 'Set up dictation' })).toHaveCSS(
     'color',
     'rgb(246, 246, 242)',

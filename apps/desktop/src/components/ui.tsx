@@ -136,9 +136,5 @@ export function Logo({ compact = false, className }: { compact?: boolean; classN
 }
 
 export function Shortcut() {
-  return (
-    <span className="inline-flex items-center gap-1 align-middle" data-shortcut>
-      <Kbd>Right Alt</Kbd>
-    </span>
-  );
+  return <Kbd data-shortcut>Right Alt</Kbd>;
 }

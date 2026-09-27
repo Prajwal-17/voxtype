@@ -249,7 +249,7 @@ Flow is flat by default. Borders, subtle tonal changes, and adjacency establish 
 - **Panel:** `0 1px 2px rgb(34 35 31 / 0.03), 0 8px 24px rgb(34 35 31 / 0.04)` — sticky save bars and restrained lifted panels.
 - **Floating:** `0 8px 24px rgb(18 20 17 / 0.22)` — the voice overlay, menus, tooltips, and overlay preview.
 - **Dialog:** `0 24px 80px rgb(18 20 17 / 0.18)` — modal and confirmation surfaces above a graphite scrim.
-- **Keyboard Key:** `0 1px 0` in the strong hairline color — a minimal physical cue for shortcut keys.
+- **Keyboard Key:** A flat muted surface with compact type, following the shadcn `Kbd` primitive; shortcut labels never fall back to ad hoc borders or plain text.
 
 **The Flat-by-Default Rule.** Cards and settings sections use a border without a shadow. Apply elevation only when layering, stickiness, or detached placement requires it.
 

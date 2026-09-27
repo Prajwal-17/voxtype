@@ -113,7 +113,6 @@ export const shadow = {
   panel: '0 1px 2px rgb(34 35 31 / 0.03), 0 8px 24px rgb(34 35 31 / 0.04)',
   floating: '0 8px 24px rgb(18 20 17 / 0.22)',
   dialog: '0 24px 80px rgb(18 20 17 / 0.18)',
-  keyboardKey: `0 1px 0 ${color.lineStrong}`,
 } as const;
 
 export const tokens = {
