@@ -1,6 +1,6 @@
 import { Check, CircleAlert, X } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
-import clsx from 'clsx';
+import { cn } from '../lib/utils';
 import { toast } from 'sonner';
 import { api, useRecording, useSession } from '../lib/api';
 import { isActive, type Session } from '../lib/types';
@@ -31,8 +31,9 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
   };
   return (
     <div
-      className={clsx(
-        'relative isolate m-2 grid h-9 w-[120px] grid-cols-[24px_minmax(0,1fr)_24px] items-center gap-1.5 rounded-[18px] bg-[#080b09] p-1.5 text-white shadow-floating scheme-dark before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border before:border-[#39453d] before:opacity-80',
+      className={cn(
+        'relative isolate m-2 grid h-9 w-30 grid-cols-[24px_minmax(0,1fr)_24px] items-center gap-1.5 rounded-floating bg-overlay p-1.5 text-white shadow-floating scheme-dark',
+        'before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border before:border-overlay-line before:opacity-80',
         preview && 'mx-auto',
       )}
       data-phase={session.phase}
@@ -41,7 +42,7 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
       aria-busy={finishing}
     >
       <button
-        className="inline-flex size-6 items-center justify-center rounded-full border-0 bg-[#414442] p-0 text-[#e8eae8] transition-[transform,background-color] duration-150 ease-out enabled:active:scale-[.97] enabled:hover:bg-[#535754] enabled:hover:text-white disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100"
+        className="inline-flex size-6 items-center justify-center rounded-full border-0 bg-overlay-muted p-0 text-overlay-text transition-[transform,background-color] duration-150 ease-out enabled:active:scale-[.97] enabled:hover:bg-overlay-muted-hover enabled:hover:text-white disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100"
         title={active ? 'Cancel dictation' : 'Dismiss overlay'}
         aria-label={active ? 'Cancel dictation' : 'Dismiss overlay'}
         disabled={!!preview || cancel.isPending}
@@ -52,9 +53,9 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
         <X size={16} strokeWidth={1.8} />
       </button>
       <div
-        className={clsx(
+        className={cn(
           'relative flex h-full min-w-0 items-center justify-center overflow-hidden text-white',
-          failed && 'text-[#e7a398]',
+          failed && 'text-overlay-danger',
         )}
       >
         {finishing ? (
@@ -87,7 +88,7 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
         )}
       </div>
       <button
-        className="inline-flex size-6 items-center justify-center rounded-full border-0 bg-white p-0 text-[#151815] transition-transform duration-150 ease-out enabled:active:scale-[.97] disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100"
+        className="inline-flex size-6 items-center justify-center rounded-full border-0 bg-white p-0 text-overlay-ink transition-transform duration-150 ease-out enabled:active:scale-[.97] disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100"
         title={failed || done ? 'Open transcript' : 'Finish dictation'}
         aria-label={failed || done ? 'Open Flow to recover transcript' : 'Finish dictation'}
         disabled={!!preview || finishing || stop.isPending || (!active && !failed && !done)}

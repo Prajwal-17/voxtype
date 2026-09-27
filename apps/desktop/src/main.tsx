@@ -1,5 +1,5 @@
 import '@fontsource-variable/dm-sans';
-import * as Tooltip from '@radix-ui/react-tooltip';
+import { TooltipProvider } from './components/ui/tooltip';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { MotionConfig } from 'motion/react';
 import React from 'react';
@@ -28,7 +28,7 @@ function Root() {
   useNativeEvents();
   return (
     <MotionConfig reducedMotion="user">
-      <Tooltip.Provider delayDuration={500} skipDelayDuration={300}>
+      <TooltipProvider delayDuration={500} skipDelayDuration={300}>
         {overlay ? <VoiceOverlay /> : <App />}
         {!overlay && (
           <Toaster
@@ -41,7 +41,7 @@ function Root() {
             }}
           />
         )}
-      </Tooltip.Provider>
+      </TooltipProvider>
     </MotionConfig>
   );
 }

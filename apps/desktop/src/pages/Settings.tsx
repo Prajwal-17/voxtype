@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  ArrowUpRight,
   Check,
   ChevronDown,
   Eye,
@@ -12,28 +13,39 @@ import {
   RefreshCw,
   ShieldCheck,
   Square,
-  TriangleAlert,
-  ArrowUpRight,
   Trash2,
+  TriangleAlert,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, native, useRecording, useSession } from '../lib/api';
+import { cn } from '../lib/utils';
 import { parseVocabulary, settingsSchema, type Bootstrap, type Settings } from '../lib/types';
 import { Button, IconButton, Shortcut, Toggle } from '../components/ui';
+import { FieldRow, PageHeader, SectionHeader } from '../components/layout';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Textarea } from '../components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select';
 import { Waveform } from '../components/waveform';
 
 export function SettingsPage({ boot, active }: { boot: Bootstrap; active: boolean }) {
   return (
     <>
-      <div className="mb-7 flex items-center justify-between gap-5 [&_h1]:text-heading [&_h1]:font-semibold [&_h1]:tracking-[-.035em] [&_h1]:text-balance [&_p]:mt-2 [&_p]:text-ui [&_p]:text-muted max-[700px]:flex-wrap max-[700px]:items-start max-[700px]:gap-3 max-[700px]:[&_h1]:text-[26px]">
-        <div>
-          <h1>Settings</h1>
-          <p>Audio, transcription, and desktop integration.</p>
-        </div>
-        <span className="flex shrink-0 items-center gap-1.5 text-caption text-muted max-[1050px]:hidden">
-          <ShieldCheck size={14} /> On this device
-        </span>
-      </div>
+      <PageHeader
+        title="Settings"
+        description="Audio, transcription, and desktop integration."
+        actions={
+          <span className="flex shrink-0 items-center gap-1.5 text-caption text-muted max-lg:hidden">
+            <ShieldCheck size={14} /> On this device
+          </span>
+        }
+      />
       <div className="max-w-4xl">
         <ApiKey boot={boot} active={active} />
         <ApiKey boot={boot} active={active} provider="deepseek" />
@@ -83,22 +95,22 @@ function ApiKey({
   });
   return (
     <section className="mb-7 border-b border-line pb-7">
-      <div className="mb-5 [&_h2]:text-title [&_h2]:font-semibold [&_h2]:tracking-[-.02em] [&_p]:mt-1 [&_p]:text-ui [&_p]:text-muted">
-        <h2>{cleanup ? 'Text cleanup' : 'Deepgram connection'}</h2>
-        <p>
-          {cleanup
+      <SectionHeader
+        title={cleanup ? 'Text cleanup' : 'Deepgram connection'}
+        description={
+          cleanup
             ? 'DeepSeek V4.1 Flash removes fillers and tidies punctuation after transcription.'
-            : 'Audio streams directly from this device to Deepgram.'}
-        </p>
-      </div>
+            : 'Audio streams directly from this device to Deepgram.'
+        }
+      />
       {hasKey && !editing ? (
-        <div className="flex items-center gap-3 rounded-control bg-surface p-4 [&>div]:min-w-0 [&>div]:flex-1 [&_strong]:text-ui [&_strong]:font-medium [&_p]:mt-1 [&_p]:text-caption [&_p]:text-muted max-[1050px]:flex-wrap">
+        <div className="flex items-center gap-3 rounded-control bg-surface p-4 max-lg:flex-wrap">
           <span className="text-success">
             <KeyRound size={19} />
           </span>
-          <div>
-            <strong>API key saved securely</strong>
-            <p>
+          <div className="min-w-0 flex-1">
+            <strong className="text-ui font-medium">API key saved securely</strong>
+            <p className="mt-1 text-caption text-muted">
               {cleanup
                 ? 'Saved in your desktop keyring. Enable Clean up dictation below to use it.'
                 : 'Stored in your desktop keyring. Ready to try a dictation.'}
@@ -117,17 +129,18 @@ function ApiKey({
         </div>
       ) : (
         <form
-          className="[&>label]:mb-2 [&>label]:block [&>label]:text-ui [&>label]:font-medium"
           onSubmit={(e) => {
             e.preventDefault();
             save.mutate(key.trim());
           }}
         >
-          <label htmlFor={inputId}>{name} API key</label>
-          <div className="flex items-center gap-2 max-[700px]:flex-wrap">
-            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-control border border-line-strong bg-surface py-1 pr-1 pl-3 text-muted focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent max-[700px]:basis-full [&_input]:w-full [&_input]:min-w-0 [&_input]:border-0 [&_input]:bg-transparent [&_input]:py-1.5 [&_input]:text-ui [&_input]:text-ink [&_input]:outline-none [&_input]:placeholder:text-muted">
-              <KeyRound size={16} />
-              <input
+          <Label htmlFor={inputId} className="mb-2 block">
+            {name} API key
+          </Label>
+          <div className="flex items-center gap-2 max-md:flex-wrap">
+            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-control border border-line-strong bg-surface py-1 pr-1 pl-3 text-muted focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent max-md:basis-full">
+              <KeyRound size={16} className="shrink-0" />
+              <Input
                 id={inputId}
                 type={visible ? 'text' : 'password'}
                 autoComplete="off"
@@ -197,6 +210,19 @@ function ApiKey({
   );
 }
 
+const LANGUAGES = [
+  ['en', 'English'],
+  ['en-US', 'English (US)'],
+  ['en-GB', 'English (UK)'],
+  ['hi', 'Hindi'],
+  ['multi', 'Multilingual'],
+  ['es', 'Spanish'],
+  ['fr', 'French'],
+  ['de', 'German'],
+  ['pt', 'Portuguese'],
+  ['ja', 'Japanese'],
+] as const;
+
 function Preferences({ settings, active }: { settings: Settings; active: boolean }) {
   const [draft, setDraft] = useState(settings);
   const [vocabulary, setVocabulary] = useState(settings.vocabulary.join('\n'));
@@ -229,35 +255,36 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
       }}
     >
       <section className="mb-7 border-b border-line pb-7">
-        <div className="mb-5 [&_h2]:text-title [&_h2]:font-semibold [&_h2]:tracking-[-.02em] [&_p]:mt-1 [&_p]:text-ui [&_p]:text-muted">
-          <h2>Voice & language</h2>
-          <p>Choose your input device and transcription language.</p>
-        </div>
-        <div className="flex items-center justify-between gap-6 border-b border-line py-4 last:border-b-0 last:pb-0 [&>div:first-child]:min-w-0 [&_label]:text-ui [&_label]:font-medium [&_p]:mt-1 [&_p]:max-w-lg [&_p]:text-ui [&_p]:text-muted max-[1050px]:gap-4 max-[700px]:flex-wrap">
-          <div>
-            <label htmlFor="microphone">Microphone</label>
-            <p>Choose the input you use for dictation.</p>
-          </div>
-          <div className="flex shrink-0 items-center gap-1.5 max-[700px]:w-full max-[700px]:max-w-full [&>span]:max-[700px]:flex-1">
-            <span className="relative inline-flex max-w-full items-center [&_select]:w-48 [&_select]:max-w-full [&_select]:appearance-none [&_select]:truncate [&_select]:rounded-control [&_select]:border [&_select]:border-line-strong [&_select]:bg-surface [&_select]:py-2 [&_select]:pr-8 [&_select]:pl-3 [&_select]:text-ui [&_select]:text-ink [&>svg]:pointer-events-none [&>svg]:absolute [&>svg]:right-3 [&>svg]:text-muted max-[1050px]:[&_select]:w-42 max-[700px]:w-full max-[700px]:[&_select]:w-full">
-              <select
-                id="microphone"
-                value={draft.microphone}
-                onChange={(e) => set('microphone', e.target.value)}
-                disabled={active}
-              >
-                <option value="">System default</option>
+        <SectionHeader
+          title="Voice & language"
+          description="Choose your input device and transcription language."
+        />
+        <FieldRow
+          label="Microphone"
+          htmlFor="microphone"
+          description="Choose the input you use for dictation."
+        >
+          <div className="flex shrink-0 items-center gap-1.5 max-md:w-full max-md:max-w-full">
+            <Select
+              value={draft.microphone || '__default'}
+              onValueChange={(v) => set('microphone', v === '__default' ? '' : v)}
+              disabled={active}
+            >
+              <SelectTrigger id="microphone" aria-label="Microphone">
+                <SelectValue placeholder="System default" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__default">System default</SelectItem>
                 {microphones.data?.map((m) => (
-                  <option key={m.id} value={m.id}>
+                  <SelectItem key={m.id} value={m.id}>
                     {m.name}
-                  </option>
+                  </SelectItem>
                 ))}
                 {draft.microphone && !microphones.data?.some((m) => m.id === draft.microphone) && (
-                  <option value={draft.microphone}>Saved microphone (not connected)</option>
+                  <SelectItem value={draft.microphone}>Saved microphone (not connected)</SelectItem>
                 )}
-              </select>
-              <ChevronDown size={14} />
-            </span>
+              </SelectContent>
+            </Select>
             <IconButton
               type="button"
               label="Refresh microphones"
@@ -267,12 +294,12 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
               <RefreshCw size={15} className={microphones.isFetching ? 'animate-spin' : ''} />
             </IconButton>
           </div>
-        </div>
+        </FieldRow>
         {microphones.isError && (
           <p className="mt-2 text-ui text-danger">{String(microphones.error)}</p>
         )}
-        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-control bg-surface px-3 py-2 [&>div:first-child]:mr-auto [&>div:first-child]:flex [&>div:first-child]:items-center [&>div:first-child]:gap-2 [&>div:first-child]:text-caption [&>div:first-child]:text-muted">
-          <div>
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-control bg-surface px-3 py-2">
+          <div className="mr-auto flex items-center gap-2 text-caption text-muted">
             <Mic size={16} />
             <span>
               {session.isTest && active
@@ -298,54 +325,44 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
         </div>
         {session.isTest && session.message && (
           <p
-            className={
+            className={cn(
               session.phase === 'error'
                 ? 'mt-2 text-ui text-danger'
-                : 'mt-2 flex items-center gap-1.5 text-caption text-muted'
-            }
+                : 'mt-2 flex items-center gap-1.5 text-caption text-muted',
+            )}
             role={session.phase === 'error' ? 'alert' : 'status'}
           >
             {session.message}
           </p>
         )}
-        <div className="flex items-center justify-between gap-6 border-b border-line py-4 last:border-b-0 last:pb-0 [&>div:first-child]:min-w-0 [&_label]:text-ui [&_label]:font-medium [&_p]:mt-1 [&_p]:max-w-lg [&_p]:text-ui [&_p]:text-muted max-[1050px]:gap-4 max-[700px]:flex-wrap">
-          <div>
-            <label htmlFor="language">Language</label>
-            <p>Use multilingual for supported mixed-language speech.</p>
-          </div>
-          <span className="relative inline-flex max-w-full items-center [&_select]:w-48 [&_select]:max-w-full [&_select]:appearance-none [&_select]:truncate [&_select]:rounded-control [&_select]:border [&_select]:border-line-strong [&_select]:bg-surface [&_select]:py-2 [&_select]:pr-8 [&_select]:pl-3 [&_select]:text-ui [&_select]:text-ink [&>svg]:pointer-events-none [&>svg]:absolute [&>svg]:right-3 [&>svg]:text-muted max-[1050px]:[&_select]:w-42 max-[700px]:w-full max-[700px]:[&_select]:w-full">
-            <select
-              id="language"
-              value={draft.language}
-              onChange={(e) => set('language', e.target.value as Settings['language'])}
-              disabled={active}
-            >
-              {[
-                ['en', 'English'],
-                ['en-US', 'English (US)'],
-                ['en-GB', 'English (UK)'],
-                ['hi', 'Hindi'],
-                ['multi', 'Multilingual'],
-                ['es', 'Spanish'],
-                ['fr', 'French'],
-                ['de', 'German'],
-                ['pt', 'Portuguese'],
-                ['ja', 'Japanese'],
-              ].map(([value, label]) => (
-                <option key={value} value={value}>
+        <FieldRow
+          label="Language"
+          htmlFor="language"
+          description="Use multilingual for supported mixed-language speech."
+        >
+          <Select
+            value={draft.language}
+            onValueChange={(v) => set('language', v as Settings['language'])}
+            disabled={active}
+          >
+            <SelectTrigger id="language" aria-label="Language">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {LANGUAGES.map(([langValue, label]) => (
+                <SelectItem key={langValue} value={langValue}>
                   {label}
-                </option>
+                </SelectItem>
               ))}
-            </select>
-            <ChevronDown size={14} />
-          </span>
-        </div>
+            </SelectContent>
+          </Select>
+        </FieldRow>
       </section>
       <section className="mb-7 border-b border-line pb-7">
-        <div className="mb-5 [&_h2]:text-title [&_h2]:font-semibold [&_h2]:tracking-[-.02em] [&_p]:mt-1 [&_p]:text-ui [&_p]:text-muted">
-          <h2>Recording preferences</h2>
-          <p>Control text insertion and local storage.</p>
-        </div>
+        <SectionHeader
+          title="Recording preferences"
+          description="Control text insertion and local storage."
+        />
         <Toggle
           label="Detect speech locally"
           description="Use on-device voice detection to skip long pauses. A short lead-in and tail protect word boundaries. Turn off if quiet speech is missed."
@@ -376,28 +393,27 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
         />
       </section>
       <section className="mb-7 border-b border-line pb-7">
-        <div className="mb-5 [&_h2]:text-title [&_h2]:font-semibold [&_h2]:tracking-[-.02em] [&_p]:mt-1 [&_p]:text-ui [&_p]:text-muted">
-          <h2>Personal vocabulary</h2>
-          <p>Help Deepgram recognize names, projects, and technical terms.</p>
-        </div>
-        <label className="sr-only" htmlFor="vocabulary">
+        <SectionHeader
+          title="Personal vocabulary"
+          description="Help Deepgram recognize names, projects, and technical terms."
+        />
+        <Label className="sr-only" htmlFor="vocabulary">
           Personal vocabulary
-        </label>
-        <textarea
+        </Label>
+        <Textarea
           id="vocabulary"
-          className="block min-h-[108px] max-h-[260px] w-full resize-y rounded-control border border-line-strong bg-surface px-4 py-3 text-ui placeholder:text-muted"
           rows={4}
           placeholder={'One word or phrase per line\nFor example: Cloudflare Workers'}
           value={vocabulary}
           onChange={(e) => setVocabulary(e.target.value)}
           disabled={active}
         />
-        <div className="mt-2 flex justify-between gap-3 text-caption text-muted max-[700px]:flex-col max-[700px]:gap-1">
+        <div className="mt-2 flex justify-between gap-3 text-caption text-muted max-md:flex-col max-md:gap-1">
           <span>Recognition hints, not automatic replacements.</span>
           <span>{value.vocabulary.length} / 100 terms</span>
         </div>
       </section>
-      <div className="sticky bottom-0 z-10 mb-7 flex items-center justify-between gap-3 border-t border-line bg-canvas py-4 text-caption text-muted max-[700px]:items-start max-[700px]:[&>span]:max-w-[45%]">
+      <div className="sticky bottom-0 z-10 mb-7 flex items-center justify-between gap-3 border-t border-line bg-canvas py-4 text-caption text-muted">
         <span>
           {active
             ? 'Finish recording to change preferences.'
@@ -436,24 +452,28 @@ function DesktopSetup({ registered, active }: { registered: boolean; active: boo
   });
   return (
     <section className="mb-7 border-b-0 border-line pb-7">
-      <div className="mb-5 [&_h2]:text-title [&_h2]:font-semibold [&_h2]:tracking-[-.02em] [&_p]:mt-1 [&_p]:text-ui [&_p]:text-muted">
+      <div className="mb-5">
         <div className="flex items-center justify-between gap-4">
-          <h2>Ubuntu desktop setup</h2>
+          <h2 className="text-title font-semibold tracking-[-.02em]">Ubuntu desktop setup</h2>
           <Button variant="ghost" onClick={() => void checks.refetch()} loading={checks.isFetching}>
             <RefreshCw size={14} /> Check again
           </Button>
         </div>
-        <p>Check the services used for shortcuts and text insertion.</p>
+        <p className="mt-1 text-ui text-muted">
+          Check the services used for shortcuts and text insertion.
+        </p>
       </div>
-      <div className="mb-5 flex items-center justify-between gap-6 rounded-control border-0 bg-surface p-4 [&>div:first-child]:min-w-0 [&_[data-shortcut]]:mt-2 [&_label]:text-ui [&_label]:font-medium [&_p]:mt-1 [&_p]:max-w-lg [&_p]:text-ui [&_p]:text-muted max-[1050px]:gap-4 max-[700px]:flex-wrap">
-        <div>
-          <label>Recording shortcut</label>
-          <p>
+      <div className="mb-5 flex items-center justify-between gap-6 rounded-control border-0 bg-surface p-4 max-lg:gap-4 max-md:flex-wrap">
+        <div className="min-w-0">
+          <Label>Recording shortcut</Label>
+          <p className="mt-1 max-w-lg text-ui text-muted">
             {registered
               ? 'Press once to record. Press again to finish.'
               : 'Enable Right Alt to start and stop dictation from any app.'}
           </p>
-          <Shortcut />
+          <span className="mt-2 block">
+            <Shortcut />
+          </span>
         </div>
         <Button
           onClick={() => enable.mutate()}
@@ -464,27 +484,24 @@ function DesktopSetup({ registered, active }: { registered: boolean; active: boo
           {registered ? 'Reapply shortcut' : 'Enable shortcut'}
         </Button>
       </div>
-      <div className="grid grid-cols-2 gap-x-6 gap-y-5 max-[700px]:grid-cols-1">
+      <div className="grid grid-cols-2 gap-x-6 gap-y-5 max-md:grid-cols-1">
         {checks.isPending ? (
-          <p>
+          <p className="flex items-center gap-2 text-ui text-muted">
             <LoaderCircle size={16} className="animate-spin" /> Checking your desktop…
           </p>
         ) : checks.isError ? (
           <p className="mt-2 text-ui text-danger">{String(checks.error)}</p>
         ) : (
           checks.data?.map((check) => (
-            <div
-              className="flex items-start gap-2 [&>svg]:mt-0.5 [&_strong]:text-ui [&_strong]:font-medium [&_p]:mt-1 [&_p]:text-caption [&_p]:text-muted"
-              key={check.name}
-            >
+            <div className="flex items-start gap-2" key={check.name}>
               {check.status === 'ok' ? (
-                <Check className="text-success" size={16} />
+                <Check className="mt-0.5 text-success" size={16} />
               ) : (
-                <TriangleAlert className="text-warning" size={16} />
+                <TriangleAlert className="mt-0.5 text-warning" size={16} />
               )}
               <div>
-                <strong>{check.name}</strong>
-                <p>{check.detail}</p>
+                <strong className="text-ui font-medium">{check.name}</strong>
+                <p className="mt-1 text-caption text-muted">{check.detail}</p>
               </div>
             </div>
           ))
@@ -496,15 +513,19 @@ function DesktopSetup({ registered, active }: { registered: boolean; active: boo
         aria-expanded={expanded}
       >
         Shortcut & paste setup{' '}
-        <ChevronDown size={16} style={{ transform: expanded ? 'rotate(180deg)' : undefined }} />
+        <ChevronDown
+          size={16}
+          className="transition-transform duration-150"
+          style={{ transform: expanded ? 'rotate(180deg)' : undefined }}
+        />
       </button>
       {expanded && (
-        <div className="pt-4 [&_p]:mb-3 [&_p]:text-ui [&_p]:text-muted">
-          <p>
+        <div className="pt-4">
+          <p className="mb-3 text-ui text-muted">
             Right Alt toggles recording. Use the cancel button in the voice overlay to discard a
             recording. Keep your cursor in the destination field while recording.
           </p>
-          <p>
+          <p className="mb-3 text-ui text-muted">
             Wayland paste needs <code className="text-caption text-accent-ink">ydotoold</code>{' '}
             running with access to <code className="text-caption text-accent-ink">/dev/uinput</code>
             . The app checks the service; it does not change system permissions. The README includes

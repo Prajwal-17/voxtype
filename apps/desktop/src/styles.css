@@ -25,6 +25,13 @@
   --color-danger-soft: #fbecef;
   --color-warning: #875d21;
   --color-warning-soft: #fcf3e3;
+  --color-overlay: #080b09;
+  --color-overlay-line: #39453d;
+  --color-overlay-muted: #414442;
+  --color-overlay-muted-hover: #535754;
+  --color-overlay-text: #e8eae8;
+  --color-overlay-ink: #151815;
+  --color-overlay-danger: #e7a398;
   --text-caption: 0.75rem;
   --text-caption--line-height: 1.5;
   --text-ui: 0.8125rem;
@@ -44,5 +51,6 @@
   --radius-floating: 1.25rem;
   --shadow-floating: 0 6px 16px #10131930;
   --shadow-dialog: 0 20px 70px #10131930;
+  --shadow-kbd: 0 1px 0 var(--color-line);
   --ease-responsive: cubic-bezier(0.16, 1, 0.3, 1);
 }
