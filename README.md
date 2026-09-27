@@ -1,4 +1,4 @@
-# Flow
+# VoxType
 
 Personal dictation app. Streams mic audio to Deepgram and pastes the transcript into the focused app. Keys stay in the OS keyring.
 

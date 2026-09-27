@@ -1,5 +1,5 @@
 ---
-name: Flow Desktop
+name: VoxType Desktop
 description: A calm, precise desktop workspace for fast, recoverable dictation.
 colors:
   canvas: "#f4f4f1"
@@ -147,7 +147,7 @@ components:
     height: "2.5rem"
 ---
 
-# Design System: Flow Desktop
+# Design System: VoxType Desktop
 
 > The project-wide foundations live in [`../../DESIGN_SYSTEM.md`](../../DESIGN_SYSTEM.md) and `@flow/design-system`. This document defines the desktop composition and component adapter; it must not redefine the shared tokens.
 
@@ -155,7 +155,7 @@ components:
 
 **Creative North Star: "The Quiet Control Room"**
 
-Flow is a conventional premium desktop productivity workspace, played straight. Its warm paper canvas and deep graphite navigation frame a focused working area; a mineral graphite accent identifies interaction and recording state without turning the interface into a brand spectacle. The result should feel calm, capable, and immediately legible during a time-sensitive task.
+VoxType is a conventional premium desktop productivity workspace, played straight. Its warm paper canvas and deep graphite navigation frame a focused working area; a mineral graphite accent identifies interaction and recording state without turning the interface into a brand spectacle. The result should feel calm, capable, and immediately legible during a time-sensitive task.
 
 Hierarchy comes from compact Mona Sans typography, measured spacing, explicit state language, and consistent surface boundaries. Most UI remains visually quiet so the live transcript, waveform, timer, and primary recording action can carry the user's attention. Behavior stays familiar: controls are compact, states are named, and recoverability is always visible.
 
@@ -240,7 +240,7 @@ Spacing follows a dense 4px foundation. Repeated component gaps and padding use 
 
 ## Elevation & Depth
 
-Flow is flat by default. Borders, subtle tonal changes, and adjacency establish most hierarchy; elevation is reserved for surfaces that genuinely float or stay above moving content.
+VoxType is flat by default. Borders, subtle tonal changes, and adjacency establish most hierarchy; elevation is reserved for surfaces that genuinely float or stay above moving content.
 
 ### Shadow Vocabulary
 
@@ -255,7 +255,7 @@ Flow is flat by default. Borders, subtle tonal changes, and adjacency establish 
 
 ## Shapes
 
-Flow uses gently rounded geometry without soft, playful inflation. Controls use a 10px radius, panels use 14px, and detached floating chrome uses 16px. Menu rows tighten to 6px; badges, switches, status dots, waveform bars, and small overlay controls use full pills or circles. The logo mark uses a deliberate 9px corner between control and panel scale.
+VoxType uses gently rounded geometry without soft, playful inflation. Controls use a 10px radius, panels use 14px, and detached floating chrome uses 16px. Menu rows tighten to 6px; badges, switches, status dots, waveform bars, and small overlay controls use full pills or circles. The logo uses five custom graphite voice bars on an ivory tile, with a corner radius of one quarter of its width.
 
 Borders are one-pixel warm-gray hairlines. Strong hairlines belong to interactive field boundaries; standard hairlines define cards, dividers, and grouped regions. Panels clip content only when their internal header, body, and footer tones need a clean shared silhouette.
 
@@ -323,3 +323,7 @@ The system-wide overlay uses a compact 288px by 56px transparent window with a f
 - **Don't** hide critical recording state behind icon-only communication.
 - **Don't** replace the 960px stacked workspace with a diminished mobile-only experience.
 - **Don't** turn transcript, history, settings, or overlay behavior into decorative UI at the expense of recovery and control.
+
+## Brand
+
+The product name is **VoxType**, with capital V and T and no space, and the icon itself contains no letters. Display VoxType beside the icon in the desktop sidebar using Mona Sans Variable, 20px, weight 620, and -0.03em tracking. Hide only the wordmark in the compact navigation rail below 1024px. Use `public/voxtype.svg` as the single scalable mark: five rounded, asymmetric graphite voice bars on an ivory tile, displayed at 32px on desktop and mobile. The bars gently pulse twice on load (under five seconds), then settle; reduced-motion users see the static mark. This decorative entrance does not indicate microphone activity. Keep the accessible name VoxType. Native packaging uses only the existing static 32px, 128px, and 256px PNG exports. Internal package names, application identifier, keyring service, settings file, and GNOME binding path retain their legacy identifiers to preserve existing installations and data.

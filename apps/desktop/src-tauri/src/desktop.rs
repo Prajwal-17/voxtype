@@ -13,7 +13,7 @@ fn gnome_settings() -> Result<(gio::Settings, gio::Settings), String> {
     let source =
         gio::SettingsSchemaSource::default().ok_or("GNOME keyboard settings are unavailable.")?;
     if source.lookup(MEDIA_KEYS, true).is_none() || source.lookup(CUSTOM_KEY, true).is_none() {
-        return Err("Use your desktop's keyboard settings to bind Flow's command.".into());
+        return Err("Use your desktop's keyboard settings to bind VoxType's command.".into());
     }
     Ok((
         gio::Settings::new(MEDIA_KEYS),
@@ -41,17 +41,17 @@ pub fn install_shortcut() -> Result<(), String> {
             existing.string("binding").as_str(),
             "0x6c" | "0x6C" | "Alt_R" | "ISO_Level3_Shift"
         ) {
-            return Err(format!("Right Alt is already assigned to {}. Remove that binding in Ubuntu Settings, then enable Flow’s shortcut again.", existing.string("name")));
+            return Err(format!("Right Alt is already assigned to {}. Remove that binding in Ubuntu Settings, then enable VoxType’s shortcut again.", existing.string("name")));
         }
     }
     let executable =
-        std::env::current_exe().map_err(|_| "Could not locate the Flow executable.")?;
+        std::env::current_exe().map_err(|_| "Could not locate the VoxType executable.")?;
     let command = format!(
         "{} toggle",
         glib::shell_quote(executable.as_os_str()).to_string_lossy()
     );
     binding
-        .set_string("name", "Flow dictation")
+        .set_string("name", "VoxType dictation")
         .map_err(|e| e.to_string())?;
     binding
         .set_string("command", &command)
@@ -138,7 +138,7 @@ pub async fn copy(text: &str) -> Result<(), String> {
     .map_err(|_| "Could not copy the transcript.")?
     .success()
     .then_some(())
-    .ok_or_else(|| "Could not copy the transcript. It remains available in Flow.".into())
+    .ok_or_else(|| "Could not copy the transcript. It remains available in VoxType.".into())
 }
 #[derive(Debug, PartialEq)]
 pub enum KeySyntax {

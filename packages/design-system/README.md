@@ -1,6 +1,6 @@
 # @flow/design-system
 
-Shared visual foundations for every Flow client.
+Shared visual foundations for every VoxType client.
 
 - Import `@flow/design-system/web.css` after Tailwind in web or desktop apps.
 - Import tokens from `@flow/design-system` in platform-neutral TypeScript.

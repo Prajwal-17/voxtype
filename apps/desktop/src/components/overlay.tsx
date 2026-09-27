@@ -29,7 +29,9 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
   const recover = () => {
     void api
       .openMain()
-      .catch(() => toast.error('Flow couldn’t open the main window. Try again from the app icon.'));
+      .catch(() =>
+        toast.error('VoxType couldn’t open the main window. Try again from the app icon.'),
+      );
   };
   return (
     <div
@@ -53,7 +55,9 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
             ? cancel.mutate()
             : void api
                 .dismiss()
-                .catch(() => toast.error('The overlay couldn’t close. Use the main Flow window.'))
+                .catch(() =>
+                  toast.error('The overlay couldn’t close. Use the main VoxType window.'),
+                )
         }
       >
         <X size={15} strokeWidth={1.8} />
@@ -83,7 +87,7 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
       <button
         className="inline-flex size-8 items-center justify-center rounded-full border-0 bg-overlay-text p-0 text-navigation transition-[transform,background-color] duration-150 ease-out enabled:active:scale-[.97] enabled:hover:bg-inverse-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-overlay-text disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100"
         title={failed || done ? 'Open transcript' : 'Finish dictation'}
-        aria-label={failed || done ? 'Open Flow to recover transcript' : 'Finish dictation'}
+        aria-label={failed || done ? 'Open VoxType to recover transcript' : 'Finish dictation'}
         disabled={!!preview || finishing || stop.isPending || (!active && !failed && !done)}
         onClick={() => (failed || done ? recover() : stop.mutate())}
       >

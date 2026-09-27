@@ -10,7 +10,6 @@ import {
   KeyRound,
   Mic,
   Settings2,
-  ShieldCheck,
   Square,
   X,
 } from 'lucide-react';
@@ -59,21 +58,11 @@ export function App() {
     return () => window.removeEventListener('keydown', handler);
   }, [active, preview, cancel]);
 
-  const appStatus =
-    session.phase === 'listening'
-      ? 'Recording'
-      : active
-        ? 'Processing'
-        : boot.data?.hasKey
-          ? 'Ready'
-          : 'Setup required';
-
   return (
     <div className="min-h-screen bg-canvas text-ink selection:bg-accent-soft selection:text-accent-ink">
       <aside className="sidebar group fixed inset-y-0 left-0 z-30 flex w-60 flex-col border-r border-navigation-line bg-navigation p-4 text-inverse max-lg:w-20 max-lg:px-3">
         <div className="flex h-12 items-center px-2 max-lg:justify-center max-lg:px-0">
-          <Logo compact={false} className="max-lg:hidden" />
-          <Logo compact className="hidden max-lg:flex" />
+          <Logo />
         </div>
 
         <nav className="mt-7 flex flex-col gap-1" aria-label="Main navigation">
@@ -101,14 +90,6 @@ export function App() {
               <Shortcut />
             </span>
           </button>
-          <div className="flex items-start gap-2.5 px-2 py-2 text-caption text-inverse-muted">
-            <ShieldCheck size={15} className="mt-0.5 shrink-0" />
-            <span>
-              {boot.data?.settings.keepHistory
-                ? 'Transcripts stay on this device'
-                : 'Local transcript history is off'}
-            </span>
-          </div>
         </div>
         <div className="mt-auto hidden justify-center max-lg:flex">
           <IconButton
@@ -122,23 +103,6 @@ export function App() {
       </aside>
 
       <main className="ml-60 min-h-screen min-w-0 max-lg:ml-20">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b border-line bg-canvas px-8 max-md:px-5">
-          <span className="text-ui font-medium text-muted">Personal workspace</span>
-          <div className="flex items-center gap-3 text-ui text-muted">
-            <span
-              className={cn(
-                'flex items-center gap-2',
-                session.phase === 'listening' && 'text-accent-ink',
-              )}
-            >
-              <StatusDot live={session.phase === 'listening'} />
-              {appStatus}
-            </span>
-            <span className="h-4 w-px bg-line max-md:hidden" />
-            <span className="tabular-nums max-md:hidden">v{boot.data?.version ?? '0.1.0'}</span>
-          </div>
-        </header>
-
         {!native && (
           <div className="border-b border-warning/15 bg-warning-soft px-5 py-2 text-center text-caption font-medium text-warning">
             Browser preview · Open the desktop app to record.
@@ -147,7 +111,7 @@ export function App() {
 
         <div className="mx-auto w-full max-w-[1240px] px-8 py-9 max-md:px-5 max-md:py-7">
           {boot.isPending ? (
-            <div className="flex flex-col gap-4 py-4" aria-label="Loading Flow">
+            <div className="flex flex-col gap-4 py-4" aria-label="Loading VoxType">
               <Skeleton className="h-8 w-48" />
               <Skeleton className="h-5 w-80 max-w-full" />
               <div className="mt-5 grid grid-cols-[minmax(0,1fr)_19rem] gap-5 max-[960px]:grid-cols-1">
@@ -157,9 +121,11 @@ export function App() {
             </div>
           ) : boot.isError ? (
             <Card className="mx-auto max-w-xl p-8 text-center">
-              <h1 className="text-heading font-semibold tracking-[-.025em]">Flow couldn’t load</h1>
+              <h1 className="text-heading font-semibold tracking-[-.025em]">
+                VoxType couldn’t load
+              </h1>
               <p className="mx-auto mt-3 mb-6 max-w-md text-body text-muted">
-                Flow couldn’t load its local configuration. Your saved settings and history are
+                VoxType couldn’t load its local configuration. Your saved settings and history are
                 still on this device.
               </p>
               <Button variant="primary" onClick={() => void boot.refetch()}>
@@ -300,7 +266,7 @@ function Dictation({
                     ? session.isTest
                       ? 'Speak naturally to see the live microphone level.'
                       : 'Start speaking when you’re ready. Natural pauses are fine.'
-                    : 'Start a dictation, then speak naturally. Flow will keep the text ready to copy or paste.'}
+                    : 'Start a dictation, then speak naturally. VoxType will keep the text ready to copy or paste.'}
                 </p>
               </div>
             )}
@@ -446,20 +412,6 @@ function Dictation({
           )}
         </div>
       )}
-
-      <div className="mt-5 flex items-center gap-4 rounded-panel bg-subtle px-5 py-4 max-md:flex-wrap">
-        <Keyboard size={19} className="shrink-0 text-muted" />
-        <div className="min-w-0">
-          <h2 className="text-ui font-semibold">Dictate without switching windows</h2>
-          <p className="mt-0.5 text-caption text-muted">
-            Place your cursor, press <Shortcut />, speak, then press it again to finish.
-          </p>
-        </div>
-        <Button variant="ghost" size="sm" onClick={onSettings} className="ml-auto shrink-0">
-          {boot.shortcutRegistered ? 'Shortcut settings' : 'Enable shortcut'}{' '}
-          <ArrowRight size={14} />
-        </Button>
-      </div>
     </>
   );
 }

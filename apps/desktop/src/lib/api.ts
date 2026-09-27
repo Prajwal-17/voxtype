@@ -26,7 +26,7 @@ export const queryClient = new QueryClient({
 });
 
 async function command<T>(name: string, args?: Record<string, unknown>): Promise<T> {
-  if (!native) throw new Error('Open the installed Flow desktop app to use this feature.');
+  if (!native) throw new Error('Open the installed VoxType desktop app to use this feature.');
   return invoke<T>(name, args);
 }
 

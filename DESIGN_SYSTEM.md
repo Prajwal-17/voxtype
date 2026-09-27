@@ -1,6 +1,6 @@
-# Flow Design System
+# VoxType Design System
 
-Flow uses one visual language across desktop and future mobile clients: warm paper surfaces, graphite chrome, Mona Sans typography, and a single mineral interaction tone. The system is quiet, direct, and optimized for capturing and reviewing speech without visual noise.
+VoxType uses one visual language across desktop and future mobile clients: warm paper surfaces, graphite chrome, Mona Sans typography, and a single mineral interaction tone. The system is quiet, direct, and optimized for capturing and reviewing speech without visual noise.
 
 ## Architecture
 
@@ -46,7 +46,7 @@ Desktop controls may use 32 or 36 heights where pointer precision allows it. Tou
 
 ### Depth and motion
 
-Flow is flat by default. Borders and tonal surfaces establish structure; shadows are reserved for true layering such as dialogs, menus, sticky action bars, and the recording overlay.
+VoxType is flat by default. Borders and tonal surfaces establish structure; shadows are reserved for true layering such as dialogs, menus, sticky action bars, and the recording overlay.
 
 State transitions use 150ms ease-out. Larger layout transitions may use the shared responsive easing up to 220ms. Reduced-motion settings remove nonessential transforms and spatial transitions.
 

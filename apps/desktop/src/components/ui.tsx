@@ -1,4 +1,3 @@
-import { AudioLines } from 'lucide-react';
 import { useId, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { cn } from '../lib/utils';
 import {
@@ -119,18 +118,16 @@ export function Confirm({
   );
 }
 
-export function Logo({ compact = false, className }: { compact?: boolean; className?: string }) {
+export function Logo({ className }: { className?: string }) {
   return (
-    <div
-      className={cn(
-        'flex items-center gap-2.5 text-subheading font-semibold tracking-[-.015em] text-inverse',
-        className,
-      )}
-    >
-      <span className="grid size-8 place-items-center rounded-[9px] bg-accent text-white">
-        <AudioLines size={18} strokeWidth={2.1} />
+    <div role="img" aria-label="VoxType" className={cn('flex items-center gap-2.5', className)}>
+      <img src="/voxtype.svg" alt="" width={32} height={32} className="size-8 shrink-0" />
+      <span
+        aria-hidden="true"
+        className="font-sans text-subheading font-semibold tracking-[-.03em] text-inverse max-lg:hidden"
+      >
+        VoxType
       </span>
-      {!compact && <span>Flow</span>}
     </div>
   );
 }

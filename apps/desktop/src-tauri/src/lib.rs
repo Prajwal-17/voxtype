@@ -258,7 +258,7 @@ pub fn run() {
         ])
         .setup(|app| {
             let handle = app.handle();
-            // Reuse Flow's existing GNOME entry: this replaces the old chord and
+            // Reuse VoxType's existing GNOME entry: this replaces the old chord and
             // refreshes the executable path when switching between dev/release.
             let shortcut_ready = desktop::install_shortcut().is_ok();
             handle
@@ -277,12 +277,12 @@ pub fn run() {
                         None::<&str>,
                     )?,
                     &MenuItem::with_id(handle, "cancel", "Cancel dictation", true, None::<&str>)?,
-                    &MenuItem::with_id(handle, "settings", "Open Flow", true, None::<&str>)?,
-                    &MenuItem::with_id(handle, "quit", "Quit Flow", true, None::<&str>)?,
+                    &MenuItem::with_id(handle, "settings", "Open VoxType", true, None::<&str>)?,
+                    &MenuItem::with_id(handle, "quit", "Quit VoxType", true, None::<&str>)?,
                 ],
             )?;
             let mut tray = tauri::tray::TrayIconBuilder::new()
-                .tooltip("Flow · voice dictation")
+                .tooltip("VoxType · voice dictation")
                 .menu(&menu)
                 .on_menu_event(|app, event| {
                     if event.id.as_ref() == "quit" {
@@ -314,6 +314,6 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect(
-            "Flow could not start. Check that the desktop session and WebKitGTK are available.",
+            "VoxType could not start. Check that the desktop session and WebKitGTK are available.",
         );
 }

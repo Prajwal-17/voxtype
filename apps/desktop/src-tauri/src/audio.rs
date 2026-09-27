@@ -50,7 +50,7 @@ pub fn start(device: &str) -> Result<Capture, String> {
         "--rate=16000",
         "--channels=1",
         "--latency-msec=40",
-        "--client-name=Flow",
+        "--client-name=VoxType",
         "--stream-name=Dictation",
     ]);
     if !device.is_empty() {

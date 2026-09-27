@@ -84,7 +84,7 @@ export function HistoryPage({ onRecord }: { onRecord: () => void }) {
           <div className="px-6 py-16 text-center">
             <h2 className="text-title font-semibold">History couldn’t load</h2>
             <p className="mt-2 mb-5 text-body text-muted">
-              Flow couldn’t read your local history. Nothing was deleted.
+              VoxType couldn’t read your local history. Nothing was deleted.
             </p>
             <Button onClick={() => void history.refetch()}>Try again</Button>
           </div>
@@ -158,7 +158,7 @@ export function HistoryPage({ onRecord }: { onRecord: () => void }) {
                       ? 'Pasted into the active app'
                       : item.delivery === 'copied'
                         ? 'Copied to the clipboard'
-                        : 'Recorded in Flow'}
+                        : 'Recorded in VoxType'}
                   </span>
                   <div className="flex gap-1 text-muted">
                     <IconButton label="Copy transcript" onClick={() => copy.mutate(item.text)}>
@@ -180,7 +180,7 @@ export function HistoryPage({ onRecord }: { onRecord: () => void }) {
       </Card>
 
       <p className="mt-4 text-caption text-muted">
-        Flow keeps up to 200 dictations locally. Nothing is synced to the cloud.
+        VoxType keeps up to 200 dictations locally. Nothing is synced to the cloud.
       </p>
     </>
   );

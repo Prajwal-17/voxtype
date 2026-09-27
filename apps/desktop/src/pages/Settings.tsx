@@ -11,7 +11,6 @@ import {
   LockKeyhole,
   Mic,
   RefreshCw,
-  ShieldCheck,
   Square,
   Trash2,
   TriangleAlert,
@@ -37,15 +36,7 @@ import { Waveform } from '../components/waveform';
 export function SettingsPage({ boot, active }: { boot: Bootstrap; active: boolean }) {
   return (
     <>
-      <PageHeader
-        title="Settings"
-        description="Audio, transcription, and desktop integration."
-        actions={
-          <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-success-soft px-3 py-1.5 text-caption font-medium text-success max-lg:hidden">
-            <ShieldCheck size={14} /> Stored on this device
-          </span>
-        }
-      />
+      <PageHeader title="Settings" description="Audio, transcription, and desktop integration." />
       <div className="max-w-5xl">
         <ApiKey boot={boot} active={active} />
         <Preferences key={JSON.stringify(boot.settings)} settings={boot.settings} active={active} />
@@ -192,7 +183,7 @@ function ApiKey({
       {cleanup ? (
         <p className="mt-4 text-caption text-muted">
           Only the finished transcript is sent to DeepSeek. You can view and copy the original
-          transcript. If cleanup fails, Flow uses the original.
+          transcript. If cleanup fails, VoxType uses the original.
         </p>
       ) : (
         <p className="mt-4 text-caption text-muted">
@@ -301,7 +292,7 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
         </FieldRow>
         {microphones.isError && (
           <p className="mt-2 text-ui text-danger">
-            Flow couldn’t list microphones. Check that one is connected, then refresh.
+            VoxType couldn’t list microphones. Check that one is connected, then refresh.
           </p>
         )}
         <div className="mt-4 flex flex-wrap items-center gap-3 rounded-control bg-subtle px-3 py-2.5">
@@ -497,7 +488,7 @@ function DesktopSetup({ registered, active }: { registered: boolean; active: boo
           </p>
         ) : checks.isError ? (
           <p className="mt-2 text-ui text-danger">
-            Flow couldn’t check desktop services. Nothing was changed. Select Check again.
+            VoxType couldn’t check desktop services. Nothing was changed. Select Check again.
           </p>
         ) : (
           checks.data?.map((check) => (

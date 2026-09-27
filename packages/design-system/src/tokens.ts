@@ -1,5 +1,5 @@
 /**
- * Canonical, platform-neutral Flow design tokens.
+ * Canonical, platform-neutral VoxType design tokens.
  *
  * Numeric dimensions are density-independent values: CSS adapters convert them
  * to rem/px, while native adapters consume them as points or dp.

@@ -115,7 +115,7 @@ pub async fn start(app: AppHandle, test: bool, external: bool) -> Result<(), Str
             }
             Ok(true) if test => {
                 snapshot.phase = Phase::Done;
-                snapshot.message = "Microphone test complete. No audio was sent or saved.".into();
+                snapshot.message.clear();
             }
             Ok(true) => {
                 snapshot.phase = Phase::Done;
@@ -124,7 +124,7 @@ pub async fn start(app: AppHandle, test: bool, external: bool) -> Result<(), Str
                     snapshot.message =
                         "No speech detected. Check your microphone and try again.".into();
                 } else {
-                    // In-app recordings intentionally stay in Flow. External recordings paste into the focused application.
+                    // In-app recordings intentionally stay in VoxType. External recordings paste into the focused application.
                     snapshot.delivery = "saved".into();
                     snapshot.message = "Your transcript is ready.".into();
                     if external {
@@ -922,7 +922,7 @@ mod tests {
         let _ = rustls::crypto::ring::default_provider().install_default();
         let key = storage::key()
             .expect("Unlock the keyring")
-            .expect("Save a key in Flow first");
+            .expect("Save a key in VoxType first");
         let mut request = listen_url(&Settings::default())
             .unwrap()
             .as_str()

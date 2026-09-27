@@ -8,15 +8,15 @@ web
 
 ## Users
 
-Flow is for people on Ubuntu who dictate text while working across desktop applications. The core job is to start recording quickly, speak naturally, and deliver a usable transcript to the app that already has focus.
+VoxType is for people on Ubuntu who dictate text while working across desktop applications. The core job is to start recording quickly, speak naturally, and deliver a usable transcript to the app that already has focus.
 
 ## Product Purpose
 
-Flow is a personal desktop dictation utility. It streams microphone audio to Deepgram, optionally cleans the finished transcript with DeepSeek, and copies or pastes the result into the user's active application. Success means recording is easy to start and stop, state is always obvious, and the result is recoverable.
+VoxType is a personal desktop dictation utility. It streams microphone audio to Deepgram, optionally cleans the finished transcript with DeepSeek, and copies or pastes the result into the user's active application. Success means recording is easy to start and stop, state is always obvious, and the result is recoverable.
 
 ## Positioning
 
-Flow combines an app-level recording workspace with a system-wide Right Alt shortcut and compact overlay, so dictation can begin and finish without leaving the destination application.
+VoxType combines an app-level recording workspace with a system-wide Right Alt shortcut and compact overlay, so dictation can begin and finish without leaving the destination application.
 
 ## Operating Context
 
@@ -36,7 +36,7 @@ Flow combines an app-level recording workspace with a system-wide Right Alt shor
 
 ## Brand Commitments
 
-- Product name: Flow.
+- Product name: VoxType.
 - Voice: concise, calm, direct, and operational.
 - The user requested a simple, clean, usable, premium application UI, a new palette centralized in global CSS, Tailwind throughout, and shadcn components as the base.
 

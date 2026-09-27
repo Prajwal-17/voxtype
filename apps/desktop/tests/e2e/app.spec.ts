@@ -170,7 +170,7 @@ test('review evidence covers compact help, filtering, and recovery states', asyn
   });
   await expect(page.getByRole('heading', { name: 'History couldn’t load' })).toBeVisible();
   await expect(
-    page.getByText('Flow couldn’t read your local history. Nothing was deleted.'),
+    page.getByText('VoxType couldn’t read your local history. Nothing was deleted.'),
   ).toBeVisible();
   await page.screenshot({ path: `${captures}/history-error.png`, fullPage: false });
 });

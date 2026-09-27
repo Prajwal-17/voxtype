@@ -1,1 +1,1 @@
-Flow app icon: original geometric audio bars drawn programmatically for this application; 256px master, olive field and ivory bars. No stock or generated imagery. Mirrors the Lucide AudioLines brand motif in the UI.
+VoxType app icon: original geometric voice symbol with five rounded asymmetric bars, authored in ../../public/voxtype.svg. Ivory field and graphite bars. Static 32px, 128px, and 256px PNG exports from the SVG master; the web SVG includes a brief reduced-motion-aware pulse. No stock or AI-generated imagery.
