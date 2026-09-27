@@ -9,8 +9,8 @@ test('first run, navigation, settings and overlay are usable', async ({ page }) 
   await expect(page.getByText('Browser preview ·')).toBeVisible();
   await mkdir(captures, { recursive: true });
   await page.screenshot({ path: `${captures}/desktop.png`, fullPage: false });
-  await page.getByRole('button', { name: 'Preview voice overlay' }).click();
-  await expect(page.getByText('Overlay preview · idle state')).toBeVisible();
+  await page.getByRole('button', { name: 'Voice overlay' }).click();
+  await expect(page.getByText('Voice overlay · idle')).toBeVisible();
   await page.screenshot({ path: `${captures}/overlay-preview.png`, fullPage: false });
   await page.getByRole('button', { name: 'Close preview' }).click();
   await page.getByRole('button', { name: 'History', exact: true }).click();
@@ -21,11 +21,12 @@ test('first run, navigation, settings and overlay are usable', async ({ page }) 
   await page.screenshot({ path: `${captures}/history.png`, fullPage: false });
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
-  await page.getByLabel('API key', { exact: true }).fill('not-a-real-api-key');
-  await expect(page.getByLabel('API key', { exact: true })).toHaveAttribute('type', 'password');
-  await page.getByRole('button', { name: 'Show API key' }).click();
-  await expect(page.getByLabel('API key', { exact: true })).toHaveAttribute('type', 'text');
-  await page.getByLabel('API key', { exact: true }).fill('');
+  const deepgramKey = page.getByLabel('Deepgram API key', { exact: true });
+  await deepgramKey.fill('not-a-real-api-key');
+  await expect(deepgramKey).toHaveAttribute('type', 'password');
+  await deepgramKey.locator('..').getByRole('button', { name: 'Show API key' }).click();
+  await expect(deepgramKey).toHaveAttribute('type', 'text');
+  await deepgramKey.fill('');
   await page.getByRole('switch', { name: 'Paste when I finish' }).click();
   await expect(page.getByText('You have unsaved changes.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Save preferences' })).toBeDisabled();
@@ -46,9 +47,7 @@ test('overlay window has transparent background and reduced motion support', asy
   await page.goto('/?window=overlay');
   await expect(page.getByRole('button', { name: 'Finish dictation' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Dismiss overlay' })).toBeVisible();
-  expect(
-    await page.locator('.voice-overlay').evaluate((el) => (el as HTMLElement).innerText.trim()),
-  ).toBe('Not recording');
+  await expect(page.getByRole('status')).toHaveText('Not recording');
   expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe(
     'rgba(0, 0, 0, 0)',
   );

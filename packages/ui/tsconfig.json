@@ -1,0 +1,9 @@
+{
+  "extends": "@flow/typescript-config/react-library.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "strictNullChecks": true
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"]
+}

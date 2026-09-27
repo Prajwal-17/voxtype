@@ -1,0 +1,56 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "ui": "tui",
+  "globalPassThroughEnv": [
+    "DBUS_SESSION_BUS_ADDRESS",
+    "DISPLAY",
+    "GDK_BACKEND",
+    "PIPEWIRE_REMOTE",
+    "PULSE_SERVER",
+    "WAYLAND_DISPLAY",
+    "XDG_RUNTIME_DIR",
+    "XDG_SESSION_TYPE"
+  ],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "env": ["TAURI_*", "VITE_*"],
+      "outputs": ["dist/**"]
+    },
+    "build:desktop": {
+      "dependsOn": ["build", "check-types"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "env": ["TAURI_*", "VITE_*"],
+      "outputs": ["src-tauri/target/release/bundle/**"]
+    },
+    "lint": {
+      "dependsOn": ["^lint"]
+    },
+    "check-types": {
+      "dependsOn": ["^check-types"]
+    },
+    "check:rust": {},
+    "test": {
+      "dependsOn": ["^build"],
+      "env": ["PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH", "TAURI_WEBVIEW_AUTOMATION"]
+    },
+    "test:web": {},
+    "test:rust": {
+      "env": ["TAURI_WEBVIEW_AUTOMATION"]
+    },
+    "test:e2e": {
+      "cache": false,
+      "env": ["PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH", "TAURI_WEBVIEW_AUTOMATION"],
+      "outputs": ["playwright-report/**", "test-results/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "dev:web": {
+      "cache": false,
+      "persistent": true
+    }
+  }
+}

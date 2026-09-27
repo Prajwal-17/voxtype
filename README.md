@@ -6,7 +6,7 @@ This branch replaces the Neutralino prototype. There is **no Cloudflare server, 
 
 ## Run on Ubuntu
 
-Requirements: Node 22+, pnpm 10, a recent stable Rust toolchain, and Ubuntu desktop libraries.
+Requirements: Node 24+, pnpm 10, a recent stable Rust toolchain, and Ubuntu desktop libraries.
 
 ```sh
 sudo apt-get install -y build-essential pkg-config libwebkit2gtk-4.1-dev \
@@ -102,13 +102,42 @@ No builds, automated tests, or live provider calls were run for this addition; e
 ## Development and verification
 
 ```sh
-pnpm typecheck
+pnpm build
+pnpm lint
+pnpm check-types
+pnpm check
 pnpm test
 pnpm test:e2e
 pnpm check:rust
 pnpm test:rust
-cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml --check
 ```
+
+The workspace uses Turborepo. Root commands delegate to package scripts, so `pnpm build`,
+`pnpm lint`, `pnpm check-types`, and `pnpm test` run the matching task across every applicable
+workspace. Use `pnpm dev` for the native Tauri app and `pnpm dev:web` for the browser preview.
+Formatting remains a root operation because it rewrites the whole repository; `pnpm check` runs
+format verification followed by Turbo's lint and type-check graph.
+
+The default `create-turbo` package roles are present under `packages/`:
+
+- `@flow/eslint-config`: shared ESLint flat configurations, including Turbo environment checks.
+- `@flow/typescript-config`: shared base, React-library, and Vite TypeScript configurations.
+- `@flow/ui`: the starter shared React component package and component generator entrypoint.
+
+### Environment variables
+
+Turbo runs in strict environment mode. Variables that can affect cached outputs are declared in
+`turbo.json`:
+
+- `VITE_*` and `TAURI_*` participate in build and desktop-package cache keys.
+- `TAURI_WEBVIEW_AUTOMATION` participates in native test and browser-test cache behavior.
+- `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` selects the browser binary for end-to-end tests.
+- Desktop session variables such as `DISPLAY`, `WAYLAND_DISPLAY`, `XDG_SESSION_TYPE`,
+  `XDG_RUNTIME_DIR`, `DBUS_SESSION_BUS_ADDRESS`, and audio-session variables are passed through to
+  native development and tests without becoming global cache inputs.
+
+Local `.env*` files are included in build inputs and remain gitignored. Only variables prefixed
+with `VITE_` are exposed to browser code; provider credentials continue to live in the OS keyring.
 
 Browser tests use an installed Google Chrome when available, otherwise Playwright Chromium (`pnpm --filter @flow/desktop exec playwright install chromium`). They check navigation, secret-input handling, preferences, empty states, overlay transparency, and the minimum desktop layout. Local Rust WebSocket tests use synthetic audio and never call Deepgram.
 

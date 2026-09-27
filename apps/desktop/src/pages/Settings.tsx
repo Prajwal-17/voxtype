@@ -224,7 +224,7 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
         e.preventDefault();
         const parsed = settingsSchema.safeParse(value);
         if (!parsed.success) {
-          toast.error(parsed.error.issues[0].message);
+          toast.error(parsed.error.issues[0]?.message ?? 'Check your preference values.');
           return;
         }
         save.mutate(parsed.data);

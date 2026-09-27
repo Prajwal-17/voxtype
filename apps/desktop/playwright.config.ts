@@ -14,5 +14,5 @@ export default defineConfig({
       args: ['--no-sandbox'],
     },
   },
-  webServer: { command: 'pnpm dev', url: 'http://127.0.0.1:1420', reuseExistingServer: true },
+  webServer: { command: 'pnpm dev:web', url: 'http://127.0.0.1:1420', reuseExistingServer: true },
 });
