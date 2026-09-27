@@ -36,7 +36,7 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
       className={cn(
         'relative isolate grid h-10 grid-cols-[32px_minmax(0,1fr)_32px] items-center gap-1 rounded-full bg-overlay p-1 text-overlay-text shadow-floating scheme-dark',
         'before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border before:border-overlay-line before:opacity-80',
-        preview ? 'mx-auto mt-2 w-72' : 'm-2 w-[calc(100%-1rem)]',
+        preview ? 'mx-auto mt-2 w-[272px]' : 'm-2 w-[calc(100%-1rem)]',
       )}
       data-phase={session.phase}
       data-speaking={session.speechActive}
