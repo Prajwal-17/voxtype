@@ -1,4 +1,4 @@
-import { Check, CircleAlert, X } from 'lucide-react';
+import { Check, CircleAlert, Sparkles, X } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import { cn } from '../lib/utils';
 import { toast } from 'sonner';
@@ -106,33 +106,11 @@ function ProcessingSignal({
   if (phase === 'cleaning') {
     return (
       <div
-        className="flex h-10 w-full max-w-44 flex-col justify-center gap-1.5"
+        className="flex h-10 w-full max-w-44 items-center justify-center"
         data-signal="cleaning"
         aria-hidden="true"
       >
-        {[1, 0.82, 0.64].map((width, index) => (
-          <span
-            key={width}
-            className="relative block h-1 overflow-hidden rounded-full bg-overlay-raised"
-            style={{ width: `${width * 100}%` }}
-          >
-            <motion.i
-              className="absolute inset-y-0 left-0 block w-1/3 rounded-full bg-overlay-text"
-              initial={false}
-              animate={{ x: reduced ? '185%' : ['-110%', '310%'], opacity: reduced ? 0.7 : 1 }}
-              transition={
-                reduced
-                  ? { duration: 0 }
-                  : {
-                      duration: 1.15,
-                      repeat: Infinity,
-                      ease: [0.45, 0, 0.55, 1],
-                      delay: index * 0.12,
-                    }
-              }
-            />
-          </span>
-        ))}
+        <Sparkles size={20} strokeWidth={1.8} />
       </div>
     );
   }

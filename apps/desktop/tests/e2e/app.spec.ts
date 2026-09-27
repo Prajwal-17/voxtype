@@ -112,7 +112,9 @@ test('overlay window has transparent background and reduced motion support', asy
     queryClient.setQueryData(['session'], { ...current, phase: 'cleaning' });
   });
   await expect(page.getByRole('status')).toHaveText('Cleaning up dictation');
-  await expect(overlay.locator('[data-signal="cleaning"]')).toBeVisible();
+  const cleaningSignal = overlay.locator('[data-signal="cleaning"]');
+  await expect(cleaningSignal.locator('svg')).toBeVisible();
+  await expect(cleaningSignal.locator('i')).toHaveCount(0);
   await page.screenshot({ path: `${captures}/overlay-cleaning.png` });
 });
 

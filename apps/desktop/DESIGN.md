@@ -302,7 +302,7 @@ The 40px by 24px switch uses a strong hairline fill when off, Mineral Graphite w
 
 ### Voice Overlay
 
-The system-wide overlay uses a compact 304px by 72px transparent window with a fully rounded 288px by 56px capsule, centered 24px above the active monitor work-area edge. Overlay Graphite, a quiet outline, and the floating shadow separate it from the working app without reading as a rectangular panel. Six-pixel internal padding pins the 32px cancel and finish controls to the ends while the center is given to a 192px by 40px waveform with 23 thick spring-driven bars that can use almost the full capsule height. There is no visible status copy. Finishing gathers a compact set of audio bars toward the center; cleaning becomes three transcript-like tracks with a moving refinement pass. Screen-reader status remains explicit, and every motion has a reduced-motion state.
+The system-wide overlay uses a compact 304px by 72px transparent window with a fully rounded 288px by 56px capsule, centered 24px above the active monitor work-area edge. Overlay Graphite, a quiet outline, and the floating shadow separate it from the working app without reading as a rectangular panel. Six-pixel internal padding pins the 32px cancel and finish controls to the ends while the center is given to a 192px by 40px waveform with 23 thick spring-driven bars that can use almost the full capsule height. There is no visible status copy. Finishing gathers a compact set of audio bars toward the center; cleaning uses a quiet static cleanup mark rather than another looping animation. Screen-reader status remains explicit, and every motion has a reduced-motion state.
 
 ## Do's and Don'ts
 
