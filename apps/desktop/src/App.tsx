@@ -275,7 +275,7 @@ function Dictation({
 
           <div className="min-w-0 flex-1 px-7 py-7 max-md:px-5 max-md:py-6">
             {text && !session.isTest ? (
-              <p className="max-h-[390px] overflow-auto whitespace-pre-wrap [overflow-wrap:anywhere] text-transcript font-[450] tracking-[-.01em]">
+              <p className="max-h-[390px] overflow-auto whitespace-pre-wrap [overflow-wrap:anywhere] text-transcript font-transcript tracking-[-.01em]">
                 <span>{session.text}</span>
                 {session.interim && <span className="text-muted"> {session.interim}</span>}
                 {active && (

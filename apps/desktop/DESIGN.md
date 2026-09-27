@@ -149,6 +149,8 @@ components:
 
 # Design System: Flow Desktop
 
+> The project-wide foundations live in [`../../DESIGN_SYSTEM.md`](../../DESIGN_SYSTEM.md) and `@flow/design-system`. This document defines the desktop composition and component adapter; it must not redefine the shared tokens.
+
 ## Overview
 
 **Creative North Star: "The Quiet Control Room"**

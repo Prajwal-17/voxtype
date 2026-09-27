@@ -1,0 +1,33 @@
+{
+  "name": "@flow/design-system",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": [
+    "./src/web.css"
+  ],
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./native": {
+      "types": "./src/native.ts",
+      "default": "./src/native.ts"
+    },
+    "./web.css": "./src/web.css"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "lint": "eslint . --max-warnings 0",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@flow/eslint-config": "workspace:*",
+    "@flow/typescript-config": "workspace:*",
+    "@types/node": "^24.0.0",
+    "eslint": "^10.11.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

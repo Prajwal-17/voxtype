@@ -2,6 +2,10 @@
 
 Personal dictation app. Streams mic audio to Deepgram and pastes the transcript into the focused app. Keys stay in the OS keyring.
 
+## Design system
+
+Shared color, typography, spacing, motion, and component contracts live in [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md) and `packages/design-system`. Desktop consumes the Tailwind adapter today; future Expo or React Native clients can consume the native theme from the same package.
+
 ## Requirements
 
 Node 24+, pnpm 10, Rust stable, Ubuntu desktop libs:

@@ -20,6 +20,9 @@ importers:
 
   apps/desktop:
     dependencies:
+      '@flow/design-system':
+        specifier: workspace:*
+        version: link:../../packages/design-system
       '@fontsource-variable/mona-sans':
         specifier: ^5.3.0
         version: 5.3.0
@@ -126,6 +129,27 @@ importers:
       vite:
         specifier: ^7.1.0
         version: 7.3.6(@types/node@24.19.0)(jiti@2.7.0)(lightningcss@1.33.0)
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@24.19.0)(jiti@2.7.0)(lightningcss@1.33.0)
+
+  packages/design-system:
+    devDependencies:
+      '@flow/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@flow/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.19.0
+      eslint:
+        specifier: ^10.11.0
+        version: 10.11.0(jiti@2.7.0)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
       vitest:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@24.19.0)(jiti@2.7.0)(lightningcss@1.33.0)
