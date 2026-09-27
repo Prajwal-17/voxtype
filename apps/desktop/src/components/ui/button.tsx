@@ -10,12 +10,9 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default:
-          'bg-accent text-white shadow-[0_1px_2px_rgb(64_56_189_/_0.25)] hover:bg-accent-hover',
-        primary:
-          'bg-accent text-white shadow-[0_1px_2px_rgb(64_56_189_/_0.25)] hover:bg-accent-hover',
-        secondary:
-          'border-line bg-surface text-ink shadow-[0_1px_1px_rgb(23_25_37_/_0.04)] hover:bg-subtle',
+        default: 'bg-accent text-white shadow-action hover:bg-accent-hover',
+        primary: 'bg-accent text-white shadow-action hover:bg-accent-hover',
+        secondary: 'border-line bg-surface text-ink shadow-control hover:bg-subtle',
         outline: 'border-line-strong bg-surface text-ink hover:bg-subtle',
         ghost: 'bg-transparent text-muted hover:bg-subtle hover:text-ink',
         destructive: 'bg-danger text-white hover:brightness-90',

@@ -123,7 +123,7 @@ export function Logo({ compact = false, className }: { compact?: boolean; classN
   return (
     <div
       className={cn(
-        'flex items-center gap-2.5 text-[22px] font-semibold tracking-[-.025em] text-inverse',
+        'flex items-center gap-2.5 text-subheading font-semibold tracking-[-.015em] text-inverse',
         className,
       )}
     >

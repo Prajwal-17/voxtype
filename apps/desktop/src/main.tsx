@@ -1,4 +1,4 @@
-import '@fontsource-variable/dm-sans';
+import '@fontsource-variable/mona-sans';
 import { TooltipProvider } from './components/ui/tooltip';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { MotionConfig } from 'motion/react';
@@ -22,7 +22,7 @@ document.body.className = overlay
   : 'm-0 min-w-[360px] bg-canvas';
 
 root!.className = overlay ? 'h-full w-full overflow-hidden bg-transparent' : '';
-if (overlay) document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#171925');
+if (overlay) document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#20221f');
 
 function Root() {
   useNativeEvents();

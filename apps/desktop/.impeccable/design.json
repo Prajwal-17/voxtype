@@ -1,204 +1,207 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-27T20:45:34+05:30",
+  "generatedAt": "2026-09-27T21:10:44+05:30",
   "title": "Design System: Flow Desktop",
   "extensions": {
     "colorMeta": {
       "canvas": {
         "role": "neutral",
-        "displayName": "Cool Canvas",
-        "canonical": "#f6f7fb",
-        "tonalRamp": ["color-mix(in oklch, #f6f7fb 25%, black)", "color-mix(in oklch, #f6f7fb 45%, black)", "color-mix(in oklch, #f6f7fb 65%, black)", "color-mix(in oklch, #f6f7fb 85%, black)", "#f6f7fb", "color-mix(in oklch, #f6f7fb 75%, white)", "color-mix(in oklch, #f6f7fb 50%, white)", "color-mix(in oklch, #f6f7fb 20%, white)"]
+        "displayName": "Warm Canvas",
+        "canonical": "#f4f4f1",
+        "tonalRamp": ["color-mix(in oklch, #f4f4f1 25%, black)", "color-mix(in oklch, #f4f4f1 45%, black)", "color-mix(in oklch, #f4f4f1 65%, black)", "color-mix(in oklch, #f4f4f1 85%, black)", "#f4f4f1", "color-mix(in oklch, #f4f4f1 75%, white)", "color-mix(in oklch, #f4f4f1 50%, white)", "color-mix(in oklch, #f4f4f1 20%, white)"]
       },
       "surface": {
         "role": "neutral",
         "displayName": "Paper Surface",
-        "canonical": "#ffffff",
-        "tonalRamp": ["color-mix(in oklch, #ffffff 25%, black)", "color-mix(in oklch, #ffffff 45%, black)", "color-mix(in oklch, #ffffff 65%, black)", "color-mix(in oklch, #ffffff 85%, black)", "#ffffff", "color-mix(in oklch, #ffffff 75%, white)", "color-mix(in oklch, #ffffff 50%, white)", "color-mix(in oklch, #ffffff 20%, white)"]
+        "canonical": "#fcfcfa",
+        "tonalRamp": ["color-mix(in oklch, #fcfcfa 25%, black)", "color-mix(in oklch, #fcfcfa 45%, black)", "color-mix(in oklch, #fcfcfa 65%, black)", "color-mix(in oklch, #fcfcfa 85%, black)", "#fcfcfa", "color-mix(in oklch, #fcfcfa 75%, white)", "color-mix(in oklch, #fcfcfa 50%, white)", "color-mix(in oklch, #fcfcfa 20%, white)"]
       },
       "surface-subtle": {
         "role": "neutral",
         "displayName": "Subtle Surface",
-        "canonical": "#f1f3f8",
-        "tonalRamp": ["color-mix(in oklch, #f1f3f8 25%, black)", "color-mix(in oklch, #f1f3f8 45%, black)", "color-mix(in oklch, #f1f3f8 65%, black)", "color-mix(in oklch, #f1f3f8 85%, black)", "#f1f3f8", "color-mix(in oklch, #f1f3f8 75%, white)", "color-mix(in oklch, #f1f3f8 50%, white)", "color-mix(in oklch, #f1f3f8 20%, white)"]
+        "canonical": "#efefeb",
+        "tonalRamp": ["color-mix(in oklch, #efefeb 25%, black)", "color-mix(in oklch, #efefeb 45%, black)", "color-mix(in oklch, #efefeb 65%, black)", "color-mix(in oklch, #efefeb 85%, black)", "#efefeb", "color-mix(in oklch, #efefeb 75%, white)", "color-mix(in oklch, #efefeb 50%, white)", "color-mix(in oklch, #efefeb 20%, white)"]
       },
       "surface-raised": {
         "role": "neutral",
         "displayName": "Raised Surface",
-        "canonical": "#fafbfc",
-        "tonalRamp": ["color-mix(in oklch, #fafbfc 25%, black)", "color-mix(in oklch, #fafbfc 45%, black)", "color-mix(in oklch, #fafbfc 65%, black)", "color-mix(in oklch, #fafbfc 85%, black)", "#fafbfc", "color-mix(in oklch, #fafbfc 75%, white)", "color-mix(in oklch, #fafbfc 50%, white)", "color-mix(in oklch, #fafbfc 20%, white)"]
+        "canonical": "#f8f8f5",
+        "tonalRamp": ["color-mix(in oklch, #f8f8f5 25%, black)", "color-mix(in oklch, #f8f8f5 45%, black)", "color-mix(in oklch, #f8f8f5 65%, black)", "color-mix(in oklch, #f8f8f5 85%, black)", "#f8f8f5", "color-mix(in oklch, #f8f8f5 75%, white)", "color-mix(in oklch, #f8f8f5 50%, white)", "color-mix(in oklch, #f8f8f5 20%, white)"]
       },
       "ink": {
         "role": "neutral",
         "displayName": "Deep Ink",
-        "canonical": "#171925",
-        "tonalRamp": ["color-mix(in oklch, #171925 25%, black)", "color-mix(in oklch, #171925 45%, black)", "color-mix(in oklch, #171925 65%, black)", "color-mix(in oklch, #171925 85%, black)", "#171925", "color-mix(in oklch, #171925 75%, white)", "color-mix(in oklch, #171925 50%, white)", "color-mix(in oklch, #171925 20%, white)"]
+        "canonical": "#1d1f1c",
+        "tonalRamp": ["color-mix(in oklch, #1d1f1c 25%, black)", "color-mix(in oklch, #1d1f1c 45%, black)", "color-mix(in oklch, #1d1f1c 65%, black)", "color-mix(in oklch, #1d1f1c 85%, black)", "#1d1f1c", "color-mix(in oklch, #1d1f1c 75%, white)", "color-mix(in oklch, #1d1f1c 50%, white)", "color-mix(in oklch, #1d1f1c 20%, white)"]
       },
       "muted": {
         "role": "neutral",
         "displayName": "Operational Gray",
-        "canonical": "#686c7a",
-        "tonalRamp": ["color-mix(in oklch, #686c7a 25%, black)", "color-mix(in oklch, #686c7a 45%, black)", "color-mix(in oklch, #686c7a 65%, black)", "color-mix(in oklch, #686c7a 85%, black)", "#686c7a", "color-mix(in oklch, #686c7a 75%, white)", "color-mix(in oklch, #686c7a 50%, white)", "color-mix(in oklch, #686c7a 20%, white)"]
+        "canonical": "#62665f",
+        "tonalRamp": ["color-mix(in oklch, #62665f 25%, black)", "color-mix(in oklch, #62665f 45%, black)", "color-mix(in oklch, #62665f 65%, black)", "color-mix(in oklch, #62665f 85%, black)", "#62665f", "color-mix(in oklch, #62665f 75%, white)", "color-mix(in oklch, #62665f 50%, white)", "color-mix(in oklch, #62665f 20%, white)"]
       },
       "faint": {
         "role": "neutral",
         "displayName": "Faint Gray",
-        "canonical": "#9296a3",
-        "tonalRamp": ["color-mix(in oklch, #9296a3 25%, black)", "color-mix(in oklch, #9296a3 45%, black)", "color-mix(in oklch, #9296a3 65%, black)", "color-mix(in oklch, #9296a3 85%, black)", "#9296a3", "color-mix(in oklch, #9296a3 75%, white)", "color-mix(in oklch, #9296a3 50%, white)", "color-mix(in oklch, #9296a3 20%, white)"]
+        "canonical": "#8f948b",
+        "tonalRamp": ["color-mix(in oklch, #8f948b 25%, black)", "color-mix(in oklch, #8f948b 45%, black)", "color-mix(in oklch, #8f948b 65%, black)", "color-mix(in oklch, #8f948b 85%, black)", "#8f948b", "color-mix(in oklch, #8f948b 75%, white)", "color-mix(in oklch, #8f948b 50%, white)", "color-mix(in oklch, #8f948b 20%, white)"]
       },
       "line": {
         "role": "neutral",
         "displayName": "Hairline",
-        "canonical": "#e3e5ec",
-        "tonalRamp": ["color-mix(in oklch, #e3e5ec 25%, black)", "color-mix(in oklch, #e3e5ec 45%, black)", "color-mix(in oklch, #e3e5ec 65%, black)", "color-mix(in oklch, #e3e5ec 85%, black)", "#e3e5ec", "color-mix(in oklch, #e3e5ec 75%, white)", "color-mix(in oklch, #e3e5ec 50%, white)", "color-mix(in oklch, #e3e5ec 20%, white)"]
+        "canonical": "#dedfd9",
+        "tonalRamp": ["color-mix(in oklch, #dedfd9 25%, black)", "color-mix(in oklch, #dedfd9 45%, black)", "color-mix(in oklch, #dedfd9 65%, black)", "color-mix(in oklch, #dedfd9 85%, black)", "#dedfd9", "color-mix(in oklch, #dedfd9 75%, white)", "color-mix(in oklch, #dedfd9 50%, white)", "color-mix(in oklch, #dedfd9 20%, white)"]
       },
       "line-strong": {
         "role": "neutral",
         "displayName": "Strong Hairline",
-        "canonical": "#cfd2dc",
-        "tonalRamp": ["color-mix(in oklch, #cfd2dc 25%, black)", "color-mix(in oklch, #cfd2dc 45%, black)", "color-mix(in oklch, #cfd2dc 65%, black)", "color-mix(in oklch, #cfd2dc 85%, black)", "#cfd2dc", "color-mix(in oklch, #cfd2dc 75%, white)", "color-mix(in oklch, #cfd2dc 50%, white)", "color-mix(in oklch, #cfd2dc 20%, white)"]
+        "canonical": "#c8cbc3",
+        "tonalRamp": ["color-mix(in oklch, #c8cbc3 25%, black)", "color-mix(in oklch, #c8cbc3 45%, black)", "color-mix(in oklch, #c8cbc3 65%, black)", "color-mix(in oklch, #c8cbc3 85%, black)", "#c8cbc3", "color-mix(in oklch, #c8cbc3 75%, white)", "color-mix(in oklch, #c8cbc3 50%, white)", "color-mix(in oklch, #c8cbc3 20%, white)"]
       },
       "accent": {
         "role": "primary",
-        "displayName": "Signal Indigo",
-        "canonical": "#625bf6",
-        "tonalRamp": ["color-mix(in oklch, #625bf6 25%, black)", "color-mix(in oklch, #625bf6 45%, black)", "color-mix(in oklch, #625bf6 65%, black)", "color-mix(in oklch, #625bf6 85%, black)", "#625bf6", "color-mix(in oklch, #625bf6 75%, white)", "color-mix(in oklch, #625bf6 50%, white)", "color-mix(in oklch, #625bf6 20%, white)"]
+        "displayName": "Forest Signal",
+        "canonical": "#3f5546",
+        "tonalRamp": ["color-mix(in oklch, #3f5546 25%, black)", "color-mix(in oklch, #3f5546 45%, black)", "color-mix(in oklch, #3f5546 65%, black)", "color-mix(in oklch, #3f5546 85%, black)", "#3f5546", "color-mix(in oklch, #3f5546 75%, white)", "color-mix(in oklch, #3f5546 50%, white)", "color-mix(in oklch, #3f5546 20%, white)"]
       },
       "accent-hover": {
         "role": "primary",
-        "displayName": "Pressed Indigo",
-        "canonical": "#5149e8",
-        "tonalRamp": ["color-mix(in oklch, #5149e8 25%, black)", "color-mix(in oklch, #5149e8 45%, black)", "color-mix(in oklch, #5149e8 65%, black)", "color-mix(in oklch, #5149e8 85%, black)", "#5149e8", "color-mix(in oklch, #5149e8 75%, white)", "color-mix(in oklch, #5149e8 50%, white)", "color-mix(in oklch, #5149e8 20%, white)"]
+        "displayName": "Deep Forest",
+        "canonical": "#33463a",
+        "tonalRamp": ["color-mix(in oklch, #33463a 25%, black)", "color-mix(in oklch, #33463a 45%, black)", "color-mix(in oklch, #33463a 65%, black)", "color-mix(in oklch, #33463a 85%, black)", "#33463a", "color-mix(in oklch, #33463a 75%, white)", "color-mix(in oklch, #33463a 50%, white)", "color-mix(in oklch, #33463a 20%, white)"]
       },
       "accent-soft": {
         "role": "primary",
-        "displayName": "Indigo Wash",
-        "canonical": "#eeedff",
-        "tonalRamp": ["color-mix(in oklch, #eeedff 25%, black)", "color-mix(in oklch, #eeedff 45%, black)", "color-mix(in oklch, #eeedff 65%, black)", "color-mix(in oklch, #eeedff 85%, black)", "#eeedff", "color-mix(in oklch, #eeedff 75%, white)", "color-mix(in oklch, #eeedff 50%, white)", "color-mix(in oklch, #eeedff 20%, white)"]
+        "displayName": "Forest Wash",
+        "canonical": "#e7ebe7",
+        "tonalRamp": ["color-mix(in oklch, #e7ebe7 25%, black)", "color-mix(in oklch, #e7ebe7 45%, black)", "color-mix(in oklch, #e7ebe7 65%, black)", "color-mix(in oklch, #e7ebe7 85%, black)", "#e7ebe7", "color-mix(in oklch, #e7ebe7 75%, white)", "color-mix(in oklch, #e7ebe7 50%, white)", "color-mix(in oklch, #e7ebe7 20%, white)"]
       },
       "accent-ink": {
         "role": "primary",
-        "displayName": "Readable Indigo",
-        "canonical": "#4038bd",
-        "tonalRamp": ["color-mix(in oklch, #4038bd 25%, black)", "color-mix(in oklch, #4038bd 45%, black)", "color-mix(in oklch, #4038bd 65%, black)", "color-mix(in oklch, #4038bd 85%, black)", "#4038bd", "color-mix(in oklch, #4038bd 75%, white)", "color-mix(in oklch, #4038bd 50%, white)", "color-mix(in oklch, #4038bd 20%, white)"]
+        "displayName": "Forest Ink",
+        "canonical": "#2c3f32",
+        "tonalRamp": ["color-mix(in oklch, #2c3f32 25%, black)", "color-mix(in oklch, #2c3f32 45%, black)", "color-mix(in oklch, #2c3f32 65%, black)", "color-mix(in oklch, #2c3f32 85%, black)", "#2c3f32", "color-mix(in oklch, #2c3f32 75%, white)", "color-mix(in oklch, #2c3f32 50%, white)", "color-mix(in oklch, #2c3f32 20%, white)"]
       },
       "navigation": {
         "role": "neutral",
-        "displayName": "Navigation Charcoal",
-        "canonical": "#1b1d29",
-        "tonalRamp": ["color-mix(in oklch, #1b1d29 25%, black)", "color-mix(in oklch, #1b1d29 45%, black)", "color-mix(in oklch, #1b1d29 65%, black)", "color-mix(in oklch, #1b1d29 85%, black)", "#1b1d29", "color-mix(in oklch, #1b1d29 75%, white)", "color-mix(in oklch, #1b1d29 50%, white)", "color-mix(in oklch, #1b1d29 20%, white)"]
+        "displayName": "Navigation Graphite",
+        "canonical": "#20221f",
+        "tonalRamp": ["color-mix(in oklch, #20221f 25%, black)", "color-mix(in oklch, #20221f 45%, black)", "color-mix(in oklch, #20221f 65%, black)", "color-mix(in oklch, #20221f 85%, black)", "#20221f", "color-mix(in oklch, #20221f 75%, white)", "color-mix(in oklch, #20221f 50%, white)", "color-mix(in oklch, #20221f 20%, white)"]
       },
       "navigation-raised": {
         "role": "neutral",
         "displayName": "Raised Navigation",
-        "canonical": "#282b3b",
-        "tonalRamp": ["color-mix(in oklch, #282b3b 25%, black)", "color-mix(in oklch, #282b3b 45%, black)", "color-mix(in oklch, #282b3b 65%, black)", "color-mix(in oklch, #282b3b 85%, black)", "#282b3b", "color-mix(in oklch, #282b3b 75%, white)", "color-mix(in oklch, #282b3b 50%, white)", "color-mix(in oklch, #282b3b 20%, white)"]
+        "canonical": "#2b2e2a",
+        "tonalRamp": ["color-mix(in oklch, #2b2e2a 25%, black)", "color-mix(in oklch, #2b2e2a 45%, black)", "color-mix(in oklch, #2b2e2a 65%, black)", "color-mix(in oklch, #2b2e2a 85%, black)", "#2b2e2a", "color-mix(in oklch, #2b2e2a 75%, white)", "color-mix(in oklch, #2b2e2a 50%, white)", "color-mix(in oklch, #2b2e2a 20%, white)"]
       },
       "navigation-hover": {
         "role": "neutral",
         "displayName": "Navigation Hover",
-        "canonical": "#303446",
-        "tonalRamp": ["color-mix(in oklch, #303446 25%, black)", "color-mix(in oklch, #303446 45%, black)", "color-mix(in oklch, #303446 65%, black)", "color-mix(in oklch, #303446 85%, black)", "#303446", "color-mix(in oklch, #303446 75%, white)", "color-mix(in oklch, #303446 50%, white)", "color-mix(in oklch, #303446 20%, white)"]
+        "canonical": "#343732",
+        "tonalRamp": ["color-mix(in oklch, #343732 25%, black)", "color-mix(in oklch, #343732 45%, black)", "color-mix(in oklch, #343732 65%, black)", "color-mix(in oklch, #343732 85%, black)", "#343732", "color-mix(in oklch, #343732 75%, white)", "color-mix(in oklch, #343732 50%, white)", "color-mix(in oklch, #343732 20%, white)"]
       },
       "navigation-line": {
         "role": "neutral",
         "displayName": "Navigation Divider",
-        "canonical": "#343748",
-        "tonalRamp": ["color-mix(in oklch, #343748 25%, black)", "color-mix(in oklch, #343748 45%, black)", "color-mix(in oklch, #343748 65%, black)", "color-mix(in oklch, #343748 85%, black)", "#343748", "color-mix(in oklch, #343748 75%, white)", "color-mix(in oklch, #343748 50%, white)", "color-mix(in oklch, #343748 20%, white)"]
+        "canonical": "#3c403a",
+        "tonalRamp": ["color-mix(in oklch, #3c403a 25%, black)", "color-mix(in oklch, #3c403a 45%, black)", "color-mix(in oklch, #3c403a 65%, black)", "color-mix(in oklch, #3c403a 85%, black)", "#3c403a", "color-mix(in oklch, #3c403a 75%, white)", "color-mix(in oklch, #3c403a 50%, white)", "color-mix(in oklch, #3c403a 20%, white)"]
       },
       "inverse": {
         "role": "neutral",
         "displayName": "Inverse White",
-        "canonical": "#f7f8fc",
-        "tonalRamp": ["color-mix(in oklch, #f7f8fc 25%, black)", "color-mix(in oklch, #f7f8fc 45%, black)", "color-mix(in oklch, #f7f8fc 65%, black)", "color-mix(in oklch, #f7f8fc 85%, black)", "#f7f8fc", "color-mix(in oklch, #f7f8fc 75%, white)", "color-mix(in oklch, #f7f8fc 50%, white)", "color-mix(in oklch, #f7f8fc 20%, white)"]
+        "canonical": "#f6f6f2",
+        "tonalRamp": ["color-mix(in oklch, #f6f6f2 25%, black)", "color-mix(in oklch, #f6f6f2 45%, black)", "color-mix(in oklch, #f6f6f2 65%, black)", "color-mix(in oklch, #f6f6f2 85%, black)", "#f6f6f2", "color-mix(in oklch, #f6f6f2 75%, white)", "color-mix(in oklch, #f6f6f2 50%, white)", "color-mix(in oklch, #f6f6f2 20%, white)"]
       },
       "inverse-muted": {
         "role": "neutral",
         "displayName": "Muted Inverse",
-        "canonical": "#aeb2c2",
-        "tonalRamp": ["color-mix(in oklch, #aeb2c2 25%, black)", "color-mix(in oklch, #aeb2c2 45%, black)", "color-mix(in oklch, #aeb2c2 65%, black)", "color-mix(in oklch, #aeb2c2 85%, black)", "#aeb2c2", "color-mix(in oklch, #aeb2c2 75%, white)", "color-mix(in oklch, #aeb2c2 50%, white)", "color-mix(in oklch, #aeb2c2 20%, white)"]
+        "canonical": "#b2b6ad",
+        "tonalRamp": ["color-mix(in oklch, #b2b6ad 25%, black)", "color-mix(in oklch, #b2b6ad 45%, black)", "color-mix(in oklch, #b2b6ad 65%, black)", "color-mix(in oklch, #b2b6ad 85%, black)", "#b2b6ad", "color-mix(in oklch, #b2b6ad 75%, white)", "color-mix(in oklch, #b2b6ad 50%, white)", "color-mix(in oklch, #b2b6ad 20%, white)"]
       },
       "success": {
         "role": "secondary",
-        "displayName": "Local Green",
-        "canonical": "#247a5a",
-        "tonalRamp": ["color-mix(in oklch, #247a5a 25%, black)", "color-mix(in oklch, #247a5a 45%, black)", "color-mix(in oklch, #247a5a 65%, black)", "color-mix(in oklch, #247a5a 85%, black)", "#247a5a", "color-mix(in oklch, #247a5a 75%, white)", "color-mix(in oklch, #247a5a 50%, white)", "color-mix(in oklch, #247a5a 20%, white)"]
+        "displayName": "Confirmation Green",
+        "canonical": "#396b50",
+        "tonalRamp": ["color-mix(in oklch, #396b50 25%, black)", "color-mix(in oklch, #396b50 45%, black)", "color-mix(in oklch, #396b50 65%, black)", "color-mix(in oklch, #396b50 85%, black)", "#396b50", "color-mix(in oklch, #396b50 75%, white)", "color-mix(in oklch, #396b50 50%, white)", "color-mix(in oklch, #396b50 20%, white)"]
       },
       "success-soft": {
         "role": "secondary",
-        "displayName": "Local Green Wash",
-        "canonical": "#eaf6f1",
-        "tonalRamp": ["color-mix(in oklch, #eaf6f1 25%, black)", "color-mix(in oklch, #eaf6f1 45%, black)", "color-mix(in oklch, #eaf6f1 65%, black)", "color-mix(in oklch, #eaf6f1 85%, black)", "#eaf6f1", "color-mix(in oklch, #eaf6f1 75%, white)", "color-mix(in oklch, #eaf6f1 50%, white)", "color-mix(in oklch, #eaf6f1 20%, white)"]
+        "displayName": "Confirmation Green Wash",
+        "canonical": "#e7efe9",
+        "tonalRamp": ["color-mix(in oklch, #e7efe9 25%, black)", "color-mix(in oklch, #e7efe9 45%, black)", "color-mix(in oklch, #e7efe9 65%, black)", "color-mix(in oklch, #e7efe9 85%, black)", "#e7efe9", "color-mix(in oklch, #e7efe9 75%, white)", "color-mix(in oklch, #e7efe9 50%, white)", "color-mix(in oklch, #e7efe9 20%, white)"]
       },
       "danger": {
         "role": "secondary",
-        "displayName": "Recovery Red",
-        "canonical": "#ba3f53",
-        "tonalRamp": ["color-mix(in oklch, #ba3f53 25%, black)", "color-mix(in oklch, #ba3f53 45%, black)", "color-mix(in oklch, #ba3f53 65%, black)", "color-mix(in oklch, #ba3f53 85%, black)", "#ba3f53", "color-mix(in oklch, #ba3f53 75%, white)", "color-mix(in oklch, #ba3f53 50%, white)", "color-mix(in oklch, #ba3f53 20%, white)"]
+        "displayName": "Muted Brick",
+        "canonical": "#93433f",
+        "tonalRamp": ["color-mix(in oklch, #93433f 25%, black)", "color-mix(in oklch, #93433f 45%, black)", "color-mix(in oklch, #93433f 65%, black)", "color-mix(in oklch, #93433f 85%, black)", "#93433f", "color-mix(in oklch, #93433f 75%, white)", "color-mix(in oklch, #93433f 50%, white)", "color-mix(in oklch, #93433f 20%, white)"]
       },
       "danger-soft": {
         "role": "secondary",
-        "displayName": "Recovery Red Wash",
-        "canonical": "#fceef1",
-        "tonalRamp": ["color-mix(in oklch, #fceef1 25%, black)", "color-mix(in oklch, #fceef1 45%, black)", "color-mix(in oklch, #fceef1 65%, black)", "color-mix(in oklch, #fceef1 85%, black)", "#fceef1", "color-mix(in oklch, #fceef1 75%, white)", "color-mix(in oklch, #fceef1 50%, white)", "color-mix(in oklch, #fceef1 20%, white)"]
+        "displayName": "Muted Brick Wash",
+        "canonical": "#f1ece9",
+        "tonalRamp": ["color-mix(in oklch, #f1ece9 25%, black)", "color-mix(in oklch, #f1ece9 45%, black)", "color-mix(in oklch, #f1ece9 65%, black)", "color-mix(in oklch, #f1ece9 85%, black)", "#f1ece9", "color-mix(in oklch, #f1ece9 75%, white)", "color-mix(in oklch, #f1ece9 50%, white)", "color-mix(in oklch, #f1ece9 20%, white)"]
       },
       "warning": {
         "role": "secondary",
-        "displayName": "Diagnostic Amber",
-        "canonical": "#96611d",
-        "tonalRamp": ["color-mix(in oklch, #96611d 25%, black)", "color-mix(in oklch, #96611d 45%, black)", "color-mix(in oklch, #96611d 65%, black)", "color-mix(in oklch, #96611d 85%, black)", "#96611d", "color-mix(in oklch, #96611d 75%, white)", "color-mix(in oklch, #96611d 50%, white)", "color-mix(in oklch, #96611d 20%, white)"]
+        "displayName": "Quiet Olive",
+        "canonical": "#625f43",
+        "tonalRamp": ["color-mix(in oklch, #625f43 25%, black)", "color-mix(in oklch, #625f43 45%, black)", "color-mix(in oklch, #625f43 65%, black)", "color-mix(in oklch, #625f43 85%, black)", "#625f43", "color-mix(in oklch, #625f43 75%, white)", "color-mix(in oklch, #625f43 50%, white)", "color-mix(in oklch, #625f43 20%, white)"]
       },
       "warning-soft": {
         "role": "secondary",
-        "displayName": "Diagnostic Amber Wash",
-        "canonical": "#fff5e4",
-        "tonalRamp": ["color-mix(in oklch, #fff5e4 25%, black)", "color-mix(in oklch, #fff5e4 45%, black)", "color-mix(in oklch, #fff5e4 65%, black)", "color-mix(in oklch, #fff5e4 85%, black)", "#fff5e4", "color-mix(in oklch, #fff5e4 75%, white)", "color-mix(in oklch, #fff5e4 50%, white)", "color-mix(in oklch, #fff5e4 20%, white)"]
+        "displayName": "Quiet Olive Wash",
+        "canonical": "#efeee5",
+        "tonalRamp": ["color-mix(in oklch, #efeee5 25%, black)", "color-mix(in oklch, #efeee5 45%, black)", "color-mix(in oklch, #efeee5 65%, black)", "color-mix(in oklch, #efeee5 85%, black)", "#efeee5", "color-mix(in oklch, #efeee5 75%, white)", "color-mix(in oklch, #efeee5 50%, white)", "color-mix(in oklch, #efeee5 20%, white)"]
       },
       "overlay": {
         "role": "neutral",
-        "displayName": "Overlay Ink",
-        "canonical": "#171925",
-        "tonalRamp": ["color-mix(in oklch, #171925 25%, black)", "color-mix(in oklch, #171925 45%, black)", "color-mix(in oklch, #171925 65%, black)", "color-mix(in oklch, #171925 85%, black)", "#171925", "color-mix(in oklch, #171925 75%, white)", "color-mix(in oklch, #171925 50%, white)", "color-mix(in oklch, #171925 20%, white)"]
+        "displayName": "Overlay Graphite",
+        "canonical": "#20221f",
+        "tonalRamp": ["color-mix(in oklch, #20221f 25%, black)", "color-mix(in oklch, #20221f 45%, black)", "color-mix(in oklch, #20221f 65%, black)", "color-mix(in oklch, #20221f 85%, black)", "#20221f", "color-mix(in oklch, #20221f 75%, white)", "color-mix(in oklch, #20221f 50%, white)", "color-mix(in oklch, #20221f 20%, white)"]
       },
       "overlay-raised": {
         "role": "neutral",
         "displayName": "Overlay Raised",
-        "canonical": "#2c2f3d",
-        "tonalRamp": ["color-mix(in oklch, #2c2f3d 25%, black)", "color-mix(in oklch, #2c2f3d 45%, black)", "color-mix(in oklch, #2c2f3d 65%, black)", "color-mix(in oklch, #2c2f3d 85%, black)", "#2c2f3d", "color-mix(in oklch, #2c2f3d 75%, white)", "color-mix(in oklch, #2c2f3d 50%, white)", "color-mix(in oklch, #2c2f3d 20%, white)"]
+        "canonical": "#30332f",
+        "tonalRamp": ["color-mix(in oklch, #30332f 25%, black)", "color-mix(in oklch, #30332f 45%, black)", "color-mix(in oklch, #30332f 65%, black)", "color-mix(in oklch, #30332f 85%, black)", "#30332f", "color-mix(in oklch, #30332f 75%, white)", "color-mix(in oklch, #30332f 50%, white)", "color-mix(in oklch, #30332f 20%, white)"]
       },
       "overlay-line": {
         "role": "neutral",
         "displayName": "Overlay Hairline",
-        "canonical": "#3b3f50",
-        "tonalRamp": ["color-mix(in oklch, #3b3f50 25%, black)", "color-mix(in oklch, #3b3f50 45%, black)", "color-mix(in oklch, #3b3f50 65%, black)", "color-mix(in oklch, #3b3f50 85%, black)", "#3b3f50", "color-mix(in oklch, #3b3f50 75%, white)", "color-mix(in oklch, #3b3f50 50%, white)", "color-mix(in oklch, #3b3f50 20%, white)"]
+        "canonical": "#42463f",
+        "tonalRamp": ["color-mix(in oklch, #42463f 25%, black)", "color-mix(in oklch, #42463f 45%, black)", "color-mix(in oklch, #42463f 65%, black)", "color-mix(in oklch, #42463f 85%, black)", "#42463f", "color-mix(in oklch, #42463f 75%, white)", "color-mix(in oklch, #42463f 50%, white)", "color-mix(in oklch, #42463f 20%, white)"]
       },
       "overlay-text": {
         "role": "neutral",
         "displayName": "Overlay Text",
-        "canonical": "#f7f8fc",
-        "tonalRamp": ["color-mix(in oklch, #f7f8fc 25%, black)", "color-mix(in oklch, #f7f8fc 45%, black)", "color-mix(in oklch, #f7f8fc 65%, black)", "color-mix(in oklch, #f7f8fc 85%, black)", "#f7f8fc", "color-mix(in oklch, #f7f8fc 75%, white)", "color-mix(in oklch, #f7f8fc 50%, white)", "color-mix(in oklch, #f7f8fc 20%, white)"]
+        "canonical": "#f6f6f2",
+        "tonalRamp": ["color-mix(in oklch, #f6f6f2 25%, black)", "color-mix(in oklch, #f6f6f2 45%, black)", "color-mix(in oklch, #f6f6f2 65%, black)", "color-mix(in oklch, #f6f6f2 85%, black)", "#f6f6f2", "color-mix(in oklch, #f6f6f2 75%, white)", "color-mix(in oklch, #f6f6f2 50%, white)", "color-mix(in oklch, #f6f6f2 20%, white)"]
       },
       "overlay-danger": {
         "role": "secondary",
-        "displayName": "Overlay Recovery Red",
-        "canonical": "#ffb0b9",
-        "tonalRamp": ["color-mix(in oklch, #ffb0b9 25%, black)", "color-mix(in oklch, #ffb0b9 45%, black)", "color-mix(in oklch, #ffb0b9 65%, black)", "color-mix(in oklch, #ffb0b9 85%, black)", "#ffb0b9", "color-mix(in oklch, #ffb0b9 75%, white)", "color-mix(in oklch, #ffb0b9 50%, white)", "color-mix(in oklch, #ffb0b9 20%, white)"]
+        "displayName": "Overlay Muted Error",
+        "canonical": "#d7d9d3",
+        "tonalRamp": ["color-mix(in oklch, #d7d9d3 25%, black)", "color-mix(in oklch, #d7d9d3 45%, black)", "color-mix(in oklch, #d7d9d3 65%, black)", "color-mix(in oklch, #d7d9d3 85%, black)", "#d7d9d3", "color-mix(in oklch, #d7d9d3 75%, white)", "color-mix(in oklch, #d7d9d3 50%, white)", "color-mix(in oklch, #d7d9d3 20%, white)"]
       }
     },
     "typographyMeta": {
-      "headline": { "displayName": "Page Headline", "purpose": "Primary titles for Dictation, History, Settings, and blocking load states." },
+      "heading": { "displayName": "Page Heading", "purpose": "Primary titles for Dictation, History, Settings, and blocking load states." },
+      "subheading": { "displayName": "Subheading", "purpose": "Transcript empty-state guidance and the product wordmark." },
       "title": { "displayName": "Section Title", "purpose": "Panel, dialog, card, and empty-state headings." },
       "body": { "displayName": "Body", "purpose": "Explanatory copy, history entries, and longer supporting text." },
-      "label": { "displayName": "UI Label", "purpose": "Navigation, controls, field labels, and operational copy." },
+      "ui": { "displayName": "UI", "purpose": "Navigation, controls, field labels, and operational copy." },
       "caption": { "displayName": "Caption", "purpose": "Metadata, counts, status labels, and compact notes." },
       "transcript": { "displayName": "Transcript", "purpose": "Live and completed dictated text in the primary canvas." },
       "timer": { "displayName": "Recorder Timer", "purpose": "Tabular elapsed time in the recorder panel." }
     },
     "shadows": [
-      { "name": "panel", "value": "0 1px 2px rgb(23 25 37 / 0.03), 0 8px 24px rgb(23 25 37 / 0.04)", "purpose": "Sticky save bars and restrained lifted panels." },
-      { "name": "floating", "value": "0 8px 24px rgb(10 12 20 / 0.24)", "purpose": "The voice overlay, menus, tooltips, and overlay preview." },
-      { "name": "dialog", "value": "0 24px 80px rgb(10 12 20 / 0.2)", "purpose": "Modal and confirmation surfaces above a scrim." },
-      { "name": "keyboard-key", "value": "0 1px 0 var(--palette-line-strong)", "purpose": "Minimal physical depth for keyboard shortcut keys." }
+      { "name": "action", "value": "0 1px 2px rgb(31 44 34 / 0.22)", "purpose": "Compact depth beneath primary forest actions." },
+      { "name": "control", "value": "0 1px 1px rgb(29 31 28 / 0.05)", "purpose": "Minimal lift beneath secondary buttons." },
+      { "name": "panel", "value": "0 1px 2px rgb(29 31 28 / 0.03), 0 8px 24px rgb(29 31 28 / 0.04)", "purpose": "Sticky save bars and restrained lifted panels." },
+      { "name": "floating", "value": "0 8px 24px rgb(18 20 17 / 0.22)", "purpose": "The voice overlay, menus, tooltips, and overlay preview." },
+      { "name": "dialog", "value": "0 24px 80px rgb(18 20 17 / 0.18)", "purpose": "Modal and confirmation surfaces above a scrim." },
+      { "name": "kbd", "value": "0 1px 0 var(--palette-line-strong)", "purpose": "Minimal physical depth for keyboard shortcut keys." }
     ],
     "motion": [
       { "name": "state-fast", "value": "150ms ease-out", "purpose": "Button, navigation, switch, and overlay state changes." },
@@ -221,7 +224,7 @@
       "refersTo": "button-primary",
       "description": "The default high-confidence action for recording, setup, and saving.",
       "html": "<button class=\"ds-btn-primary\">Start dictation</button>",
-      "css": ".ds-btn-primary { display:inline-flex; min-height:36px; align-items:center; justify-content:center; gap:8px; border:1px solid transparent; border-radius:var(--radius-control, 10px); padding:8px 14px; background:var(--palette-accent); color:#fff; box-shadow:0 1px 2px rgb(64 56 189 / 0.25); font:520 13px/1.5 'DM Sans Variable','DM Sans',sans-serif; transition:transform 150ms ease-out,background-color 150ms ease-out,box-shadow 150ms ease-out; } .ds-btn-primary:hover { background:var(--palette-accent-hover); } .ds-btn-primary:active { transform:scale(.98); } .ds-btn-primary:focus-visible { outline:2px solid var(--palette-accent); outline-offset:2px; } @media (prefers-reduced-motion: reduce) { .ds-btn-primary { transition:none; } .ds-btn-primary:active { transform:none; } }"
+      "css": ".ds-btn-primary { display:inline-flex; min-height:36px; align-items:center; justify-content:center; gap:8px; border:1px solid transparent; border-radius:var(--radius-control, 10px); padding:8px 14px; background:var(--palette-accent); color:#fff; box-shadow:0 1px 2px rgb(31 44 34 / 0.22); font:500 13px/1.45 'Mona Sans Variable','Mona Sans','Segoe UI',sans-serif; transition:transform 150ms ease-out,background-color 150ms ease-out,box-shadow 150ms ease-out; } .ds-btn-primary:hover { background:var(--palette-accent-hover); } .ds-btn-primary:active { transform:scale(.98); } .ds-btn-primary:focus-visible { outline:2px solid var(--palette-accent); outline-offset:2px; } @media (prefers-reduced-motion: reduce) { .ds-btn-primary { transition:none; } .ds-btn-primary:active { transform:none; } }"
     },
     {
       "name": "Secondary Button",
@@ -229,7 +232,7 @@
       "refersTo": "button-secondary",
       "description": "The bordered paper-surface action used for ordinary supporting choices.",
       "html": "<button class=\"ds-btn-secondary\">Replace key</button>",
-      "css": ".ds-btn-secondary { display:inline-flex; min-height:36px; align-items:center; justify-content:center; gap:8px; border:1px solid var(--palette-line); border-radius:var(--radius-control, 10px); padding:8px 14px; background:var(--palette-surface); color:var(--palette-ink); box-shadow:0 1px 1px rgb(23 25 37 / 0.04); font:520 13px/1.5 'DM Sans Variable','DM Sans',sans-serif; transition:transform 150ms ease-out,background-color 150ms ease-out; } .ds-btn-secondary:hover { background:var(--palette-surface-subtle); } .ds-btn-secondary:active { transform:scale(.98); } .ds-btn-secondary:focus-visible { outline:2px solid var(--palette-accent); outline-offset:2px; }"
+      "css": ".ds-btn-secondary { display:inline-flex; min-height:36px; align-items:center; justify-content:center; gap:8px; border:1px solid var(--palette-line); border-radius:var(--radius-control, 10px); padding:8px 14px; background:var(--palette-surface); color:var(--palette-ink); box-shadow:0 1px 1px rgb(29 31 28 / 0.05); font:500 13px/1.45 'Mona Sans Variable','Mona Sans','Segoe UI',sans-serif; transition:transform 150ms ease-out,background-color 150ms ease-out; } .ds-btn-secondary:hover { background:var(--palette-surface-subtle); } .ds-btn-secondary:active { transform:scale(.98); } .ds-btn-secondary:focus-visible { outline:2px solid var(--palette-accent); outline-offset:2px; }"
     },
     {
       "name": "Ghost Button",
@@ -237,14 +240,14 @@
       "refersTo": "button-ghost",
       "description": "A low-emphasis action that gains a subtle surface only on interaction.",
       "html": "<button class=\"ds-btn-ghost\">Cancel</button>",
-      "css": ".ds-btn-ghost { display:inline-flex; min-height:36px; align-items:center; justify-content:center; gap:8px; border:1px solid transparent; border-radius:var(--radius-control, 10px); padding:8px 14px; background:transparent; color:var(--palette-muted); font:520 13px/1.5 'DM Sans Variable','DM Sans',sans-serif; transition:transform 150ms ease-out,background-color 150ms ease-out,color 150ms ease-out; } .ds-btn-ghost:hover { background:var(--palette-surface-subtle); color:var(--palette-ink); } .ds-btn-ghost:active { transform:scale(.98); } .ds-btn-ghost:focus-visible { outline:2px solid var(--palette-accent); outline-offset:2px; }"
+      "css": ".ds-btn-ghost { display:inline-flex; min-height:36px; align-items:center; justify-content:center; gap:8px; border:1px solid transparent; border-radius:var(--radius-control, 10px); padding:8px 14px; background:transparent; color:var(--palette-muted); font:500 13px/1.45 'Mona Sans Variable','Mona Sans','Segoe UI',sans-serif; transition:transform 150ms ease-out,background-color 150ms ease-out,color 150ms ease-out; } .ds-btn-ghost:hover { background:var(--palette-surface-subtle); color:var(--palette-ink); } .ds-btn-ghost:active { transform:scale(.98); } .ds-btn-ghost:focus-visible { outline:2px solid var(--palette-accent); outline-offset:2px; }"
     },
     {
       "name": "Search Field",
       "kind": "input",
       "description": "The compound bordered field used to find saved transcripts.",
       "html": "<label class=\"ds-search\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.3-4.3\"/></svg><input placeholder=\"Search transcripts\" /></label>",
-      "css": ".ds-search { display:flex; width:320px; max-width:100%; align-items:center; gap:8px; border:1px solid var(--palette-line-strong); border-radius:var(--radius-control, 10px); padding:0 12px; background:var(--palette-surface); color:var(--palette-muted); } .ds-search svg { width:16px; height:16px; flex:none; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; } .ds-search input { min-width:0; width:100%; border:0; outline:0; padding:8px 0; background:transparent; color:var(--palette-ink); font:400 13px/1.5 'DM Sans Variable','DM Sans',sans-serif; } .ds-search input::placeholder { color:var(--palette-muted); } .ds-search:focus-within { outline:2px solid var(--palette-accent); outline-offset:2px; }"
+      "css": ".ds-search { display:flex; width:320px; max-width:100%; align-items:center; gap:8px; border:1px solid var(--palette-line-strong); border-radius:var(--radius-control, 10px); padding:0 12px; background:var(--palette-surface); color:var(--palette-muted); } .ds-search svg { width:16px; height:16px; flex:none; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; } .ds-search input { min-width:0; width:100%; border:0; outline:0; padding:8px 0; background:transparent; color:var(--palette-ink); font:400 13px/1.45 'Mona Sans Variable','Mona Sans','Segoe UI',sans-serif; } .ds-search input::placeholder { color:var(--palette-muted); } .ds-search:focus-within { outline:2px solid var(--palette-accent); outline-offset:2px; }"
     },
     {
       "name": "Active Navigation Item",
@@ -252,7 +255,7 @@
       "refersTo": "sidebar-item-active",
       "description": "The selected destination in the deep neutral desktop sidebar.",
       "html": "<button class=\"ds-nav-item\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M4 14.5V9.5M8 17V7M12 20V4M16 17V7M20 14.5V9.5\"/></svg><span>Dictation</span><i></i></button>",
-      "css": ".ds-nav-item { display:flex; width:220px; height:40px; align-items:center; gap:12px; border:0; border-radius:var(--radius-control, 10px); padding:0 12px; background:var(--palette-navigation-raised); color:var(--palette-inverse); font:520 13px/1.5 'DM Sans Variable','DM Sans',sans-serif; text-align:left; transition:background-color 150ms ease-out; } .ds-nav-item:hover { background:var(--palette-navigation-hover); } .ds-nav-item:focus-visible { outline:2px solid var(--palette-accent); outline-offset:2px; } .ds-nav-item svg { width:17px; height:17px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; } .ds-nav-item i { width:4px; height:4px; margin-left:auto; border-radius:999px; background:var(--palette-accent); }"
+      "css": ".ds-nav-item { display:flex; width:220px; height:40px; align-items:center; gap:12px; border:0; border-radius:var(--radius-control, 10px); padding:0 12px; background:var(--palette-navigation-raised); color:var(--palette-inverse); font:500 13px/1.45 'Mona Sans Variable','Mona Sans','Segoe UI',sans-serif; text-align:left; transition:background-color 150ms ease-out; } .ds-nav-item:hover { background:var(--palette-navigation-hover); } .ds-nav-item:focus-visible { outline:2px solid var(--palette-accent); outline-offset:2px; } .ds-nav-item svg { width:17px; height:17px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; } .ds-nav-item i { width:4px; height:4px; margin-left:auto; border-radius:999px; background:var(--palette-accent); }"
     },
     {
       "name": "Recording Status Badge",
@@ -260,7 +263,7 @@
       "refersTo": "status-badge",
       "description": "A compact text-and-dot indicator for live recorder state.",
       "html": "<span class=\"ds-status\"><i></i>Speech detected</span>",
-      "css": ".ds-status { display:inline-flex; align-items:center; gap:8px; border-radius:999px; padding:4px 10px; background:var(--palette-accent-soft); color:var(--palette-accent-ink); font:520 12px/1.45 'DM Sans Variable','DM Sans',sans-serif; } .ds-status i { width:6px; height:6px; border-radius:999px; background:var(--palette-accent); } .ds-status:focus-visible { outline:2px solid var(--palette-accent); outline-offset:2px; }"
+      "css": ".ds-status { display:inline-flex; align-items:center; gap:8px; border-radius:999px; padding:4px 10px; background:var(--palette-accent-soft); color:var(--palette-accent-ink); font:500 12px/1.4 'Mona Sans Variable','Mona Sans','Segoe UI',sans-serif; } .ds-status i { width:6px; height:6px; border-radius:999px; background:var(--palette-accent); } .ds-status:focus-visible { outline:2px solid var(--palette-accent); outline-offset:2px; }"
     },
     {
       "name": "Workspace Card",
@@ -268,37 +271,37 @@
       "refersTo": "card",
       "description": "The flat bordered panel used for transcript, recorder, history, and settings groups.",
       "html": "<section class=\"ds-card\"><h3>Transcript</h3><p>Your transcript will appear here</p></section>",
-      "css": ".ds-card { width:320px; border:1px solid var(--palette-line); border-radius:var(--radius-panel, 14px); padding:20px; background:var(--palette-surface); color:var(--palette-ink); font-family:'DM Sans Variable','DM Sans',sans-serif; } .ds-card h3 { margin:0; font-size:16px; line-height:1.4; font-weight:620; letter-spacing:-.02em; } .ds-card p { margin:8px 0 0; color:var(--palette-muted); font-size:14px; line-height:1.65; } .ds-card:focus-within { border-color:var(--palette-line-strong); }"
+      "css": ".ds-card { width:320px; border:1px solid var(--palette-line); border-radius:var(--radius-panel, 14px); padding:20px; background:var(--palette-surface); color:var(--palette-ink); font-family:'Mona Sans Variable','Mona Sans','Segoe UI',sans-serif; } .ds-card h3 { margin:0; font-size:17px; line-height:1.35; font-weight:620; letter-spacing:-.02em; } .ds-card p { margin:8px 0 0; color:var(--palette-muted); font-size:15px; line-height:1.6; } .ds-card:focus-within { border-color:var(--palette-line-strong); }"
     },
     {
       "name": "Preference Switch",
       "kind": "custom",
       "description": "The compact explicit toggle used for recording and local-storage preferences.",
       "html": "<button class=\"ds-switch\" role=\"switch\" aria-checked=\"true\"><span></span></button>",
-      "css": ".ds-switch { position:relative; width:40px; height:24px; border:0; border-radius:999px; padding:2px; background:var(--palette-accent); transition:background-color 150ms ease-out; } .ds-switch span { display:block; width:20px; height:20px; border-radius:999px; background:var(--palette-surface); box-shadow:0 1px 2px rgb(23 25 37 / 0.16); transform:translateX(16px); transition:transform 150ms ease-out; } .ds-switch:hover { background:var(--palette-accent-hover); } .ds-switch:focus-visible { outline:2px solid var(--palette-accent); outline-offset:2px; }"
+      "css": ".ds-switch { position:relative; width:40px; height:24px; border:0; border-radius:999px; padding:2px; background:var(--palette-accent); transition:background-color 150ms ease-out; } .ds-switch span { display:block; width:20px; height:20px; border-radius:999px; background:var(--palette-surface); box-shadow:0 1px 2px rgb(29 31 28 / 0.16); transform:translateX(16px); transition:transform 150ms ease-out; } .ds-switch:hover { background:var(--palette-accent-hover); } .ds-switch:focus-visible { outline:2px solid var(--palette-accent); outline-offset:2px; }"
     },
     {
       "name": "Voice Overlay",
       "kind": "custom",
       "description": "The system-wide compact recorder with cancel, live waveform, and finish controls.",
       "html": "<div class=\"ds-overlay\"><button aria-label=\"Cancel dictation\">×</button><span class=\"ds-wave\"><i></i><i></i><i></i><i></i><i></i></span><button class=\"ds-finish\" aria-label=\"Finish dictation\">✓</button></div>",
-      "css": ".ds-overlay { display:grid; width:120px; height:36px; grid-template-columns:24px minmax(0,1fr) 24px; align-items:center; gap:6px; border:1px solid var(--palette-overlay-line); border-radius:var(--radius-floating, 16px); padding:5px; background:var(--palette-overlay); color:#fff; box-shadow:0 8px 24px rgb(10 12 20 / 0.24); } .ds-overlay button { display:grid; width:24px; height:24px; place-items:center; border:0; border-radius:999px; padding:0; background:var(--palette-overlay-raised); color:var(--palette-overlay-text); font:520 16px/1 'DM Sans Variable','DM Sans',sans-serif; transition:transform 150ms ease-out,background-color 150ms ease-out; } .ds-overlay button:hover { background:var(--palette-navigation-line); } .ds-overlay button:active { transform:scale(.97); } .ds-overlay button:focus-visible { outline:2px solid var(--palette-accent); outline-offset:2px; } .ds-overlay .ds-finish { background:#fff; color:var(--palette-navigation); } .ds-wave { display:flex; height:20px; align-items:center; justify-content:center; gap:2px; } .ds-wave i { display:block; width:2px; border-radius:999px; background:currentColor; } .ds-wave i:nth-child(1),.ds-wave i:nth-child(5) { height:5px; } .ds-wave i:nth-child(2),.ds-wave i:nth-child(4) { height:11px; } .ds-wave i:nth-child(3) { height:17px; }"
+      "css": ".ds-overlay { display:grid; width:120px; height:36px; grid-template-columns:24px minmax(0,1fr) 24px; align-items:center; gap:6px; border:1px solid var(--palette-overlay-line); border-radius:var(--radius-floating, 16px); padding:5px; background:var(--palette-overlay); color:#fff; box-shadow:0 8px 24px rgb(18 20 17 / 0.22); } .ds-overlay button { display:grid; width:24px; height:24px; place-items:center; border:0; border-radius:999px; padding:0; background:var(--palette-overlay-raised); color:var(--palette-overlay-text); font:500 16px/1 'Mona Sans Variable','Mona Sans','Segoe UI',sans-serif; transition:transform 150ms ease-out,background-color 150ms ease-out; } .ds-overlay button:hover { background:var(--palette-navigation-line); } .ds-overlay button:active { transform:scale(.97); } .ds-overlay button:focus-visible { outline:2px solid var(--palette-accent); outline-offset:2px; } .ds-overlay .ds-finish { background:#fff; color:var(--palette-navigation); } .ds-wave { display:flex; height:20px; align-items:center; justify-content:center; gap:2px; } .ds-wave i { display:block; width:2px; border-radius:999px; background:currentColor; } .ds-wave i:nth-child(1),.ds-wave i:nth-child(5) { height:5px; } .ds-wave i:nth-child(2),.ds-wave i:nth-child(4) { height:11px; } .ds-wave i:nth-child(3) { height:17px; }"
     }
   ],
   "narrative": {
     "northStar": "The Quiet Control Room",
-    "overview": "Flow is a conventional premium desktop productivity workspace, played straight. Its off-white canvas and deep neutral navigation frame a focused working area; precise indigo identifies interaction and recording state without turning the interface into a brand spectacle. The result should feel calm, capable, and immediately legible during a time-sensitive task.\n\nHierarchy comes from compact DM Sans typography, measured spacing, explicit state language, and consistent surface boundaries. Most UI remains visually quiet so the live transcript, waveform, timer, and primary recording action can carry the user's attention. Behavior stays familiar: controls are compact, states are named, and recoverability is always visible.",
+    "overview": "Flow is a conventional premium desktop productivity workspace, played straight. Its warm paper canvas and deep graphite navigation frame a focused working area; a low-chroma forest accent identifies interaction and recording state without turning the interface into a brand spectacle. The result should feel calm, capable, and immediately legible during a time-sensitive task.\n\nHierarchy comes from compact Mona Sans typography, measured spacing, explicit state language, and consistent surface boundaries. Most UI remains visually quiet so the live transcript, waveform, timer, and primary recording action can carry the user's attention. Behavior stays familiar: controls are compact, states are named, and recoverability is always visible.",
     "keyCharacteristics": [
-      "Calm off-white application canvas with white working surfaces.",
-      "Deep neutral sidebar that anchors the desktop workspace.",
-      "One precise indigo interaction color, used sparingly and consistently.",
+      "Warm paper application canvas with softly off-white working surfaces.",
+      "Deep graphite sidebar that anchors the desktop workspace.",
+      "One low-chroma forest interaction color, used sparingly and consistently.",
       "Compact Radix/shadcn-style controls with visible focus and direct state labels.",
       "Restrained borders and elevation; no gradients, glass, or oversized decoration.",
       "Transcript-first working area with a dedicated recorder panel."
     ],
     "rules": [
-      { "name": "The One Signal Rule", "body": "Indigo is the only general interaction accent. Semantic green, red, and amber communicate outcomes; they do not compete for ordinary actions.", "section": "colors" },
-      { "name": "The Quiet Canvas Rule", "body": "Use the cool canvas behind paper surfaces. Do not add gradients, decorative color fields, or translucent glass.", "section": "colors" },
+      { "name": "The One Signal Rule", "body": "Forest green is the only general interaction accent. Semantic success, danger, and warning tones communicate outcomes; they do not compete for ordinary actions.", "section": "colors" },
+      { "name": "The Quiet Canvas Rule", "body": "Use the warm canvas behind paper surfaces. Do not add gradients, decorative color fields, or translucent glass.", "section": "colors" },
       { "name": "The Working Type Rule", "body": "Reserve the timer scale for elapsed time and the transcript scale for dictated content. Ordinary interface copy stays compact.", "section": "typography" },
       { "name": "The Explicit State Rule", "body": "Never rely on color or iconography alone; state changes retain a concise text label.", "section": "typography" },
       { "name": "The Transcript-First Rule", "body": "At normal desktop sizes, the transcript owns the flexible column and the recorder remains a stable 304px tool panel.", "section": "layout" },
@@ -316,7 +319,7 @@
     ],
     "donts": [
       "Don't add gradients, glass effects, oversized decoration, or novelty metaphors.",
-      "Don't introduce another general-purpose accent color alongside Signal Indigo.",
+      "Don't introduce another general-purpose accent color alongside Forest Signal.",
       "Don't shadow ordinary cards or settings sections.",
       "Don't hide critical recording state behind icon-only communication.",
       "Don't replace the 960px stacked workspace with a diminished mobile-only experience.",

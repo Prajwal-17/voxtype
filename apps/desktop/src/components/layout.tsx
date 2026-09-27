@@ -66,9 +66,7 @@ export function PageHeader({
   return (
     <div className="mb-7 flex items-end justify-between gap-5 max-md:flex-wrap max-md:items-start max-md:gap-3">
       <div>
-        <h1 className="text-heading font-semibold tracking-[-.025em] text-balance max-md:text-[25px]">
-          {title}
-        </h1>
+        <h1 className="text-heading font-semibold tracking-[-.02em] text-balance">{title}</h1>
         <p className="mt-1.5 text-body text-muted">{description}</p>
       </div>
       {actions}

@@ -288,7 +288,7 @@ function Dictation({
             ) : (
               <div className="flex h-full min-h-[260px] flex-col justify-center">
                 <span className="mb-5 block h-1 w-10 rounded-full bg-accent" aria-hidden="true" />
-                <h2 className="max-w-md text-[1.35rem] font-semibold tracking-[-.025em]">
+                <h2 className="max-w-md text-subheading font-semibold tracking-[-.018em]">
                   {active
                     ? session.isTest
                       ? 'Test your microphone'
@@ -338,7 +338,7 @@ function Dictation({
 
           <div className="flex flex-1 flex-col items-center justify-center py-10 max-[960px]:py-8">
             <Waveform level={session.level} active={session.phase === 'listening'} large />
-            <span className="mt-7 text-[2.35rem] leading-none font-medium tracking-[-.035em] tabular-nums">
+            <span className="mt-7 text-timer font-medium tracking-[-.025em] tabular-nums">
               {duration(session.elapsedMs)}
             </span>
             <span className="mt-2 text-caption text-muted" role="status">
