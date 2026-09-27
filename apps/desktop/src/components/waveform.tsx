@@ -51,7 +51,7 @@ export function Waveform({
     <div
       className={cn(
         'flex h-[30px] w-28 shrink-0 items-center justify-center gap-0.75 text-accent',
-        overlay && 'h-10 w-full max-w-48 gap-0.75 text-inherit',
+        overlay && 'h-8 w-full max-w-48 gap-0.75 text-inherit',
         large &&
           !overlay &&
           'h-[104px] w-[184px] text-accent max-[1050px]:h-[72px] max-[1050px]:w-[148px] max-[700px]:h-16 max-[700px]:w-[100px]',
@@ -74,7 +74,7 @@ export function Waveform({
             className={cn(
               'block origin-center rounded-full bg-current',
               overlay
-                ? 'h-[38px] max-w-[5px] flex-[1_1_5px]'
+                ? 'h-[30px] max-w-[5px] flex-[1_1_5px]'
                 : 'h-[calc(100%-6px)] max-w-1.5 flex-[1_1_4px]',
             )}
             aria-hidden="true"

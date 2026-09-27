@@ -54,7 +54,7 @@ test('first run, navigation, settings and overlay are usable', async ({ page }) 
 });
 test('overlay window has transparent background and reduced motion support', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.setViewportSize({ width: 304, height: 72 });
+  await page.setViewportSize({ width: 304, height: 56 });
   await page.goto('/?window=overlay');
   await expect(page.getByRole('button', { name: 'Finish dictation' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Dismiss overlay' })).toBeVisible();
@@ -62,14 +62,14 @@ test('overlay window has transparent background and reduced motion support', asy
   await expect(page.getByText('Ready')).toHaveCount(0);
   const overlay = page.getByLabel('Voice recording controls');
   await expect(overlay).toHaveCSS('width', '288px');
-  await expect(overlay).toHaveCSS('height', '56px');
+  await expect(overlay).toHaveCSS('height', '40px');
   await expect(overlay).toHaveClass(/rounded-full/);
   const meter = page.getByRole('meter', { name: 'Microphone level' });
   await expect(meter).toHaveCSS('width', '192px');
-  await expect(meter).toHaveCSS('height', '40px');
+  await expect(meter).toHaveCSS('height', '32px');
   await expect(meter.locator('span')).toHaveCount(23);
   await expect(page.getByRole('button', { name: 'Dismiss overlay' })).toHaveCSS('width', '32px');
-  expect(await overlay.boundingBox()).toMatchObject({ x: 8, y: 8, width: 288, height: 56 });
+  expect(await overlay.boundingBox()).toMatchObject({ x: 8, y: 8, width: 288, height: 40 });
   expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe(
     'rgba(0, 0, 0, 0)',
   );
@@ -102,7 +102,7 @@ test('overlay window has transparent background and reduced motion support', asy
     queryClient.setQueryData(['session'], { ...current, phase: 'finishing' });
   });
   await expect(page.getByRole('status')).toHaveText('Finishing transcription');
-  await expect(overlay.locator('[data-signal="finishing"]')).toBeVisible();
+  await expect(overlay.locator('[data-signal="loading"]')).toBeVisible();
   await page.screenshot({ path: `${captures}/overlay-finishing.png` });
 
   await page.evaluate(async () => {
@@ -112,9 +112,7 @@ test('overlay window has transparent background and reduced motion support', asy
     queryClient.setQueryData(['session'], { ...current, phase: 'cleaning' });
   });
   await expect(page.getByRole('status')).toHaveText('Cleaning up dictation');
-  const cleaningSignal = overlay.locator('[data-signal="cleaning"]');
-  await expect(cleaningSignal.locator('svg')).toBeVisible();
-  await expect(cleaningSignal.locator('i')).toHaveCount(0);
+  await expect(overlay.locator('[data-signal="loading"]')).toBeVisible();
   await page.screenshot({ path: `${captures}/overlay-cleaning.png` });
 });
 

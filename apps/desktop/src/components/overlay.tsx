@@ -1,5 +1,4 @@
-import { Check, CircleAlert, Sparkles, X } from 'lucide-react';
-import { motion, useReducedMotion } from 'motion/react';
+import { Check, CircleAlert, LoaderCircle, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { toast } from 'sonner';
 import { api, useRecording, useSession } from '../lib/api';
@@ -14,7 +13,6 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
   const finishing = session.phase === 'finishing' || session.phase === 'cleaning';
   const failed = session.phase === 'error';
   const done = session.phase === 'done';
-  const reduced = useReducedMotion();
   const status = failed
     ? session.message
     : finishing
@@ -36,7 +34,7 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
   return (
     <div
       className={cn(
-        'relative isolate grid h-14 grid-cols-[32px_minmax(0,1fr)_32px] items-center gap-1 rounded-full bg-overlay p-1.5 text-overlay-text shadow-floating scheme-dark',
+        'relative isolate grid h-10 grid-cols-[32px_minmax(0,1fr)_32px] items-center gap-1 rounded-full bg-overlay p-1 text-overlay-text shadow-floating scheme-dark',
         'before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border before:border-overlay-line before:opacity-80',
         preview ? 'mx-auto mt-2 w-72' : 'm-2 w-[calc(100%-1rem)]',
       )}
@@ -67,9 +65,12 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
         )}
       >
         {finishing ? (
-          <ProcessingSignal
-            phase={session.phase === 'cleaning' ? 'cleaning' : 'finishing'}
-            reduced={Boolean(reduced)}
+          <LoaderCircle
+            size={20}
+            strokeWidth={1.8}
+            className="animate-spin motion-reduce:animate-none"
+            data-signal="loading"
+            aria-hidden="true"
           />
         ) : failed ? (
           <CircleAlert size={16} />
@@ -92,66 +93,6 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
       <span className="sr-only" role={failed ? 'alert' : 'status'}>
         {status}
       </span>
-    </div>
-  );
-}
-
-function ProcessingSignal({
-  phase,
-  reduced,
-}: {
-  phase: 'finishing' | 'cleaning';
-  reduced: boolean;
-}) {
-  if (phase === 'cleaning') {
-    return (
-      <div
-        className="flex h-10 w-full max-w-44 items-center justify-center"
-        data-signal="cleaning"
-        aria-hidden="true"
-      >
-        <Sparkles size={20} strokeWidth={1.8} />
-      </div>
-    );
-  }
-
-  const heights = [12, 18, 26, 34, 40, 34, 26, 18, 12];
-  return (
-    <div
-      className="flex h-10 w-full max-w-40 items-center justify-center gap-1"
-      data-signal="finishing"
-      aria-hidden="true"
-    >
-      {heights.map((height, index) => {
-        const offset = index - (heights.length - 1) / 2;
-        return (
-          <motion.i
-            key={`${height}-${index}`}
-            className="block w-1 rounded-full bg-current"
-            style={{ height }}
-            initial={false}
-            animate={
-              reduced
-                ? { scaleY: 0.62, opacity: 0.72 }
-                : {
-                    x: [offset * 1.5, 0, offset * 1.5],
-                    scaleY: [0.38, 1, 0.38],
-                    opacity: [0.34, 1, 0.34],
-                  }
-            }
-            transition={
-              reduced
-                ? { duration: 0 }
-                : {
-                    duration: 1.05,
-                    repeat: Infinity,
-                    ease: [0.45, 0, 0.55, 1],
-                    delay: Math.abs(offset) * 0.045,
-                  }
-            }
-          />
-        );
-      })}
     </div>
   );
 }
