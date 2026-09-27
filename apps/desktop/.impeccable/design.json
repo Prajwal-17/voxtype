@@ -30,21 +30,21 @@
       },
       "ink": {
         "role": "neutral",
-        "displayName": "Deep Ink",
-        "canonical": "#1d1f1c",
-        "tonalRamp": ["color-mix(in oklch, #1d1f1c 25%, black)", "color-mix(in oklch, #1d1f1c 45%, black)", "color-mix(in oklch, #1d1f1c 65%, black)", "color-mix(in oklch, #1d1f1c 85%, black)", "#1d1f1c", "color-mix(in oklch, #1d1f1c 75%, white)", "color-mix(in oklch, #1d1f1c 50%, white)", "color-mix(in oklch, #1d1f1c 20%, white)"]
+        "displayName": "Warm Ink",
+        "canonical": "#22231f",
+        "tonalRamp": ["color-mix(in oklch, #22231f 25%, black)", "color-mix(in oklch, #22231f 45%, black)", "color-mix(in oklch, #22231f 65%, black)", "color-mix(in oklch, #22231f 85%, black)", "#22231f", "color-mix(in oklch, #22231f 75%, white)", "color-mix(in oklch, #22231f 50%, white)", "color-mix(in oklch, #22231f 20%, white)"]
       },
       "muted": {
         "role": "neutral",
         "displayName": "Operational Gray",
-        "canonical": "#62665f",
-        "tonalRamp": ["color-mix(in oklch, #62665f 25%, black)", "color-mix(in oklch, #62665f 45%, black)", "color-mix(in oklch, #62665f 65%, black)", "color-mix(in oklch, #62665f 85%, black)", "#62665f", "color-mix(in oklch, #62665f 75%, white)", "color-mix(in oklch, #62665f 50%, white)", "color-mix(in oklch, #62665f 20%, white)"]
+        "canonical": "#62645e",
+        "tonalRamp": ["color-mix(in oklch, #62645e 25%, black)", "color-mix(in oklch, #62645e 45%, black)", "color-mix(in oklch, #62645e 65%, black)", "color-mix(in oklch, #62645e 85%, black)", "#62645e", "color-mix(in oklch, #62645e 75%, white)", "color-mix(in oklch, #62645e 50%, white)", "color-mix(in oklch, #62645e 20%, white)"]
       },
       "faint": {
         "role": "neutral",
         "displayName": "Faint Gray",
-        "canonical": "#8f948b",
-        "tonalRamp": ["color-mix(in oklch, #8f948b 25%, black)", "color-mix(in oklch, #8f948b 45%, black)", "color-mix(in oklch, #8f948b 65%, black)", "color-mix(in oklch, #8f948b 85%, black)", "#8f948b", "color-mix(in oklch, #8f948b 75%, white)", "color-mix(in oklch, #8f948b 50%, white)", "color-mix(in oklch, #8f948b 20%, white)"]
+        "canonical": "#8f928a",
+        "tonalRamp": ["color-mix(in oklch, #8f928a 25%, black)", "color-mix(in oklch, #8f928a 45%, black)", "color-mix(in oklch, #8f928a 65%, black)", "color-mix(in oklch, #8f928a 85%, black)", "#8f928a", "color-mix(in oklch, #8f928a 75%, white)", "color-mix(in oklch, #8f928a 50%, white)", "color-mix(in oklch, #8f928a 20%, white)"]
       },
       "line": {
         "role": "neutral",
@@ -60,27 +60,27 @@
       },
       "accent": {
         "role": "primary",
-        "displayName": "Forest Signal",
-        "canonical": "#3f5546",
-        "tonalRamp": ["color-mix(in oklch, #3f5546 25%, black)", "color-mix(in oklch, #3f5546 45%, black)", "color-mix(in oklch, #3f5546 65%, black)", "color-mix(in oklch, #3f5546 85%, black)", "#3f5546", "color-mix(in oklch, #3f5546 75%, white)", "color-mix(in oklch, #3f5546 50%, white)", "color-mix(in oklch, #3f5546 20%, white)"]
+        "displayName": "Mineral Graphite",
+        "canonical": "#464944",
+        "tonalRamp": ["color-mix(in oklch, #464944 25%, black)", "color-mix(in oklch, #464944 45%, black)", "color-mix(in oklch, #464944 65%, black)", "color-mix(in oklch, #464944 85%, black)", "#464944", "color-mix(in oklch, #464944 75%, white)", "color-mix(in oklch, #464944 50%, white)", "color-mix(in oklch, #464944 20%, white)"]
       },
       "accent-hover": {
         "role": "primary",
-        "displayName": "Deep Forest",
-        "canonical": "#33463a",
-        "tonalRamp": ["color-mix(in oklch, #33463a 25%, black)", "color-mix(in oklch, #33463a 45%, black)", "color-mix(in oklch, #33463a 65%, black)", "color-mix(in oklch, #33463a 85%, black)", "#33463a", "color-mix(in oklch, #33463a 75%, white)", "color-mix(in oklch, #33463a 50%, white)", "color-mix(in oklch, #33463a 20%, white)"]
+        "displayName": "Pressed Graphite",
+        "canonical": "#353833",
+        "tonalRamp": ["color-mix(in oklch, #353833 25%, black)", "color-mix(in oklch, #353833 45%, black)", "color-mix(in oklch, #353833 65%, black)", "color-mix(in oklch, #353833 85%, black)", "#353833", "color-mix(in oklch, #353833 75%, white)", "color-mix(in oklch, #353833 50%, white)", "color-mix(in oklch, #353833 20%, white)"]
       },
       "accent-soft": {
         "role": "primary",
-        "displayName": "Forest Wash",
-        "canonical": "#e7ebe7",
-        "tonalRamp": ["color-mix(in oklch, #e7ebe7 25%, black)", "color-mix(in oklch, #e7ebe7 45%, black)", "color-mix(in oklch, #e7ebe7 65%, black)", "color-mix(in oklch, #e7ebe7 85%, black)", "#e7ebe7", "color-mix(in oklch, #e7ebe7 75%, white)", "color-mix(in oklch, #e7ebe7 50%, white)", "color-mix(in oklch, #e7ebe7 20%, white)"]
+        "displayName": "Mineral Wash",
+        "canonical": "#e9eae6",
+        "tonalRamp": ["color-mix(in oklch, #e9eae6 25%, black)", "color-mix(in oklch, #e9eae6 45%, black)", "color-mix(in oklch, #e9eae6 65%, black)", "color-mix(in oklch, #e9eae6 85%, black)", "#e9eae6", "color-mix(in oklch, #e9eae6 75%, white)", "color-mix(in oklch, #e9eae6 50%, white)", "color-mix(in oklch, #e9eae6 20%, white)"]
       },
       "accent-ink": {
         "role": "primary",
-        "displayName": "Forest Ink",
-        "canonical": "#2c3f32",
-        "tonalRamp": ["color-mix(in oklch, #2c3f32 25%, black)", "color-mix(in oklch, #2c3f32 45%, black)", "color-mix(in oklch, #2c3f32 65%, black)", "color-mix(in oklch, #2c3f32 85%, black)", "#2c3f32", "color-mix(in oklch, #2c3f32 75%, white)", "color-mix(in oklch, #2c3f32 50%, white)", "color-mix(in oklch, #2c3f32 20%, white)"]
+        "displayName": "Mineral Ink",
+        "canonical": "#2d302b",
+        "tonalRamp": ["color-mix(in oklch, #2d302b 25%, black)", "color-mix(in oklch, #2d302b 45%, black)", "color-mix(in oklch, #2d302b 65%, black)", "color-mix(in oklch, #2d302b 85%, black)", "#2d302b", "color-mix(in oklch, #2d302b 75%, white)", "color-mix(in oklch, #2d302b 50%, white)", "color-mix(in oklch, #2d302b 20%, white)"]
       },
       "navigation": {
         "role": "neutral",
@@ -196,9 +196,9 @@
       "timer": { "displayName": "Recorder Timer", "purpose": "Tabular elapsed time in the recorder panel." }
     },
     "shadows": [
-      { "name": "action", "value": "0 1px 2px rgb(31 44 34 / 0.22)", "purpose": "Compact depth beneath primary forest actions." },
-      { "name": "control", "value": "0 1px 1px rgb(29 31 28 / 0.05)", "purpose": "Minimal lift beneath secondary buttons." },
-      { "name": "panel", "value": "0 1px 2px rgb(29 31 28 / 0.03), 0 8px 24px rgb(29 31 28 / 0.04)", "purpose": "Sticky save bars and restrained lifted panels." },
+      { "name": "action", "value": "0 1px 2px rgb(34 35 31 / 0.22)", "purpose": "Compact depth beneath primary graphite actions." },
+      { "name": "control", "value": "0 1px 1px rgb(34 35 31 / 0.05)", "purpose": "Minimal lift beneath secondary buttons." },
+      { "name": "panel", "value": "0 1px 2px rgb(34 35 31 / 0.03), 0 8px 24px rgb(34 35 31 / 0.04)", "purpose": "Sticky save bars and restrained lifted panels." },
       { "name": "floating", "value": "0 8px 24px rgb(18 20 17 / 0.22)", "purpose": "The voice overlay, menus, tooltips, and overlay preview." },
       { "name": "dialog", "value": "0 24px 80px rgb(18 20 17 / 0.18)", "purpose": "Modal and confirmation surfaces above a scrim." },
       { "name": "kbd", "value": "0 1px 0 var(--palette-line-strong)", "purpose": "Minimal physical depth for keyboard shortcut keys." }
@@ -224,7 +224,7 @@
       "refersTo": "button-primary",
       "description": "The default high-confidence action for recording, setup, and saving.",
       "html": "<button class=\"ds-btn-primary\">Start dictation</button>",
-      "css": ".ds-btn-primary { display:inline-flex; min-height:36px; align-items:center; justify-content:center; gap:8px; border:1px solid transparent; border-radius:var(--radius-control, 10px); padding:8px 14px; background:var(--palette-accent); color:#fff; box-shadow:0 1px 2px rgb(31 44 34 / 0.22); font:500 13px/1.45 'Mona Sans Variable','Mona Sans','Segoe UI',sans-serif; transition:transform 150ms ease-out,background-color 150ms ease-out,box-shadow 150ms ease-out; } .ds-btn-primary:hover { background:var(--palette-accent-hover); } .ds-btn-primary:active { transform:scale(.98); } .ds-btn-primary:focus-visible { outline:2px solid var(--palette-accent); outline-offset:2px; } @media (prefers-reduced-motion: reduce) { .ds-btn-primary { transition:none; } .ds-btn-primary:active { transform:none; } }"
+      "css": ".ds-btn-primary { display:inline-flex; min-height:36px; align-items:center; justify-content:center; gap:8px; border:1px solid transparent; border-radius:var(--radius-control, 10px); padding:8px 14px; background:var(--palette-accent); color:var(--palette-inverse); box-shadow:0 1px 2px rgb(34 35 31 / 0.22); font:500 13px/1.45 'Mona Sans Variable','Mona Sans','Segoe UI',sans-serif; transition:transform 150ms ease-out,background-color 150ms ease-out,box-shadow 150ms ease-out; } .ds-btn-primary:hover { background:var(--palette-accent-hover); } .ds-btn-primary:active { transform:scale(.98); } .ds-btn-primary:focus-visible { outline:2px solid var(--palette-accent); outline-offset:2px; } @media (prefers-reduced-motion: reduce) { .ds-btn-primary { transition:none; } .ds-btn-primary:active { transform:none; } }"
     },
     {
       "name": "Secondary Button",
@@ -232,7 +232,7 @@
       "refersTo": "button-secondary",
       "description": "The bordered paper-surface action used for ordinary supporting choices.",
       "html": "<button class=\"ds-btn-secondary\">Replace key</button>",
-      "css": ".ds-btn-secondary { display:inline-flex; min-height:36px; align-items:center; justify-content:center; gap:8px; border:1px solid var(--palette-line); border-radius:var(--radius-control, 10px); padding:8px 14px; background:var(--palette-surface); color:var(--palette-ink); box-shadow:0 1px 1px rgb(29 31 28 / 0.05); font:500 13px/1.45 'Mona Sans Variable','Mona Sans','Segoe UI',sans-serif; transition:transform 150ms ease-out,background-color 150ms ease-out; } .ds-btn-secondary:hover { background:var(--palette-surface-subtle); } .ds-btn-secondary:active { transform:scale(.98); } .ds-btn-secondary:focus-visible { outline:2px solid var(--palette-accent); outline-offset:2px; }"
+      "css": ".ds-btn-secondary { display:inline-flex; min-height:36px; align-items:center; justify-content:center; gap:8px; border:1px solid var(--palette-line); border-radius:var(--radius-control, 10px); padding:8px 14px; background:var(--palette-surface); color:var(--palette-ink); box-shadow:0 1px 1px rgb(34 35 31 / 0.05); font:500 13px/1.45 'Mona Sans Variable','Mona Sans','Segoe UI',sans-serif; transition:transform 150ms ease-out,background-color 150ms ease-out; } .ds-btn-secondary:hover { background:var(--palette-surface-subtle); } .ds-btn-secondary:active { transform:scale(.98); } .ds-btn-secondary:focus-visible { outline:2px solid var(--palette-accent); outline-offset:2px; }"
     },
     {
       "name": "Ghost Button",
@@ -278,7 +278,7 @@
       "kind": "custom",
       "description": "The compact explicit toggle used for recording and local-storage preferences.",
       "html": "<button class=\"ds-switch\" role=\"switch\" aria-checked=\"true\"><span></span></button>",
-      "css": ".ds-switch { position:relative; width:40px; height:24px; border:0; border-radius:999px; padding:2px; background:var(--palette-accent); transition:background-color 150ms ease-out; } .ds-switch span { display:block; width:20px; height:20px; border-radius:999px; background:var(--palette-surface); box-shadow:0 1px 2px rgb(29 31 28 / 0.16); transform:translateX(16px); transition:transform 150ms ease-out; } .ds-switch:hover { background:var(--palette-accent-hover); } .ds-switch:focus-visible { outline:2px solid var(--palette-accent); outline-offset:2px; }"
+      "css": ".ds-switch { position:relative; width:40px; height:24px; border:0; border-radius:999px; padding:2px; background:var(--palette-accent); transition:background-color 150ms ease-out; } .ds-switch span { display:block; width:20px; height:20px; border-radius:999px; background:var(--palette-surface); box-shadow:0 1px 2px rgb(34 35 31 / 0.16); transform:translateX(16px); transition:transform 150ms ease-out; } .ds-switch:hover { background:var(--palette-accent-hover); } .ds-switch:focus-visible { outline:2px solid var(--palette-accent); outline-offset:2px; }"
     },
     {
       "name": "Voice Overlay",
@@ -290,17 +290,17 @@
   ],
   "narrative": {
     "northStar": "The Quiet Control Room",
-    "overview": "Flow is a conventional premium desktop productivity workspace, played straight. Its warm paper canvas and deep graphite navigation frame a focused working area; a low-chroma forest accent identifies interaction and recording state without turning the interface into a brand spectacle. The result should feel calm, capable, and immediately legible during a time-sensitive task.\n\nHierarchy comes from compact Mona Sans typography, measured spacing, explicit state language, and consistent surface boundaries. Most UI remains visually quiet so the live transcript, waveform, timer, and primary recording action can carry the user's attention. Behavior stays familiar: controls are compact, states are named, and recoverability is always visible.",
+    "overview": "Flow is a conventional premium desktop productivity workspace, played straight. Its warm paper canvas and deep graphite navigation frame a focused working area; a mineral graphite accent identifies interaction and recording state without turning the interface into a brand spectacle. The result should feel calm, capable, and immediately legible during a time-sensitive task.\n\nHierarchy comes from compact Mona Sans typography, measured spacing, explicit state language, and consistent surface boundaries. Most UI remains visually quiet so the live transcript, waveform, timer, and primary recording action can carry the user's attention. Behavior stays familiar: controls are compact, states are named, and recoverability is always visible.",
     "keyCharacteristics": [
       "Warm paper application canvas with softly off-white working surfaces.",
       "Deep graphite sidebar that anchors the desktop workspace.",
-      "One low-chroma forest interaction color, used sparingly and consistently.",
+      "One mineral graphite interaction tone, used sparingly and consistently.",
       "Compact Radix/shadcn-style controls with visible focus and direct state labels.",
       "Restrained borders and elevation; no gradients, glass, or oversized decoration.",
       "Transcript-first working area with a dedicated recorder panel."
     ],
     "rules": [
-      { "name": "The One Signal Rule", "body": "Forest green is the only general interaction accent. Semantic success, danger, and warning tones communicate outcomes; they do not compete for ordinary actions.", "section": "colors" },
+      { "name": "The One Signal Rule", "body": "Mineral graphite is the only general interaction accent. Semantic success, danger, and warning tones communicate outcomes; they do not compete for ordinary actions.", "section": "colors" },
       { "name": "The Quiet Canvas Rule", "body": "Use the warm canvas behind paper surfaces. Do not add gradients, decorative color fields, or translucent glass.", "section": "colors" },
       { "name": "The Working Type Rule", "body": "Reserve the timer scale for elapsed time and the transcript scale for dictated content. Ordinary interface copy stays compact.", "section": "typography" },
       { "name": "The Explicit State Rule", "body": "Never rely on color or iconography alone; state changes retain a concise text label.", "section": "typography" },
@@ -319,7 +319,7 @@
     ],
     "donts": [
       "Don't add gradients, glass effects, oversized decoration, or novelty metaphors.",
-      "Don't introduce another general-purpose accent color alongside Forest Signal.",
+      "Don't introduce another general-purpose accent color alongside Mineral Graphite.",
       "Don't shadow ordinary cards or settings sections.",
       "Don't hide critical recording state behind icon-only communication.",
       "Don't replace the 960px stacked workspace with a diminished mobile-only experience.",

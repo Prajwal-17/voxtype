@@ -78,14 +78,14 @@ export const nativeTheme = {
   easing,
   shadow: {
     action: {
-      shadowColor: '#1f2c22',
+      shadowColor: '#22231f',
       shadowOffset: { width: 0, height: 1 },
       shadowOpacity: 0.22,
       shadowRadius: 1,
       elevation: 1,
     },
     panel: {
-      shadowColor: '#1d1f1c',
+      shadowColor: '#22231f',
       shadowOffset: { width: 0, height: 3 },
       shadowOpacity: 0.08,
       shadowRadius: 10,

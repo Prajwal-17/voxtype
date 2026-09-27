@@ -1,6 +1,6 @@
 # Flow Design System
 
-Flow uses one visual language across desktop and future mobile clients: warm paper surfaces, graphite chrome, Mona Sans typography, and a single low-chroma forest interaction color. The system is quiet, direct, and optimized for capturing and reviewing speech without visual noise.
+Flow uses one visual language across desktop and future mobile clients: warm paper surfaces, graphite chrome, Mona Sans typography, and a single mineral interaction tone. The system is quiet, direct, and optimized for capturing and reviewing speech without visual noise.
 
 ## Architecture
 
@@ -17,7 +17,7 @@ This boundary is intentional. Visual identity is shared; HTML, hover behavior, p
 
 ### Color
 
-The palette is neutral-first. Warm canvas and paper surfaces establish hierarchy; graphite provides primary text and application chrome. Forest is the only general interaction accent and is reserved for primary actions, focus, selection, links, and live recording cues.
+The palette is neutral-first. Warm canvas and paper surfaces establish hierarchy; warm ink provides text contrast and graphite anchors application chrome. Mineral graphite is the only general interaction accent and is reserved for primary actions, focus, selection, links, and live recording cues.
 
 Success, danger, and warning colors communicate outcomes only. Never use them for decoration or ordinary actions. State must always include text or an icon in addition to color.
 

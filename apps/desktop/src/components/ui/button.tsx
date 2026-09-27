@@ -10,20 +10,21 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: 'bg-accent text-white shadow-action hover:bg-accent-hover',
-        primary: 'bg-accent text-white shadow-action hover:bg-accent-hover',
+        default: 'bg-accent text-inverse shadow-action hover:bg-accent-hover',
+        primary: 'bg-accent text-inverse shadow-action hover:bg-accent-hover',
         secondary: 'border-line bg-surface text-ink shadow-control hover:bg-subtle',
         outline: 'border-line-strong bg-surface text-ink hover:bg-subtle',
         ghost: 'bg-transparent text-muted hover:bg-subtle hover:text-ink',
-        destructive: 'bg-danger text-white hover:brightness-90',
-        danger: 'bg-danger text-white hover:brightness-90',
+        destructive: 'bg-danger text-inverse hover:brightness-90',
+        danger: 'bg-danger text-inverse hover:brightness-90',
         link: 'bg-transparent text-accent underline-offset-4 hover:text-accent-hover hover:underline',
       },
       size: {
-        sm: 'min-h-8 px-3 py-1.5 text-caption',
-        default: 'min-h-9 px-3.5 py-2 text-ui',
-        md: 'min-h-9 px-3.5 py-2 text-ui',
-        lg: 'min-h-11 px-5 py-2.5 text-body',
+        sm: 'min-h-8 px-3 py-1.5 text-[length:var(--text-caption)] leading-[var(--text-caption--line-height)]',
+        default:
+          'min-h-9 px-3.5 py-2 text-[length:var(--text-ui)] leading-[var(--text-ui--line-height)]',
+        md: 'min-h-9 px-3.5 py-2 text-[length:var(--text-ui)] leading-[var(--text-ui--line-height)]',
+        lg: 'min-h-11 px-5 py-2.5 text-[length:var(--text-body)] leading-[var(--text-body--line-height)]',
         icon: 'size-8 p-0 [&_svg]:size-4',
         'icon-sm': 'size-7 p-0 [&_svg]:size-3.5',
       },

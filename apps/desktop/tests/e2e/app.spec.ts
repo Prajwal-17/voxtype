@@ -8,6 +8,14 @@ test('first run, navigation, settings and overlay are usable', async ({ page }) 
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Dictation' })).toBeVisible();
   await expect(page.getByText('Browser preview ·')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Set up dictation' })).toHaveCSS(
+    'color',
+    'rgb(246, 246, 242)',
+  );
+  await expect(page.getByRole('button', { name: 'Set up dictation' })).toHaveCSS(
+    'background-color',
+    'rgb(70, 73, 68)',
+  );
   await mkdir(captures, { recursive: true });
   await page.screenshot({ path: `${captures}/desktop.png`, fullPage: false });
   await page.getByRole('button', { name: 'Preview overlay' }).click();
