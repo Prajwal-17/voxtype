@@ -36,3 +36,8 @@ pnpm build:desktop
 ```
 
 `.deb` lands in `apps/desktop/src-tauri/target/release/bundle/deb/`.
+
+## Cloud backend
+
+The sync/auth API lives in [`apps/api`](apps/api). See its README for D1 creation, Google OAuth,
+migrations, local development, and deployment.

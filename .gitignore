@@ -1,8 +1,11 @@
 node_modules/
 .turbo/
+.wrangler/
 dist/
 .env*
 !.env.example
+.dev.vars
+worker-configuration.d.ts
 apps/desktop/bin/
 apps/desktop/.tmp/
 apps/desktop/.storage/

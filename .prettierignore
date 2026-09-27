@@ -7,3 +7,6 @@ apps/desktop/src-tauri/gen
 apps/desktop/src-tauri/icons
 pnpm-lock.yaml
 *.deb
+apps/api/migrations/meta/
+apps/api/worker-configuration.d.ts
+apps/api/.wrangler/

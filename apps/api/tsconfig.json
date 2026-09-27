@@ -1,0 +1,10 @@
+{
+  "extends": "@flow/typescript-config/base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noEmit": true,
+    "types": ["./worker-configuration.d.ts"]
+  },
+  "include": ["src", "test", "drizzle.config.ts", "vitest.config.ts"]
+}
