@@ -7,4 +7,11 @@ apps/desktop/bin/
 apps/desktop/.tmp/
 apps/desktop/.storage/
 apps/desktop/neutralinojs.log
+target/
+test-results/
+playwright-report/
+.impeccable/review/
+*.deb
 
+.agents/
+.impeccable/

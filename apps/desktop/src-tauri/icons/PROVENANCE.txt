@@ -1,0 +1,1 @@
+Flow app icon: original geometric audio bars drawn programmatically for this application; 256px master, olive field and ivory bars. No stock or generated imagery. Mirrors the Lucide AudioLines brand motif in the UI.

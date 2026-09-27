@@ -1,0 +1,56 @@
+import { expect, test } from '@playwright/test';
+import { mkdir } from 'node:fs/promises';
+const captures = '../../.impeccable/review';
+test('first run, navigation, settings and overlay are usable', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Dictation' })).toBeVisible();
+  await expect(page.getByText('Browser preview ·')).toBeVisible();
+  await mkdir(captures, { recursive: true });
+  await page.screenshot({ path: `${captures}/desktop.png`, fullPage: false });
+  await page.getByRole('button', { name: 'Preview voice overlay' }).click();
+  await expect(page.getByText('Overlay preview · idle state')).toBeVisible();
+  await page.screenshot({ path: `${captures}/overlay-preview.png`, fullPage: false });
+  await page.getByRole('button', { name: 'Close preview' }).click();
+  await page.getByRole('button', { name: 'History', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'No dictations yet' })).toBeVisible();
+  await page.getByRole('searchbox', { name: 'Search history' }).fill('unknown');
+  await expect(page.getByText('No matching transcripts')).toBeVisible();
+  await page.getByRole('button', { name: 'Clear search' }).click();
+  await page.screenshot({ path: `${captures}/history.png`, fullPage: false });
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+  await page.getByLabel('API key', { exact: true }).fill('not-a-real-api-key');
+  await expect(page.getByLabel('API key', { exact: true })).toHaveAttribute('type', 'password');
+  await page.getByRole('button', { name: 'Show API key' }).click();
+  await expect(page.getByLabel('API key', { exact: true })).toHaveAttribute('type', 'text');
+  await page.getByLabel('API key', { exact: true }).fill('');
+  await page.getByRole('switch', { name: 'Paste when I finish' }).click();
+  await expect(page.getByText('You have unsaved changes.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save preferences' })).toBeDisabled();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({ path: `${captures}/settings.png`, fullPage: false });
+  await page.getByRole('heading', { name: 'Personal vocabulary' }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `${captures}/settings-lower.png`, fullPage: false });
+  await page.setViewportSize({ width: 760, height: 650 });
+  await page.getByRole('button', { name: 'Dictation', exact: true }).click();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({ path: `${captures}/compact-desktop.png`, fullPage: false });
+  expect(errors).toEqual([]);
+});
+test('overlay window has transparent background and reduced motion support', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.setViewportSize({ width: 248, height: 64 });
+  await page.goto('/?window=overlay');
+  await expect(page.getByRole('button', { name: 'Finish dictation' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Dismiss overlay' })).toBeVisible();
+  expect(
+    await page.locator('.voice-overlay').evaluate((el) => (el as HTMLElement).innerText.trim()),
+  ).toBe('Not recording');
+  expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe(
+    'rgba(0, 0, 0, 0)',
+  );
+  await page.screenshot({ path: `${captures}/overlay.png` });
+});

@@ -3,16 +3,27 @@
   "private": true,
   "packageManager": "pnpm@10.30.3",
   "scripts": {
-    "build": "turbo run build",
-    "typecheck": "turbo run typecheck",
-    "dev": "pnpm --filter @flow/desktop dev",
-    "probe": "pnpm --filter @flow/desktop probe",
-    "runtime:download": "pnpm --filter @flow/desktop runtime:download",
-    "package:linux": "pnpm --filter @flow/desktop package:linux",
-    "test": "turbo run test"
+    "dev": "pnpm --filter @flow/desktop tauri dev",
+    "dev:web": "pnpm --filter @flow/desktop dev",
+    "build": "pnpm --filter @flow/desktop build",
+    "build:desktop": "pnpm --filter @flow/desktop tauri build --bundles deb",
+    "format": "prettier --write . && cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml",
+    "format:check": "prettier --check . && cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check",
+    "lint": "eslint . --max-warnings 0 && cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets --all-features -- -D warnings",
+    "typecheck": "pnpm --filter @flow/desktop typecheck",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck",
+    "test": "pnpm --filter @flow/desktop test",
+    "test:e2e": "pnpm --filter @flow/desktop test:e2e",
+    "check:rust": "cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml",
+    "test:rust": "cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml"
   },
   "devDependencies": {
-    "turbo": "2.11.3",
-    "typescript": "5.9.3"
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.11.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.7",
+    "globals": "^17.12.0",
+    "prettier": "^3.9.9",
+    "typescript-eslint": "^8.70.1"
   }
 }
