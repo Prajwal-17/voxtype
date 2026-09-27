@@ -6,13 +6,16 @@ import * as React from 'react';
 import { cn } from '../../lib/utils';
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-control border border-transparent font-medium transition-[transform,background-color,color,border-color] duration-150 ease-out enabled:active:scale-[.97] disabled:cursor-not-allowed disabled:opacity-45 motion-reduce:transition-none motion-reduce:active:scale-100 [&_svg]:shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-control border border-transparent font-medium transition-[transform,background-color,color,border-color,box-shadow] duration-150 ease-out enabled:active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-45 motion-reduce:transition-none motion-reduce:active:scale-100 [&_svg]:shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
   {
     variants: {
       variant: {
-        default: 'bg-accent text-white hover:bg-accent-hover',
-        primary: 'bg-accent text-white hover:bg-accent-hover',
-        secondary: 'border-line-strong bg-surface text-ink hover:bg-subtle',
+        default:
+          'bg-accent text-white shadow-[0_1px_2px_rgb(64_56_189_/_0.25)] hover:bg-accent-hover',
+        primary:
+          'bg-accent text-white shadow-[0_1px_2px_rgb(64_56_189_/_0.25)] hover:bg-accent-hover',
+        secondary:
+          'border-line bg-surface text-ink shadow-[0_1px_1px_rgb(23_25_37_/_0.04)] hover:bg-subtle',
         outline: 'border-line-strong bg-surface text-ink hover:bg-subtle',
         ghost: 'bg-transparent text-muted hover:bg-subtle hover:text-ink',
         destructive: 'bg-danger text-white hover:brightness-90',

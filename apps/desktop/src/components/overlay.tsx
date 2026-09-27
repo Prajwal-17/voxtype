@@ -27,7 +27,9 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
           ? 'Transcript ready'
           : 'Not recording';
   const recover = () => {
-    void api.openMain().catch((error) => toast.error(String(error)));
+    void api
+      .openMain()
+      .catch(() => toast.error('Flow couldn’t open the main window. Try again from the app icon.'));
   };
   return (
     <div
@@ -42,12 +44,16 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
       aria-busy={finishing}
     >
       <button
-        className="inline-flex size-6 items-center justify-center rounded-full border-0 bg-overlay-muted p-0 text-overlay-text transition-[transform,background-color] duration-150 ease-out enabled:active:scale-[.97] enabled:hover:bg-overlay-muted-hover enabled:hover:text-white disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100"
+        className="inline-flex size-6 items-center justify-center rounded-full border-0 bg-overlay-raised p-0 text-overlay-text transition-[transform,background-color] duration-150 ease-out enabled:active:scale-[.97] enabled:hover:bg-navigation-line enabled:hover:text-white disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100"
         title={active ? 'Cancel dictation' : 'Dismiss overlay'}
         aria-label={active ? 'Cancel dictation' : 'Dismiss overlay'}
         disabled={!!preview || cancel.isPending}
         onClick={() =>
-          active ? cancel.mutate() : void api.dismiss().catch((error) => toast.error(String(error)))
+          active
+            ? cancel.mutate()
+            : void api
+                .dismiss()
+                .catch(() => toast.error('The overlay couldn’t close. Use the main Flow window.'))
         }
       >
         <X size={16} strokeWidth={1.8} />
@@ -88,7 +94,7 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
         )}
       </div>
       <button
-        className="inline-flex size-6 items-center justify-center rounded-full border-0 bg-white p-0 text-overlay-ink transition-transform duration-150 ease-out enabled:active:scale-[.97] disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100"
+        className="inline-flex size-6 items-center justify-center rounded-full border-0 bg-white p-0 text-navigation transition-transform duration-150 ease-out enabled:active:scale-[.97] disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100"
         title={failed || done ? 'Open transcript' : 'Finish dictation'}
         aria-label={failed || done ? 'Open Flow to recover transcript' : 'Finish dictation'}
         disabled={!!preview || finishing || stop.isPending || (!active && !failed && !done)}

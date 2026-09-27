@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
+type ApiModule = typeof import('../../src/lib/api');
 const captures = '../../.impeccable/review';
 test('first run, navigation, settings and overlay are usable', async ({ page }) => {
   const errors: string[] = [];
@@ -9,15 +10,13 @@ test('first run, navigation, settings and overlay are usable', async ({ page }) 
   await expect(page.getByText('Browser preview ·')).toBeVisible();
   await mkdir(captures, { recursive: true });
   await page.screenshot({ path: `${captures}/desktop.png`, fullPage: false });
-  await page.getByRole('button', { name: 'Voice overlay' }).click();
-  await expect(page.getByText('Voice overlay · idle')).toBeVisible();
+  await page.getByRole('button', { name: 'Preview overlay' }).click();
+  await expect(page.getByText('Overlay preview · Idle')).toBeVisible();
   await page.screenshot({ path: `${captures}/overlay-preview.png`, fullPage: false });
   await page.getByRole('button', { name: 'Close preview' }).click();
   await page.getByRole('button', { name: 'History', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'No dictations yet' })).toBeVisible();
-  await page.getByRole('searchbox', { name: 'Search history' }).fill('unknown');
-  await expect(page.getByText('No matching transcripts')).toBeVisible();
-  await page.getByRole('button', { name: 'Clear search' }).click();
+  await expect(page.getByRole('searchbox', { name: 'Search history' })).toBeDisabled();
   await page.screenshot({ path: `${captures}/history.png`, fullPage: false });
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
@@ -52,4 +51,63 @@ test('overlay window has transparent background and reduced motion support', asy
     'rgba(0, 0, 0, 0)',
   );
   await page.screenshot({ path: `${captures}/overlay.png` });
+});
+
+test('review evidence covers compact help, filtering, and recovery states', async ({ page }) => {
+  await page.setViewportSize({ width: 760, height: 650 });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Dictation', exact: true }).hover();
+  await expect(page.getByRole('tooltip')).toHaveText('Dictation');
+  await page.screenshot({ path: `${captures}/compact-tooltip.png`, fullPage: false });
+
+  await page.setViewportSize({ width: 1100, height: 800 });
+  await page.evaluate(async () => {
+    // @ts-expect-error Vite resolves this browser-only module path during the test.
+    const { queryClient } = (await import('/src/lib/api.ts')) as ApiModule;
+    queryClient.setQueryData(
+      ['history'],
+      [
+        {
+          id: 'one',
+          text: 'Alpha project planning notes',
+          createdAt: Date.now(),
+          durationMs: 18000,
+          words: 4,
+          delivery: 'copied',
+        },
+        {
+          id: 'two',
+          text: 'Beta meeting follow-up',
+          createdAt: Date.now() - 60000,
+          durationMs: 12000,
+          words: 3,
+          delivery: 'pasted',
+        },
+      ],
+    );
+  });
+  await page.getByRole('button', { name: 'History', exact: true }).click();
+  await page.getByRole('searchbox', { name: 'Search history' }).fill('alpha');
+  await expect(page.getByText('1 of 2 dictations')).toBeVisible();
+  await page.screenshot({ path: `${captures}/history-filtered.png`, fullPage: false });
+
+  await page.evaluate(async () => {
+    // @ts-expect-error Vite resolves this browser-only module path during the test.
+    const { queryClient } = (await import('/src/lib/api.ts')) as ApiModule;
+    const query = queryClient.getQueryCache().find({ queryKey: ['history'] });
+    if (!query) throw new Error('History query is missing');
+    query.setState({
+      ...query.state,
+      data: undefined,
+      error: new Error('Synthetic history failure'),
+      errorUpdatedAt: Date.now(),
+      fetchStatus: 'idle',
+      status: 'error',
+    });
+  });
+  await expect(page.getByRole('heading', { name: 'History couldn’t load' })).toBeVisible();
+  await expect(
+    page.getByText('Flow couldn’t read your local history. Nothing was deleted.'),
+  ).toBeVisible();
+  await page.screenshot({ path: `${captures}/history-error.png`, fullPage: false });
 });

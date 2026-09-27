@@ -41,16 +41,16 @@ export function SettingsPage({ boot, active }: { boot: Bootstrap; active: boolea
         title="Settings"
         description="Audio, transcription, and desktop integration."
         actions={
-          <span className="flex shrink-0 items-center gap-1.5 text-caption text-muted max-lg:hidden">
-            <ShieldCheck size={14} /> On this device
+          <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-success-soft px-3 py-1.5 text-caption font-medium text-success max-lg:hidden">
+            <ShieldCheck size={14} /> Stored on this device
           </span>
         }
       />
-      <div className="max-w-4xl">
+      <div className="max-w-5xl">
         <ApiKey boot={boot} active={active} />
-        <ApiKey boot={boot} active={active} provider="deepseek" />
         <Preferences key={JSON.stringify(boot.settings)} settings={boot.settings} active={active} />
         <DesktopSetup registered={boot.shortcutRegistered} active={active} />
+        <ApiKey boot={boot} active={active} provider="deepseek" />
       </div>
     </>
   );
@@ -94,7 +94,7 @@ function ApiKey({
     },
   });
   return (
-    <section className="mb-7 border-b border-line pb-7">
+    <section className="mb-5 rounded-panel border border-line bg-surface p-5 max-md:p-4">
       <SectionHeader
         title={cleanup ? 'Text cleanup' : 'Deepgram connection'}
         description={
@@ -104,7 +104,7 @@ function ApiKey({
         }
       />
       {hasKey && !editing ? (
-        <div className="flex items-center gap-3 rounded-control bg-surface p-4 max-lg:flex-wrap">
+        <div className="flex items-center gap-3 rounded-control bg-subtle p-4 max-lg:flex-wrap">
           <span className="text-success">
             <KeyRound size={19} />
           </span>
@@ -138,7 +138,7 @@ function ApiKey({
             {name} API key
           </Label>
           <div className="flex items-center gap-2 max-md:flex-wrap">
-            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-control border border-line-strong bg-surface py-1 pr-1 pl-3 text-muted focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent max-md:basis-full">
+            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-control border border-line-strong bg-raised py-1 pr-1 pl-3 text-muted focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent max-md:basis-full">
               <KeyRound size={16} className="shrink-0" />
               <Input
                 id={inputId}
@@ -200,7 +200,11 @@ function ApiKey({
           <button
             className="inline-flex items-center gap-1 border-0 bg-transparent p-0 text-caption text-accent hover:text-accent-hover hover:underline hover:underline-offset-[3px]"
             type="button"
-            onClick={() => void api.openDeepgram().catch((error) => toast.error(String(error)))}
+            onClick={() =>
+              void api
+                .openDeepgram()
+                .catch(() => toast.error('Couldn’t open the Deepgram console. Try again.'))
+            }
           >
             Deepgram console <ArrowUpRight size={12} />
           </button>
@@ -254,7 +258,7 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
         save.mutate(parsed.data);
       }}
     >
-      <section className="mb-7 border-b border-line pb-7">
+      <section className="mb-5 rounded-panel border border-line bg-surface p-5 max-md:p-4">
         <SectionHeader
           title="Voice & language"
           description="Choose your input device and transcription language."
@@ -296,9 +300,11 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
           </div>
         </FieldRow>
         {microphones.isError && (
-          <p className="mt-2 text-ui text-danger">{String(microphones.error)}</p>
+          <p className="mt-2 text-ui text-danger">
+            Flow couldn’t list microphones. Check that one is connected, then refresh.
+          </p>
         )}
-        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-control bg-surface px-3 py-2">
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-control bg-subtle px-3 py-2.5">
           <div className="mr-auto flex items-center gap-2 text-caption text-muted">
             <Mic size={16} />
             <span>
@@ -358,7 +364,7 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
           </Select>
         </FieldRow>
       </section>
-      <section className="mb-7 border-b border-line pb-7">
+      <section className="mb-5 rounded-panel border border-line bg-surface p-5 max-md:p-4">
         <SectionHeader
           title="Recording preferences"
           description="Control text insertion and local storage."
@@ -379,7 +385,7 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
         />
         <Toggle
           label="Clean up dictation"
-          description="Send the finished transcript to DeepSeek before pasting. Add your DeepSeek key above first."
+          description="Send the finished transcript to DeepSeek before pasting. Connect the optional cleanup service below."
           checked={draft.cleanupEnabled}
           onChange={(v) => set('cleanupEnabled', v)}
           disabled={active}
@@ -392,7 +398,7 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
           disabled={active}
         />
       </section>
-      <section className="mb-7 border-b border-line pb-7">
+      <section className="mb-5 rounded-panel border border-line bg-surface p-5 max-md:p-4">
         <SectionHeader
           title="Personal vocabulary"
           description="Help Deepgram recognize names, projects, and technical terms."
@@ -413,7 +419,7 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
           <span>{value.vocabulary.length} / 100 terms</span>
         </div>
       </section>
-      <div className="sticky bottom-0 z-10 mb-7 flex items-center justify-between gap-3 border-t border-line bg-canvas py-4 text-caption text-muted">
+      <div className="sticky bottom-4 z-10 mb-5 flex items-center justify-between gap-3 rounded-panel border border-line bg-surface px-4 py-3 text-caption text-muted shadow-panel">
         <span>
           {active
             ? 'Finish recording to change preferences.'
@@ -451,7 +457,7 @@ function DesktopSetup({ registered, active }: { registered: boolean; active: boo
     staleTime: 60_000,
   });
   return (
-    <section className="mb-7 border-b-0 border-line pb-7">
+    <section className="mb-7 rounded-panel border border-line bg-surface p-5 max-md:p-4">
       <div className="mb-5">
         <div className="flex items-center justify-between gap-4">
           <h2 className="text-title font-semibold tracking-[-.02em]">Ubuntu desktop setup</h2>
@@ -463,7 +469,7 @@ function DesktopSetup({ registered, active }: { registered: boolean; active: boo
           Check the services used for shortcuts and text insertion.
         </p>
       </div>
-      <div className="mb-5 flex items-center justify-between gap-6 rounded-control border-0 bg-surface p-4 max-lg:gap-4 max-md:flex-wrap">
+      <div className="mb-5 flex items-center justify-between gap-6 rounded-control bg-subtle p-4 max-lg:gap-4 max-md:flex-wrap">
         <div className="min-w-0">
           <Label>Recording shortcut</Label>
           <p className="mt-1 max-w-lg text-ui text-muted">
@@ -490,7 +496,9 @@ function DesktopSetup({ registered, active }: { registered: boolean; active: boo
             <LoaderCircle size={16} className="animate-spin" /> Checking your desktop…
           </p>
         ) : checks.isError ? (
-          <p className="mt-2 text-ui text-danger">{String(checks.error)}</p>
+          <p className="mt-2 text-ui text-danger">
+            Flow couldn’t check desktop services. Nothing was changed. Select Check again.
+          </p>
         ) : (
           checks.data?.map((check) => (
             <div className="flex items-start gap-2" key={check.name}>

@@ -119,13 +119,18 @@ export function Confirm({
   );
 }
 
-export function Logo({ compact = false }: { compact?: boolean }) {
+export function Logo({ compact = false, className }: { compact?: boolean; className?: string }) {
   return (
-    <div className="flex items-center gap-2.5 text-[28px] font-semibold tracking-[-.04em]">
-      <span className="grid size-8 place-items-center text-signal">
-        <AudioLines size={23} strokeWidth={2.2} />
+    <div
+      className={cn(
+        'flex items-center gap-2.5 text-[22px] font-semibold tracking-[-.025em] text-inverse',
+        className,
+      )}
+    >
+      <span className="grid size-8 place-items-center rounded-[9px] bg-accent text-white">
+        <AudioLines size={18} strokeWidth={2.1} />
       </span>
-      {!compact && <span>flow</span>}
+      {!compact && <span>Flow</span>}
     </div>
   );
 }

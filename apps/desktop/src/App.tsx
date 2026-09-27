@@ -1,10 +1,8 @@
 import {
   ArrowRight,
-  ArrowUpRight,
   AudioLines,
   Check,
   CircleAlert,
-  CircleHelp,
   Copy,
   FileText,
   History,
@@ -20,6 +18,7 @@ import { useEffect, useState } from 'react';
 import { VoiceOverlay } from './components/overlay';
 import { PageHeader, SidebarNavItem, StatusDot } from './components/layout';
 import { Button, IconButton, Logo, Shortcut } from './components/ui';
+import { Card } from './components/ui/card';
 import { Skeleton } from './components/ui/skeleton';
 import { Waveform } from './components/waveform';
 import { native, useBootstrap, useCopy, useRecording, useSession } from './lib/api';
@@ -29,6 +28,7 @@ import { HistoryPage } from './pages/History';
 import { SettingsPage } from './pages/Settings';
 
 type Page = 'dictation' | 'history' | 'settings';
+
 const navigation = [
   { id: 'dictation', icon: AudioLines, label: 'Dictation' },
   { id: 'history', icon: History, label: 'History' },
@@ -45,28 +45,38 @@ export function App() {
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        if (preview) {
-          setPreview(false);
-          return;
-        }
-        if (active) {
-          event.preventDefault();
-          cancel.mutate();
-        }
+      if (event.key !== 'Escape') return;
+      if (preview) {
+        setPreview(false);
+        return;
+      }
+      if (active) {
+        event.preventDefault();
+        cancel.mutate();
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [active, preview, cancel]);
 
+  const appStatus =
+    session.phase === 'listening'
+      ? 'Recording'
+      : active
+        ? 'Processing'
+        : boot.data?.hasKey
+          ? 'Ready'
+          : 'Setup required';
+
   return (
-    <div className="flex min-h-screen selection:bg-accent-soft selection:text-accent-ink">
-      <aside className="sidebar group fixed inset-y-0 left-0 z-10 flex w-48 shrink-0 flex-col bg-graphite px-3 py-7 text-inverse max-lg:w-44 max-md:w-16 max-md:px-2 max-md:py-5">
-        <div className="mb-12 ml-3 max-md:mx-0 max-md:mb-8 max-md:justify-center max-md:flex">
-          <Logo />
+    <div className="min-h-screen bg-canvas text-ink selection:bg-accent-soft selection:text-accent-ink">
+      <aside className="sidebar group fixed inset-y-0 left-0 z-30 flex w-60 flex-col border-r border-navigation-line bg-navigation p-4 text-inverse max-lg:w-20 max-lg:px-3">
+        <div className="flex h-12 items-center px-2 max-lg:justify-center max-lg:px-0">
+          <Logo compact={false} className="max-lg:hidden" />
+          <Logo compact className="hidden max-lg:flex" />
         </div>
-        <nav className="flex flex-col gap-1" aria-label="Main navigation">
+
+        <nav className="mt-7 flex flex-col gap-1" aria-label="Main navigation">
           {navigation.map(({ id, icon, label }) => (
             <SidebarNavItem
               key={id}
@@ -77,99 +87,105 @@ export function App() {
             />
           ))}
         </nav>
-        <div className="mt-auto pt-12 max-md:hidden">
+
+        <div className="mt-auto space-y-3 max-lg:hidden">
           <button
-            className="mb-5 grid w-full grid-cols-[16px_1fr] items-center gap-x-2 gap-y-2 rounded-control border border-graphite-line bg-transparent px-3 py-3 text-left text-caption text-inverse-muted hover:text-inverse"
+            type="button"
+            className="w-full rounded-panel bg-navigation-raised p-3.5 text-left transition-colors hover:bg-navigation-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             onClick={() => setPage('settings')}
           >
-            <Keyboard size={17} />
-            <span>Record anywhere</span>
-            <span className="col-start-2">
+            <span className="flex items-center gap-2 text-ui font-medium text-inverse">
+              <Keyboard size={16} /> Dictate anywhere
+            </span>
+            <span className="mt-2.5 block">
               <Shortcut />
             </span>
           </button>
-          <div className="flex items-center gap-2.5 border-t border-graphite-line px-2 pt-5">
-            <ShieldCheck size={16} className="shrink-0 text-inverse-muted" />
-            <div>
-              <strong className="block text-caption font-medium text-inverse">
-                Transcript history
-              </strong>
-              <span className="mt-1 block text-caption text-inverse-muted">
-                {boot.data?.settings.keepHistory ? 'Saved on this device' : 'History off'}
-              </span>
-            </div>
+          <div className="flex items-start gap-2.5 px-2 py-2 text-caption text-inverse-muted">
+            <ShieldCheck size={15} className="mt-0.5 shrink-0" />
+            <span>
+              {boot.data?.settings.keepHistory
+                ? 'Transcripts stay on this device'
+                : 'Local transcript history is off'}
+            </span>
           </div>
-          <button
-            className="mt-5 flex w-full items-center gap-2 border-0 bg-transparent px-2 text-caption text-inverse-muted hover:text-inverse"
+        </div>
+        <div className="mt-auto hidden justify-center max-lg:flex">
+          <IconButton
+            label="Right Alt shortcut settings"
             onClick={() => setPage('settings')}
+            className="text-inverse-muted hover:bg-navigation-raised hover:text-inverse"
           >
-            <CircleHelp size={15} />
-            <span>Setup & help</span>
-            <ArrowUpRight size={14} className="ml-auto" />
-          </button>
+            <Keyboard size={17} />
+          </IconButton>
         </div>
       </aside>
-      <main className="ml-48 min-w-0 flex-1 max-lg:ml-44 max-md:ml-16">
-        <header className="flex h-14 items-center justify-between gap-4 border-b border-line px-9 text-caption text-muted max-lg:px-6 max-md:px-4">
-          <span className="font-medium">Personal workspace</span>
-          <span
-            className={cn(
-              'flex items-center gap-2 max-md:text-[11px]',
-              session.phase === 'listening' && 'text-accent',
-            )}
-          >
-            <StatusDot live={session.phase === 'listening'} />
-            {session.phase === 'listening'
-              ? 'Microphone on'
-              : active
-                ? 'Processing transcript'
-                : boot.data?.hasKey
-                  ? 'Ready to dictate'
-                  : 'Setup required'}
-            <span className="ml-3 border-l border-line pl-4 tabular-nums max-md:hidden">
-              v{boot.data?.version ?? '0.1.0'}
+
+      <main className="ml-60 min-h-screen min-w-0 max-lg:ml-20">
+        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b border-line bg-canvas px-8 max-md:px-5">
+          <span className="text-ui font-medium text-muted">Personal workspace</span>
+          <div className="flex items-center gap-3 text-ui text-muted">
+            <span
+              className={cn(
+                'flex items-center gap-2',
+                session.phase === 'listening' && 'text-accent-ink',
+              )}
+            >
+              <StatusDot live={session.phase === 'listening'} />
+              {appStatus}
             </span>
-          </span>
+            <span className="h-4 w-px bg-line max-md:hidden" />
+            <span className="tabular-nums max-md:hidden">v{boot.data?.version ?? '0.1.0'}</span>
+          </div>
         </header>
+
         {!native && (
-          <div className="bg-warning-soft px-5 py-2 text-center text-caption text-warning">
+          <div className="border-b border-warning/15 bg-warning-soft px-5 py-2 text-center text-caption font-medium text-warning">
             Browser preview · Open the desktop app to record.
           </div>
         )}
-        <div className="mx-auto max-w-6xl px-9 pt-9 pb-7 xl:pt-12 max-lg:px-6 max-lg:py-7 max-md:px-4 max-md:py-6">
+
+        <div className="mx-auto w-full max-w-[1240px] px-8 py-9 max-md:px-5 max-md:py-7">
           {boot.isPending ? (
-            <div className="flex flex-col gap-5 py-5" aria-label="Loading Flow">
-              <Skeleton className="h-6 w-2/5" />
-              <Skeleton className="h-6 w-2/5" />
-              <Skeleton className="h-72 w-full" />
+            <div className="flex flex-col gap-4 py-4" aria-label="Loading Flow">
+              <Skeleton className="h-8 w-48" />
+              <Skeleton className="h-5 w-80 max-w-full" />
+              <div className="mt-5 grid grid-cols-[minmax(0,1fr)_19rem] gap-5 max-[960px]:grid-cols-1">
+                <Skeleton className="h-[510px] w-full" />
+                <Skeleton className="h-[510px] w-full" />
+              </div>
             </div>
           ) : boot.isError ? (
-            <div className="px-5 py-16">
-              <h1 className="text-heading font-semibold">Flow couldn’t load.</h1>
-              <p className="mt-3 mb-6 text-muted">{String(boot.error)}</p>
-              <Button onClick={() => void boot.refetch()}>Try again</Button>
-            </div>
-          ) : (
-            boot.data && (
-              <>
-                {page === 'dictation' && (
-                  <Dictation
-                    boot={boot.data}
-                    session={session}
-                    onSettings={() => setPage('settings')}
-                    onPreview={() => setPreview((value) => !value)}
-                  />
-                )}
-                {page === 'history' && <HistoryPage onRecord={() => setPage('dictation')} />}
-                {page === 'settings' && <SettingsPage boot={boot.data} active={active} />}
-              </>
-            )
-          )}
+            <Card className="mx-auto max-w-xl p-8 text-center">
+              <h1 className="text-heading font-semibold tracking-[-.025em]">Flow couldn’t load</h1>
+              <p className="mx-auto mt-3 mb-6 max-w-md text-body text-muted">
+                Flow couldn’t load its local configuration. Your saved settings and history are
+                still on this device.
+              </p>
+              <Button variant="primary" onClick={() => void boot.refetch()}>
+                Try again
+              </Button>
+            </Card>
+          ) : boot.data ? (
+            <>
+              {page === 'dictation' && (
+                <Dictation
+                  boot={boot.data}
+                  session={session}
+                  onSettings={() => setPage('settings')}
+                  onPreview={() => setPreview((value) => !value)}
+                />
+              )}
+              {page === 'history' && <HistoryPage onRecord={() => setPage('dictation')} />}
+              {page === 'settings' && <SettingsPage boot={boot.data} active={active} />}
+            </>
+          ) : null}
         </div>
+
         {preview && page === 'dictation' && (
-          <div className="fixed bottom-7 left-[calc(50%+6rem)] z-20 w-[min(240px,calc(100vw-12rem-24px))] -translate-x-1/2 p-2 max-lg:left-[calc(50%+5.5rem)] max-lg:w-[min(240px,calc(100vw-11rem-24px))] max-md:left-[calc(50%+2rem)] max-md:w-[min(240px,calc(100vw-4rem-24px))]">
-            <div className="flex items-center justify-between pl-2 text-caption text-muted">
-              <span>Voice overlay · {active ? 'live' : 'idle'}</span>
+          <div className="fixed right-6 bottom-6 z-40 w-64 rounded-panel border border-line bg-surface p-3 shadow-floating max-md:right-4 max-md:bottom-4">
+            <div className="flex items-center justify-between pl-1 text-caption text-muted">
+              <span>Overlay preview · {active ? 'Live' : 'Idle'}</span>
               <IconButton label="Close preview" onClick={() => setPreview(false)}>
                 <X size={15} />
               </IconButton>
@@ -217,56 +233,130 @@ function Dictation({
               : 'Listening'
           : session.phase === 'error'
             ? 'Recording interrupted'
-            : 'Ready to record';
+            : boot.hasKey
+              ? 'Ready to record'
+              : 'Setup needed';
+
   return (
     <>
       <PageHeader
         title="Dictation"
-        description="Record here, or use your shortcut in another app."
+        description="Speak here or use your shortcut from any desktop app."
         actions={
-          <Button variant="ghost" size="sm" onClick={onPreview}>
-            <AudioLines size={16} /> Voice overlay <ArrowUpRight size={14} />
+          <Button variant="outline" size="sm" onClick={onPreview}>
+            <AudioLines size={15} /> Preview overlay
           </Button>
         }
       />
+
       {!boot.hasKey && (
-        <div className="mb-5 flex items-center gap-3 rounded-control bg-accent-soft px-4 py-3 text-accent-ink max-md:flex-wrap">
-          <KeyRound size={18} className="shrink-0 max-md:hidden" />
-          <div>
-            <strong className="text-ui font-semibold">Connect your transcription service</strong>
-            <p className="mt-0.5 text-caption">Add a Deepgram API key to start dictating.</p>
+        <div className="mb-5 flex items-center gap-3 rounded-panel border border-accent/15 bg-accent-soft px-4 py-3.5 text-accent-ink max-md:flex-wrap">
+          <KeyRound size={18} className="shrink-0" />
+          <div className="min-w-0">
+            <strong className="text-ui font-semibold">Connect Deepgram to start dictating</strong>
+            <p className="mt-0.5 text-caption opacity-80">
+              Your key is stored securely in the desktop keyring.
+            </p>
           </div>
-          <Button size="sm" onClick={onSettings} className="ml-auto max-md:ml-0">
-            Connect <ArrowRight size={14} />
+          <Button size="sm" variant="primary" onClick={onSettings} className="ml-auto max-md:ml-0">
+            Open settings <ArrowRight size={14} />
           </Button>
         </div>
       )}
-      <section
-        className="grid grid-cols-[224px_minmax(0,1fr)] overflow-hidden rounded-panel border border-line bg-surface xl:grid-cols-[248px_minmax(0,1fr)] max-lg:grid-cols-1"
-        aria-label="Dictation workspace"
-        data-active={active}
-      >
-        <div className="flex flex-col border-r border-line bg-subtle px-5 py-5 max-lg:grid max-lg:grid-cols-[minmax(0,1fr)_auto] max-lg:gap-x-5 max-lg:gap-y-3 max-lg:border-r-0 max-lg:border-b max-md:gap-3 max-md:p-4">
-          <div className="flex items-center gap-2 text-ui font-medium max-lg:col-start-1">
-            <Mic size={16} />
-            <span>Microphone</span>
-            <StatusDot live={session.phase === 'listening'} className="ml-auto max-lg:ml-1" />
+
+      <div className="grid grid-cols-[minmax(0,1fr)_19rem] items-stretch gap-5 max-[960px]:grid-cols-1">
+        <Card className="flex min-h-[520px] min-w-0 flex-col overflow-hidden max-[960px]:min-h-[420px]">
+          <div className="flex min-h-14 items-center justify-between gap-4 border-b border-line px-5">
+            <span className="flex items-center gap-2 text-ui font-semibold">
+              <FileText size={15} className="text-muted" /> Transcript
+            </span>
+            <span className="text-caption text-muted">{language}</span>
           </div>
-          <div className="flex flex-1 flex-col items-center justify-center pt-9 pb-5 max-lg:col-start-1 max-lg:row-start-2 max-lg:flex-row max-lg:flex-wrap max-lg:justify-start max-lg:gap-x-3 max-lg:gap-y-2 max-lg:p-0">
+
+          <div className="min-w-0 flex-1 px-7 py-7 max-md:px-5 max-md:py-6">
+            {text && !session.isTest ? (
+              <p className="max-h-[390px] overflow-auto whitespace-pre-wrap [overflow-wrap:anywhere] text-transcript font-[450] tracking-[-.01em]">
+                <span>{session.text}</span>
+                {session.interim && <span className="text-muted"> {session.interim}</span>}
+                {active && (
+                  <span
+                    className="ml-1 inline-block h-5 w-0.5 translate-y-1 bg-accent"
+                    aria-hidden="true"
+                  />
+                )}
+              </p>
+            ) : (
+              <div className="flex h-full min-h-[260px] flex-col justify-center">
+                <span className="mb-5 block h-1 w-10 rounded-full bg-accent" aria-hidden="true" />
+                <h2 className="max-w-md text-[1.35rem] font-semibold tracking-[-.025em]">
+                  {active
+                    ? session.isTest
+                      ? 'Test your microphone'
+                      : 'Listening for your words…'
+                    : 'Your transcript will appear here'}
+                </h2>
+                <p className="mt-2 max-w-md text-body text-muted">
+                  {active
+                    ? session.isTest
+                      ? 'Speak naturally to see the live microphone level.'
+                      : 'Start speaking when you’re ready. Natural pauses are fine.'
+                    : 'Start a dictation, then speak naturally. Flow will keep the text ready to copy or paste.'}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="flex min-h-14 items-center justify-between gap-3 border-t border-line bg-raised px-5 text-caption text-muted">
+            <span>{text ? `${text.trim().split(/\s+/).length} words` : 'No audio is stored'}</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => copy.mutate(text)}
+              disabled={!text}
+              loading={copy.isPending}
+            >
+              <Copy size={14} /> Copy transcript
+            </Button>
+          </div>
+        </Card>
+
+        <Card className="flex min-h-[520px] flex-col p-5 max-[960px]:min-h-0">
+          <div className="flex items-center justify-between">
+            <span className="flex items-center gap-2 text-ui font-semibold">
+              <Mic size={15} className="text-muted" /> Recorder
+            </span>
+            <span
+              className={cn(
+                'inline-flex items-center gap-2 rounded-full bg-subtle px-2.5 py-1 text-caption font-medium text-muted',
+                active && 'bg-accent-soft text-accent-ink',
+                session.phase === 'error' && 'bg-danger-soft text-danger',
+              )}
+            >
+              <StatusDot live={session.phase === 'listening'} /> {status}
+            </span>
+          </div>
+
+          <div className="flex flex-1 flex-col items-center justify-center py-10 max-[960px]:py-8">
             <Waveform level={session.level} active={session.phase === 'listening'} large />
-            <span className="mt-5 text-[32px] leading-[1.1] font-[450] tracking-[-.035em] text-ink tabular-nums max-lg:m-0 max-lg:text-2xl max-md:text-xl">
+            <span className="mt-7 text-[2.35rem] leading-none font-medium tracking-[-.035em] tabular-nums">
               {duration(session.elapsedMs)}
             </span>
-            <span className="mt-2 text-caption text-muted max-lg:m-0 max-lg:w-full" role="status">
-              {status}
+            <span className="mt-2 text-caption text-muted" role="status">
+              {active
+                ? 'Press Escape to cancel'
+                : boot.hasKey
+                  ? 'Ready when you are'
+                  : 'Add a Deepgram key to begin'}
             </span>
           </div>
-          <div className="flex flex-col items-stretch gap-2 max-lg:col-start-2 max-lg:row-span-2 max-lg:row-start-1 max-lg:justify-center">
+
+          <div className="space-y-2">
             {active ? (
               <>
                 <Button
                   variant="primary"
                   size="lg"
+                  className="w-full"
                   onClick={() => recording.stop.mutate()}
                   loading={finishing || recording.stop.isPending}
                 >
@@ -275,6 +365,7 @@ function Dictation({
                 </Button>
                 <Button
                   variant="ghost"
+                  className="w-full"
                   onClick={() => recording.cancel.mutate()}
                   disabled={recording.cancel.isPending}
                 >
@@ -286,6 +377,7 @@ function Dictation({
                 <Button
                   variant="primary"
                   size="lg"
+                  className="w-full"
                   onClick={() => (boot.hasKey ? recording.start.mutate(false) : onSettings())}
                   disabled={boot.hasKey && !native}
                   loading={recording.start.isPending}
@@ -293,83 +385,32 @@ function Dictation({
                   {boot.hasKey ? <Mic size={17} /> : <KeyRound size={16} />}
                   {boot.hasKey ? 'Start dictation' : 'Set up dictation'}
                 </Button>
-                <span className="flex min-h-9 items-center justify-center gap-2 text-caption text-muted">
-                  or press <Shortcut />
-                </span>
+                <div className="flex min-h-9 items-center justify-center gap-2 text-caption text-muted">
+                  Or press <Shortcut />
+                </div>
               </>
             )}
           </div>
-          <div className="mt-6 flex items-center justify-center gap-2 border-t border-line pt-4 text-caption text-muted max-lg:col-span-full max-lg:m-0 max-lg:justify-start max-lg:pt-2.5">
-            <StatusDot />
-            {boot.settings.voiceDetection ? 'Silence detection on' : 'Continuous audio'}
-          </div>
-        </div>
-        <div className="flex min-h-[392px] min-w-0 flex-col xl:min-h-[460px] max-lg:min-h-[300px]">
-          <div className="flex items-center justify-between gap-3 border-b border-line px-6 py-4 text-caption text-muted max-md:px-[18px]">
-            <span className="flex items-center gap-2 font-medium text-ink">
-              <FileText size={15} /> Transcript
+
+          <div className="mt-5 flex items-center justify-between border-t border-line pt-4 text-caption text-muted">
+            <span>{boot.settings.voiceDetection ? 'Silence detection' : 'Continuous audio'}</span>
+            <span className="font-medium text-ink">
+              {boot.settings.voiceDetection ? 'On' : 'Off'}
             </span>
-            <span>{language}</span>
           </div>
-          <div className={cn('min-w-0 flex-1 px-7 py-8 max-lg:p-6 max-md:px-[18px]')}>
-            {text && !session.isTest ? (
-              <p className="max-h-[370px] overflow-auto [overflow-wrap:anywhere] whitespace-pre-wrap text-transcript font-[440] tracking-[-.012em] max-md:text-[17px]">
-                <span>{session.text}</span>
-                {session.interim && <span className="text-muted"> {session.interim}</span>}
-                {active && (
-                  <span
-                    className="ml-1 inline-block h-5 w-0.5 translate-y-1 bg-accent"
-                    aria-hidden="true"
-                  />
-                )}
-              </p>
-            ) : (
-              <div className="pt-4 max-lg:pt-0">
-                <span className="mb-6 block h-8 w-0.5 bg-accent max-lg:mb-4" aria-hidden="true" />
-                <h2 className="text-title font-medium">
-                  {active
-                    ? session.isTest
-                      ? 'Test your microphone'
-                      : 'Listening for your words…'
-                    : 'Your transcript starts here'}
-                </h2>
-                <p className="mt-2 max-w-72 text-ui text-muted">
-                  {active
-                    ? session.isTest
-                      ? 'Speak to see your microphone level.'
-                      : 'Speak naturally. Pauses are fine.'
-                    : 'Start a dictation to turn speech into text.'}
-                </p>
-                {!active && (
-                  <span className="mt-8 block max-w-64 text-caption text-muted max-lg:mt-5">
-                    Edit in your destination app after copying.
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-          <div className="flex min-h-14 items-center justify-between gap-3 border-t border-line px-6 py-2 text-caption text-muted max-md:px-[18px]">
-            <span>{text ? `${text.trim().split(/\s+/).length} words` : 'No audio saved'}</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => copy.mutate(text)}
-              disabled={!text}
-              loading={copy.isPending}
-            >
-              <Copy size={14} /> Copy text
-            </Button>
-          </div>
-        </div>
-      </section>
+        </Card>
+      </div>
+
       {session.originalText && !active && (
-        <details className="my-4 text-ui text-muted">
-          <summary className="w-fit cursor-pointer py-1.5 font-medium">Original transcript</summary>
-          <p className="my-2 whitespace-pre-wrap [overflow-wrap:anywhere] text-body">
+        <details className="mt-5 rounded-panel border border-line bg-surface px-5 py-4 text-ui text-muted">
+          <summary className="w-fit cursor-pointer font-medium text-ink">
+            Original transcript
+          </summary>
+          <p className="my-3 whitespace-pre-wrap [overflow-wrap:anywhere] text-body">
             {session.originalText}
           </p>
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
             onClick={() => copy.mutate(session.originalText!)}
             loading={copy.isPending}
@@ -378,10 +419,11 @@ function Dictation({
           </Button>
         </details>
       )}
+
       {session.message && (
         <div
           className={cn(
-            'mt-4 flex items-start gap-2 rounded-control bg-success-soft px-4 py-3 text-ui text-success',
+            'mt-5 flex items-start gap-2 rounded-panel bg-success-soft px-4 py-3 text-ui text-success',
             session.phase === 'error' && 'bg-danger-soft text-danger',
           )}
           role={session.phase === 'error' ? 'alert' : 'status'}
@@ -393,38 +435,31 @@ function Dictation({
           )}
           <span className="min-w-0 [overflow-wrap:anywhere]">{session.message}</span>
           {session.phase === 'error' && (
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={onSettings}
-              className="ml-auto inline-flex shrink-0 items-center gap-1 border-0 bg-transparent text-caption text-current"
+              className="ml-auto -my-1 text-current"
             >
-              Settings <ArrowUpRight size={13} />
-            </button>
+              Settings <ArrowRight size={13} />
+            </Button>
           )}
         </div>
       )}
-      <section
-        className="mt-6 flex items-center gap-4 border-y border-line py-5 max-lg:flex-wrap max-lg:gap-3"
-        aria-label="Dictate in another app"
-      >
-        <Keyboard size={20} strokeWidth={1.5} className="shrink-0 text-muted max-md:hidden" />
-        <div>
-          <h2 className="text-ui font-semibold">Dictate in any app</h2>
-          <p className="mt-1.5 text-caption text-muted">
-            Place your cursor, press <Shortcut />, and speak. Press again to finish.
+
+      <div className="mt-5 flex items-center gap-4 rounded-panel bg-subtle px-5 py-4 max-md:flex-wrap">
+        <Keyboard size={19} className="shrink-0 text-muted" />
+        <div className="min-w-0">
+          <h2 className="text-ui font-semibold">Dictate without switching windows</h2>
+          <p className="mt-0.5 text-caption text-muted">
+            Place your cursor, press <Shortcut />, speak, then press it again to finish.
           </p>
         </div>
         <Button variant="ghost" size="sm" onClick={onSettings} className="ml-auto shrink-0">
-          {boot.shortcutRegistered ? 'Shortcut settings' : 'Enable shortcut'}
+          {boot.shortcutRegistered ? 'Shortcut settings' : 'Enable shortcut'}{' '}
           <ArrowRight size={14} />
         </Button>
-      </section>
-      <footer className="mt-5 flex items-center justify-between gap-4 text-caption text-muted max-md:flex-wrap max-md:gap-2">
-        <span className="flex items-center gap-1.5">
-          <ShieldCheck size={13} />
-          {boot.settings.keepHistory ? 'History stays on this device' : 'Local history is off'}
-        </span>
-        <span>Deepgram Nova-3</span>
-      </footer>
+      </div>
     </>
   );
 }

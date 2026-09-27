@@ -43,7 +43,7 @@ export function Waveform({
   return (
     <div
       className={cn(
-        'flex h-[30px] w-28 shrink-0 items-center justify-center gap-0.75 text-signal [&>span]:block [&>span]:h-[calc(100%-6px)] [&>span]:max-w-1.5 [&>span]:flex-[1_1_4px] [&>span]:origin-center [&>span]:rounded-full [&>span]:bg-current',
+        'flex h-[30px] w-28 shrink-0 items-center justify-center gap-0.75 text-accent [&>span]:block [&>span]:h-[calc(100%-6px)] [&>span]:max-w-1.5 [&>span]:flex-[1_1_4px] [&>span]:origin-center [&>span]:rounded-full [&>span]:bg-current',
         overlay &&
           'h-5 w-11 max-w-full gap-0.5 text-inherit [&>span]:max-w-0.5 [&>span]:flex-[1_1_2px]',
         large &&
