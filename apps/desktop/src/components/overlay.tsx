@@ -1,4 +1,4 @@
-import { Check, CircleAlert, LoaderCircle, X } from 'lucide-react';
+import { ArrowUpRight, CircleAlert, FileText, LoaderCircle, Square, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { toast } from 'sonner';
 import { api, useRecording, useSession } from '../lib/api';
@@ -75,7 +75,7 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
         ) : failed ? (
           <CircleAlert size={16} />
         ) : done ? (
-          <Check size={17} />
+          <FileText size={16} strokeWidth={1.8} />
         ) : (
           <Waveform level={session.level} active={session.phase === 'listening'} overlay />
         )}
@@ -87,7 +87,11 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
         disabled={!!preview || finishing || stop.isPending || (!active && !failed && !done)}
         onClick={() => (failed || done ? recover() : stop.mutate())}
       >
-        <Check size={16} strokeWidth={2} />
+        {failed || done ? (
+          <ArrowUpRight size={15} strokeWidth={1.9} />
+        ) : (
+          <Square size={11} fill="currentColor" strokeWidth={1.5} />
+        )}
       </button>
 
       <span className="sr-only" role={failed ? 'alert' : 'status'}>

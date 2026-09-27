@@ -244,7 +244,7 @@ fn position_overlay(w: &tauri::WebviewWindow) {
         .or_else(|| w.primary_monitor().ok().flatten());
     if let (Some(monitor), Ok(size)) = (monitor, w.outer_size()) {
         let area = monitor.work_area();
-        let gap = (12.0 * monitor.scale_factor()).round() as u32;
+        let gap = 0;
         let _ = w.set_position(overlay_position(area.position, area.size, size, gap));
     }
 }
@@ -665,15 +665,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn overlay_is_centered_close_to_the_monitor_work_area_edge() {
+    fn overlay_is_centered_at_the_monitor_work_area_edge() {
         let position = overlay_position(
             tauri::PhysicalPosition::new(1920, 40),
             tauri::PhysicalSize::new(2560, 1400),
             tauri::PhysicalSize::new(672, 160),
-            24,
+            0,
         );
         assert_eq!(position.x, 2864);
-        assert_eq!(position.y, 1256);
+        assert_eq!(position.y, 1280);
     }
     use serde_json::json;
     fn frame(text: &str, final_: bool, start: f64) -> serde_json::Value {
