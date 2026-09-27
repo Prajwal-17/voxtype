@@ -63,8 +63,11 @@ test('overlay window has transparent background and reduced motion support', asy
   const overlay = page.getByLabel('Voice recording controls');
   await expect(overlay).toHaveCSS('width', '320px');
   await expect(overlay).toHaveCSS('height', '64px');
-  await expect(page.getByRole('meter', { name: 'Microphone level' })).toHaveCSS('width', '96px');
-  await expect(page.getByRole('button', { name: 'Dismiss overlay' })).toHaveCSS('width', '36px');
+  await expect(overlay).toHaveClass(/rounded-full/);
+  const meter = page.getByRole('meter', { name: 'Microphone level' });
+  await expect(meter).toHaveCSS('width', '96px');
+  await expect(meter.locator('span')).toHaveCount(19);
+  await expect(page.getByRole('button', { name: 'Dismiss overlay' })).toHaveCSS('width', '32px');
   expect(await overlay.boundingBox()).toMatchObject({ x: 8, y: 8, width: 320, height: 64 });
   expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe(
     'rgba(0, 0, 0, 0)',

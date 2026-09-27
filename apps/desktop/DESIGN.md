@@ -302,7 +302,7 @@ The 40px by 24px switch uses a strong hairline fill when off, Mineral Graphite w
 
 ### Voice Overlay
 
-The system-wide overlay uses a 336px by 80px transparent window with a 320px by 64px three-cell control, centered 24px above the active monitor work-area edge. Overlay Graphite, a 16px floating radius, quiet outline, and floating shadow separate it from the working app. Minimal 36px cancel and finish controls flank a richer 96px waveform with 21 spring-driven bars; the explicit status label sits directly beneath it so the center remains the visual focus. Motion appears only when useful and respects reduced-motion settings.
+The system-wide overlay uses a 336px by 80px transparent window with a fully rounded 320px by 64px capsule, centered 24px above the active monitor work-area edge. Overlay Graphite, a quiet outline, and the floating shadow separate it from the working app without reading as a rectangular panel. Minimal 32px cancel and finish controls flank a richer 96px waveform with 19 thick spring-driven bars; the explicit status label sits directly beneath it so the center remains the visual focus. Motion appears only when useful and respects reduced-motion settings.
 
 ## Do's and Don'ts
 

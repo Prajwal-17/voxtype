@@ -47,7 +47,7 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
   return (
     <div
       className={cn(
-        'relative isolate grid h-16 grid-cols-[36px_minmax(0,1fr)_36px] items-center gap-2 rounded-floating bg-overlay p-2 text-overlay-text shadow-floating scheme-dark',
+        'relative isolate grid h-16 grid-cols-[32px_minmax(0,1fr)_32px] items-center gap-2 rounded-full bg-overlay p-2 text-overlay-text shadow-floating scheme-dark',
         'before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border before:border-overlay-line before:opacity-80',
         preview ? 'mx-auto mt-2 w-full' : 'm-2 w-[calc(100%-1rem)]',
       )}
@@ -57,7 +57,7 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
       aria-busy={finishing}
     >
       <button
-        className="inline-flex size-9 items-center justify-center rounded-full border-0 bg-overlay-raised p-0 text-overlay-text transition-[transform,background-color] duration-150 ease-out enabled:active:scale-[.97] enabled:hover:bg-navigation-line enabled:hover:text-white focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-overlay-text disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100"
+        className="inline-flex size-8 items-center justify-center rounded-full border-0 bg-overlay-raised p-0 text-overlay-text transition-[transform,background-color] duration-150 ease-out enabled:active:scale-[.97] enabled:hover:bg-navigation-line enabled:hover:text-white focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-overlay-text disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100"
         title={active ? 'Cancel dictation' : 'Dismiss overlay'}
         aria-label={active ? 'Cancel dictation' : 'Dismiss overlay'}
         disabled={!!preview || cancel.isPending}
@@ -69,7 +69,7 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
                 .catch(() => toast.error('The overlay couldn’t close. Use the main Flow window.'))
         }
       >
-        <X size={16} strokeWidth={1.8} />
+        <X size={15} strokeWidth={1.8} />
       </button>
       <div
         className={cn(
@@ -116,13 +116,13 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
         </span>
       </div>
       <button
-        className="inline-flex size-9 items-center justify-center rounded-full border-0 bg-overlay-text p-0 text-navigation transition-[transform,background-color] duration-150 ease-out enabled:active:scale-[.97] enabled:hover:bg-inverse-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-overlay-text disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100"
+        className="inline-flex size-8 items-center justify-center rounded-full border-0 bg-overlay-text p-0 text-navigation transition-[transform,background-color] duration-150 ease-out enabled:active:scale-[.97] enabled:hover:bg-inverse-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-overlay-text disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100"
         title={failed || done ? 'Open transcript' : 'Finish dictation'}
         aria-label={failed || done ? 'Open Flow to recover transcript' : 'Finish dictation'}
         disabled={!!preview || finishing || stop.isPending || (!active && !failed && !done)}
         onClick={() => (failed || done ? recover() : stop.mutate())}
       >
-        <Check size={17} strokeWidth={2} />
+        <Check size={16} strokeWidth={2} />
       </button>
 
       <span className="sr-only" role={failed ? 'alert' : 'status'}>
