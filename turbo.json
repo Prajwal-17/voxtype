@@ -30,25 +30,11 @@
     "check-types": {
       "dependsOn": ["^check-types"]
     },
-    "check:rust": {},
     "test": {
       "dependsOn": ["^build"],
-      "env": ["PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH", "TAURI_WEBVIEW_AUTOMATION"]
-    },
-    "test:web": {},
-    "test:rust": {
       "env": ["TAURI_WEBVIEW_AUTOMATION"]
     },
-    "test:e2e": {
-      "cache": false,
-      "env": ["PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH", "TAURI_WEBVIEW_AUTOMATION"],
-      "outputs": ["playwright-report/**", "test-results/**"]
-    },
     "dev": {
-      "cache": false,
-      "persistent": true
-    },
-    "dev:web": {
       "cache": false,
       "persistent": true
     }

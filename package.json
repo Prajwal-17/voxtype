@@ -7,20 +7,13 @@
   },
   "scripts": {
     "dev": "turbo run dev --filter=@flow/desktop",
-    "dev:web": "turbo run dev:web --filter=@flow/desktop",
-    "build": "turbo run build",
     "build:desktop": "turbo run build:desktop --filter=@flow/desktop",
     "format": "prettier --write . && cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml",
     "format:check": "prettier --check . && cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check",
     "lint": "turbo run lint",
     "check-types": "turbo run check-types",
-    "typecheck": "pnpm check-types",
     "check": "pnpm format:check && turbo run lint check-types",
-    "test": "turbo run test",
-    "test:web": "turbo run test:web --filter=@flow/desktop",
-    "test:rust": "turbo run test:rust --filter=@flow/desktop",
-    "test:e2e": "turbo run test:e2e --filter=@flow/desktop",
-    "check:rust": "turbo run check:rust --filter=@flow/desktop"
+    "test": "turbo run test"
   },
   "devDependencies": {
     "prettier": "^3.9.9",
