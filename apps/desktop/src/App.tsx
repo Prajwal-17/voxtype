@@ -183,7 +183,7 @@ export function App() {
         </div>
 
         {preview && page === 'dictation' && (
-          <div className="fixed right-6 bottom-6 z-40 w-[360px] max-w-[calc(100vw-2rem)] rounded-panel border border-line bg-surface p-3 shadow-floating max-md:right-4 max-md:bottom-4">
+          <div className="fixed right-6 bottom-6 z-40 w-[328px] max-w-[calc(100vw-2rem)] rounded-panel border border-line bg-surface p-3 shadow-floating max-md:right-4 max-md:bottom-4">
             <div className="flex items-center justify-between pl-1 text-caption text-muted">
               <span>Overlay preview · {active ? 'Live' : 'Idle'}</span>
               <IconButton label="Close preview" onClick={() => setPreview(false)}>

@@ -26,8 +26,8 @@
         "label": "overlay",
         "title": "Flow dictation",
         "url": "index.html?window=overlay",
-        "width": 336,
-        "height": 80,
+        "width": 304,
+        "height": 72,
         "decorations": false,
         "transparent": true,
         "shadow": false,
@@ -37,10 +37,10 @@
         "focus": false,
         "focusable": false,
         "visible": false,
-        "minWidth": 336,
-        "maxWidth": 336,
-        "minHeight": 80,
-        "maxHeight": 80
+        "minWidth": 304,
+        "maxWidth": 304,
+        "minHeight": 72,
+        "maxHeight": 72
       }
     ],
     "security": {

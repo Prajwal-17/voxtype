@@ -14,7 +14,7 @@ export function Waveform({
   large?: boolean;
   overlay?: boolean;
 }) {
-  const count = overlay ? 19 : large ? 37 : 23;
+  const count = overlay ? 23 : large ? 37 : 23;
   const clampedLevel = Number.isFinite(level) ? Math.max(0, Math.min(1, level)) : 0;
   const [samples, setSamples] = useState<number[]>(() => Array<number>(count).fill(0));
   const current = useRef(clampedLevel);
@@ -51,7 +51,7 @@ export function Waveform({
     <div
       className={cn(
         'flex h-[30px] w-28 shrink-0 items-center justify-center gap-0.75 text-accent',
-        overlay && 'h-8 w-24 max-w-full gap-0.5 text-inherit',
+        overlay && 'h-7 w-full max-w-48 gap-0.75 text-inherit',
         large &&
           !overlay &&
           'h-[104px] w-[184px] text-accent max-[1050px]:h-[72px] max-[1050px]:w-[148px] max-[700px]:h-16 max-[700px]:w-[100px]',
@@ -74,7 +74,7 @@ export function Waveform({
             className={cn(
               'block origin-center rounded-full bg-current',
               overlay
-                ? 'h-[30px] max-w-[3px] flex-[1_1_3px]'
+                ? 'h-[26px] max-w-[5px] flex-[1_1_5px]'
                 : 'h-[calc(100%-6px)] max-w-1.5 flex-[1_1_4px]',
             )}
             aria-hidden="true"
