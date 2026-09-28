@@ -154,8 +154,10 @@ export async function startMobileSignIn(
     asResponse: true,
   });
   const body: unknown = await response.json();
-  const url = typeof body === 'object' && body !== null && 'url' in body &&
-    typeof body.url === 'string' ? body.url : null;
+  const url =
+    typeof body === 'object' && body !== null && 'url' in body && typeof body.url === 'string'
+      ? body.url
+      : null;
   if (!url) throw new ApiError(502, 'oauth_start_failed', 'Google sign-in could not be started.');
   const responseHeaders = new Headers(response.headers);
   responseHeaders.set('location', url);
@@ -174,7 +176,10 @@ export async function finishMobileSignIn(
   const callbackUrl = new URL('voxtype://auth/callback');
   callbackUrl.searchParams.set('state', state);
   if (oauthError) {
-    callbackUrl.searchParams.set('error', oauthError === 'email_not_allowed' ? 'account_not_allowed' : 'sign_in_failed');
+    callbackUrl.searchParams.set(
+      'error',
+      oauthError === 'email_not_allowed' ? 'account_not_allowed' : 'sign_in_failed',
+    );
     return callbackUrl.toString();
   }
   const auth = createAuthService(env, executionContext);
