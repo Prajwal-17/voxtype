@@ -1,7 +1,4 @@
-type ShortcutKeyEvent = Pick<
-  KeyboardEvent,
-  'key' | 'ctrlKey' | 'altKey' | 'shiftKey' | 'metaKey'
->;
+type ShortcutKeyEvent = Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'altKey' | 'shiftKey' | 'metaKey'>;
 
 export interface CapturedShortcut {
   id: string;
