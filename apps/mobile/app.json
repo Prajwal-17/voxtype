@@ -6,14 +6,25 @@
     "platforms": ["android", "web"],
     "android": {
       "package": "com.voxtype.dictation.mobile",
-      "permissions": ["RECORD_AUDIO", "SYSTEM_ALERT_WINDOW", "FOREGROUND_SERVICE", "FOREGROUND_SERVICE_MICROPHONE"]
+      "permissions": ["RECORD_AUDIO", "FOREGROUND_SERVICE", "FOREGROUND_SERVICE_MICROPHONE"]
     },
     "web": {
       "output": "static"
     },
     "plugins": [
       "expo-router",
-      "expo-status-bar"
+      "expo-status-bar",
+      "expo-web-browser",
+      "expo-audio",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 33
+          }
+        }
+      ],
+      "expo-font"
     ],
     "name": "VoxType",
     "slug": "voxtype-mobile"
