@@ -1,4 +1,4 @@
 {
-  "extends": "@flow/typescript-config/vite.json",
+  "extends": "@voxtype/typescript-config/vite.json",
   "include": ["src", "tests", "vite.config.ts", "vitest.config.ts", "playwright.config.ts"]
 }

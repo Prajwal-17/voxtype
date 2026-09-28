@@ -43,7 +43,6 @@ export function SidebarNavItem({
         >
           <Icon size={17} strokeWidth={1.8} className={cn(active && 'text-white')} />
           <span className="max-lg:hidden">{label}</span>
-          {active && <span className="ml-auto size-1 rounded-full bg-accent max-lg:hidden" />}
         </button>
       </TooltipTrigger>
       <TooltipContent side="right" className="hidden max-lg:block">
@@ -63,10 +62,22 @@ export function PageHeader({
   description: string;
   actions?: React.ReactNode;
 }) {
+  const headingRef = React.useRef<HTMLHeadingElement>(null);
+
+  React.useEffect(() => {
+    headingRef.current?.focus();
+  }, []);
+
   return (
     <div className="mb-7 flex items-end justify-between gap-5 max-md:flex-wrap max-md:items-start max-md:gap-3">
       <div>
-        <h1 className="text-heading font-semibold tracking-[-.02em] text-balance">{title}</h1>
+        <h1
+          ref={headingRef}
+          tabIndex={-1}
+          className="text-heading font-semibold tracking-[-.02em] text-balance outline-none"
+        >
+          {title}
+        </h1>
         <p className="mt-1.5 text-body text-muted">{description}</p>
       </div>
       {actions}

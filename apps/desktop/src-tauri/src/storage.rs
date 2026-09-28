@@ -1,10 +1,13 @@
 //! Preferences/history use Tauri Store. Credentials never enter that file or leave Rust.
-use crate::model::{HistoryItem, Settings};
+use crate::{
+    environment,
+    model::{HistoryItem, Settings},
+};
 use tauri::{AppHandle, Emitter};
 use tauri_plugin_store::StoreExt;
 
 fn entry(account: &str) -> Result<keyring::Entry, String> {
-    keyring::Entry::new("com.flow.dictation", account)
+    keyring::Entry::new(environment::keyring_service(), account)
         .map_err(|_| "The desktop keyring is unavailable.".into())
 }
 fn read_key(account: &str) -> Result<Option<String>, String> {
@@ -48,8 +51,26 @@ pub fn delete_cleanup_key() -> Result<(), String> {
     remove_key("deepseek")
 }
 
+pub fn auth_token() -> Result<Option<String>, String> {
+    read_key("auth-session")
+}
+pub fn save_auth_token(value: &str) -> Result<(), String> {
+    let value = value.trim();
+    if !(20..=2_048).contains(&value.len()) || value.chars().any(char::is_whitespace) {
+        return Err("VoxType received an invalid account session.".into());
+    }
+    entry("auth-session")?.set_password(value).map_err(|_| {
+        "Could not save your account session. Unlock your keyring and try again.".into()
+    })
+}
+pub fn delete_auth_token() -> Result<(), String> {
+    remove_key("auth-session")
+}
+
 pub fn settings(app: &AppHandle) -> Result<Settings, String> {
-    let store = app.store("flow.json").map_err(|e| e.to_string())?;
+    let store = app
+        .store(environment::store_file())
+        .map_err(|e| e.to_string())?;
     match store.get("settings") {
         Some(value) => serde_json::from_value(value).map_err(|_| {
             "Settings could not be read. Your local data has not been overwritten.".into()
@@ -59,7 +80,9 @@ pub fn settings(app: &AppHandle) -> Result<Settings, String> {
 }
 pub fn save_settings(app: &AppHandle, settings: &Settings) -> Result<(), String> {
     settings.validate()?;
-    let store = app.store("flow.json").map_err(|e| e.to_string())?;
+    let store = app
+        .store(environment::store_file())
+        .map_err(|e| e.to_string())?;
     store.set(
         "settings",
         serde_json::to_value(settings).map_err(|e| e.to_string())?,
@@ -67,7 +90,9 @@ pub fn save_settings(app: &AppHandle, settings: &Settings) -> Result<(), String>
     store.save().map_err(|e| e.to_string())
 }
 pub fn history(app: &AppHandle) -> Result<Vec<HistoryItem>, String> {
-    let store = app.store("flow.json").map_err(|e| e.to_string())?;
+    let store = app
+        .store(environment::store_file())
+        .map_err(|e| e.to_string())?;
     match store.get("history") {
         Some(value) => {
             serde_json::from_value(value).map_err(|_| "Local history could not be read.".into())
@@ -76,7 +101,9 @@ pub fn history(app: &AppHandle) -> Result<Vec<HistoryItem>, String> {
     }
 }
 pub fn write_history(app: &AppHandle, items: Vec<HistoryItem>) -> Result<(), String> {
-    let store = app.store("flow.json").map_err(|e| e.to_string())?;
+    let store = app
+        .store(environment::store_file())
+        .map_err(|e| e.to_string())?;
     store.set(
         "history",
         serde_json::to_value(items).map_err(|e| e.to_string())?,

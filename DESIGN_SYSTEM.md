@@ -4,11 +4,11 @@ VoxType uses one visual language across desktop and future mobile clients: warm 
 
 ## Architecture
 
-The canonical implementation lives in `@flow/design-system`.
+The canonical implementation lives in `@voxtype/design-system`.
 
-- `@flow/design-system` exports platform-neutral TypeScript tokens.
-- `@flow/design-system/web.css` exposes the tokens as CSS variables and Tailwind v4 theme values.
-- `@flow/design-system/native` maps the same roles to React Native/Expo-compatible values.
+- `@voxtype/design-system` exports platform-neutral TypeScript tokens.
+- `@voxtype/design-system/web.css` exposes the tokens as CSS variables and Tailwind v4 theme values.
+- `@voxtype/design-system/native` maps the same roles to React Native/Expo-compatible values.
 - Each application owns its rendered components. Desktop uses shadcn-style Radix primitives; mobile must use native controls and navigation conventions.
 
 This boundary is intentional. Visual identity is shared; HTML, hover behavior, platform navigation, gestures, safe areas, sheets, and pickers are not.

@@ -1,5 +1,6 @@
 //! parec handles Ubuntu's PulseAudio/PipeWire capture and resampling.
 //! A bounded Tokio channel caps audio buffering. Dropping the task kills its child.
+use crate::environment;
 use std::{collections::VecDeque, process::Stdio, time::Duration};
 use tokio::{
     io::AsyncReadExt,
@@ -50,9 +51,12 @@ pub fn start(device: &str) -> Result<Capture, String> {
         "--rate=16000",
         "--channels=1",
         "--latency-msec=40",
-        "--client-name=VoxType",
-        "--stream-name=Dictation",
-    ]);
+    ])
+    .arg(format!(
+        "--client-name={}",
+        environment::audio_client_name()
+    ))
+    .arg("--stream-name=Dictation");
     if !device.is_empty() {
         cmd.arg(format!("--device={device}"));
     }

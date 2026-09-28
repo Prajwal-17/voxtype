@@ -1,0 +1,44 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "VoxType Dev",
+  "identifier": "com.voxtype.dictation.dev",
+  "mainBinaryName": "voxtype-desktop-dev",
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "VoxType Dev",
+        "visible": false,
+        "width": 1100,
+        "height": 760,
+        "minWidth": 760,
+        "minHeight": 600,
+        "center": true,
+        "backgroundColor": "#f3f4f5"
+      },
+      {
+        "label": "overlay",
+        "title": "VoxType Dev dictation",
+        "url": "index.html?window=overlay",
+        "width": 288,
+        "height": 64,
+        "decorations": false,
+        "transparent": true,
+        "shadow": false,
+        "resizable": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "focus": false,
+        "focusable": false,
+        "visible": false,
+        "minWidth": 288,
+        "maxWidth": 288,
+        "minHeight": 64,
+        "maxHeight": 64
+      }
+    ]
+  },
+  "bundle": {
+    "shortDescription": "Development build of VoxType"
+  }
+}

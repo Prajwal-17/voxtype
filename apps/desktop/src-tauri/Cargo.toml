@@ -1,12 +1,12 @@
 [package]
-name = "flow-desktop"
+name = "voxtype-desktop"
 version = "0.1.0"
 description = "Personal voice dictation for Ubuntu."
 edition = "2021"
 rust-version = "1.87"
 
 [lib]
-name = "flow_desktop_lib"
+name = "voxtype_desktop_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

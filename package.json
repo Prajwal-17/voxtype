@@ -1,13 +1,16 @@
 {
-  "name": "flow",
+  "name": "voxtype",
   "private": true,
   "packageManager": "pnpm@10.30.3",
   "engines": {
     "node": ">=24"
   },
   "scripts": {
-    "dev": "turbo run dev --filter=@flow/desktop",
-    "build:desktop": "turbo run build:desktop --filter=@flow/desktop",
+    "dev": "turbo run dev --filter=@voxtype/api --filter=@voxtype/desktop",
+    "dev:api": "pnpm --filter @voxtype/api dev",
+    "dev:desktop": "pnpm --filter @voxtype/desktop dev",
+    "dev:web": "pnpm --filter @voxtype/desktop dev:web",
+    "build:desktop": "turbo run build:desktop --filter=@voxtype/desktop",
     "format": "prettier --write . && cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml",
     "format:check": "prettier --check . && cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check",
     "lint": "turbo run lint",

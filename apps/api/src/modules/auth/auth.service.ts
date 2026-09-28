@@ -1,15 +1,17 @@
 import { betterAuth } from 'better-auth';
 import { bearer } from 'better-auth/plugins';
+import { oneTimeToken } from 'better-auth/plugins/one-time-token';
+import { ApiError } from '../../shared/errors/api-error';
+import { apiEnvironment } from '../../shared/runtime/environment';
 import { createAuthRepository } from './auth.repository';
-import type { BackgroundContext } from './auth.types';
+import type { BackgroundContext, DesktopAuthCallback } from './auth.types';
 import { normalizeEmail, parseCommaSeparated } from './auth.utils';
 
 export function createAuthService(env: Env, executionContext?: BackgroundContext) {
   const allowedEmail = normalizeEmail(env.ALLOWED_EMAIL);
-  const googleClientIds = parseCommaSeparated(env.GOOGLE_CLIENT_IDS);
 
   return betterAuth({
-    appName: 'VoxType',
+    appName: apiEnvironment(env.API_URL) === 'development' ? 'VoxType Dev' : 'VoxType',
     baseURL: env.API_URL,
     secret: env.BETTER_AUTH_SECRET,
     database: createAuthRepository(env.DB),
@@ -34,7 +36,7 @@ export function createAuthService(env: Env, executionContext?: BackgroundContext
     },
     socialProviders: {
       google: {
-        clientId: googleClientIds.length === 1 ? googleClientIds[0]! : googleClientIds,
+        clientId: env.GOOGLE_CLIENT_ID,
         clientSecret: env.GOOGLE_CLIENT_SECRET,
         prompt: 'select_account',
         requireEmailVerification: true,
@@ -45,7 +47,10 @@ export function createAuthService(env: Env, executionContext?: BackgroundContext
       window: 60,
       max: 30,
     },
-    plugins: [bearer({ requireSignature: true })],
+    plugins: [
+      bearer({ requireSignature: true }),
+      oneTimeToken({ disableClientRequest: true, expiresIn: 2, storeToken: 'hashed' }),
+    ],
     advanced: {
       ipAddress: {
         ipAddressHeaders: ['cf-connecting-ip'],
@@ -61,4 +66,70 @@ export function createAuthService(env: Env, executionContext?: BackgroundContext
         : undefined,
     },
   });
+}
+
+export async function startDesktopSignIn(
+  env: Env,
+  executionContext: BackgroundContext,
+  headers: Headers,
+  callback: DesktopAuthCallback,
+): Promise<Response> {
+  const callbackUrl = new URL('/api/desktop-auth/callback', env.API_URL);
+  callbackUrl.searchParams.set('port', String(callback.port));
+  callbackUrl.searchParams.set('state', callback.state);
+
+  const response = await createAuthService(env, executionContext).api.signInSocial({
+    headers,
+    body: {
+      provider: 'google',
+      callbackURL: callbackUrl.toString(),
+      errorCallbackURL: callbackUrl.toString(),
+      disableRedirect: true,
+    },
+    asResponse: true,
+  });
+  const body: unknown = await response.json();
+  const authorizationUrl =
+    typeof body === 'object' && body !== null && 'url' in body && typeof body.url === 'string'
+      ? body.url
+      : null;
+
+  if (!authorizationUrl) {
+    throw new ApiError(502, 'oauth_start_failed', 'Google sign-in could not be started.');
+  }
+
+  const responseHeaders = new Headers(response.headers);
+  responseHeaders.set('location', authorizationUrl);
+  responseHeaders.delete('content-length');
+  responseHeaders.delete('content-type');
+  return new Response(null, { status: 302, headers: responseHeaders });
+}
+
+export async function finishDesktopSignIn(
+  env: Env,
+  executionContext: BackgroundContext,
+  headers: Headers,
+  callback: DesktopAuthCallback & { oauthError?: string },
+): Promise<string> {
+  const loopbackUrl = new URL(`http://127.0.0.1:${callback.port}/callback`);
+  loopbackUrl.searchParams.set('state', callback.state);
+
+  if (callback.oauthError) {
+    loopbackUrl.searchParams.set(
+      'error',
+      callback.oauthError === 'email_not_allowed' ? 'account_not_allowed' : 'sign_in_failed',
+    );
+    return loopbackUrl.toString();
+  }
+
+  const auth = createAuthService(env, executionContext);
+  const session = await auth.api.getSession({ headers });
+  if (!session) {
+    loopbackUrl.searchParams.set('error', 'sign_in_failed');
+    return loopbackUrl.toString();
+  }
+
+  const { token } = await auth.api.generateOneTimeToken({ headers });
+  loopbackUrl.searchParams.set('token', token);
+  return loopbackUrl.toString();
 }

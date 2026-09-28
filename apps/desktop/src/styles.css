@@ -1,5 +1,5 @@
 @import 'tailwindcss';
-@import '@flow/design-system/web.css';
+@import '@voxtype/design-system/web.css';
 
 @layer base {
   * {

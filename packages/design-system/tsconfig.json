@@ -1,5 +1,5 @@
 {
-  "extends": "@flow/typescript-config/base.json",
+  "extends": "@voxtype/typescript-config/base.json",
   "compilerOptions": {
     "module": "ESNext",
     "moduleResolution": "Bundler",

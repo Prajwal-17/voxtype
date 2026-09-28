@@ -2,154 +2,154 @@
 name: VoxType Desktop
 description: A calm, precise desktop workspace for fast, recoverable dictation.
 colors:
-  canvas: "#f4f4f1"
-  surface: "#fcfcfa"
-  surface-subtle: "#efefeb"
-  surface-raised: "#f8f8f5"
-  ink: "#22231f"
-  muted: "#62645e"
-  faint: "#8f928a"
-  line: "#dedfd9"
-  line-strong: "#c8cbc3"
-  accent: "#464944"
-  accent-hover: "#353833"
-  accent-soft: "#e9eae6"
-  accent-ink: "#2d302b"
-  navigation: "#20221f"
-  navigation-raised: "#2b2e2a"
-  navigation-hover: "#343732"
-  navigation-line: "#3c403a"
-  inverse: "#f6f6f2"
-  inverse-muted: "#b2b6ad"
-  success: "#396b50"
-  success-soft: "#e7efe9"
-  danger: "#93433f"
-  danger-soft: "#f1ece9"
-  warning: "#625f43"
-  warning-soft: "#efeee5"
-  overlay: "#20221f"
-  overlay-raised: "#30332f"
-  overlay-line: "#42463f"
-  overlay-text: "#f6f6f2"
-  overlay-danger: "#d7d9d3"
+  canvas: '#f4f4f1'
+  surface: '#fcfcfa'
+  surface-subtle: '#efefeb'
+  surface-raised: '#f8f8f5'
+  ink: '#22231f'
+  muted: '#62645e'
+  faint: '#8f928a'
+  line: '#dedfd9'
+  line-strong: '#c8cbc3'
+  accent: '#464944'
+  accent-hover: '#353833'
+  accent-soft: '#e9eae6'
+  accent-ink: '#2d302b'
+  navigation: '#20221f'
+  navigation-raised: '#2b2e2a'
+  navigation-hover: '#343732'
+  navigation-line: '#3c403a'
+  inverse: '#f6f6f2'
+  inverse-muted: '#b2b6ad'
+  success: '#396b50'
+  success-soft: '#e7efe9'
+  danger: '#93433f'
+  danger-soft: '#f1ece9'
+  warning: '#625f43'
+  warning-soft: '#efeee5'
+  overlay: '#20221f'
+  overlay-raised: '#30332f'
+  overlay-line: '#42463f'
+  overlay-text: '#f6f6f2'
+  overlay-danger: '#d7d9d3'
 typography:
   heading:
-    fontFamily: "Mona Sans Variable, Mona Sans, Segoe UI, sans-serif"
-    fontSize: "1.875rem"
+    fontFamily: 'Mona Sans Variable, Mona Sans, Segoe UI, sans-serif'
+    fontSize: '1.875rem'
     fontWeight: 620
     lineHeight: 1.15
-    letterSpacing: "-0.02em"
+    letterSpacing: '-0.02em'
   subheading:
-    fontFamily: "Mona Sans Variable, Mona Sans, Segoe UI, sans-serif"
-    fontSize: "1.25rem"
+    fontFamily: 'Mona Sans Variable, Mona Sans, Segoe UI, sans-serif'
+    fontSize: '1.25rem'
     fontWeight: 620
     lineHeight: 1.3
-    letterSpacing: "-0.018em"
+    letterSpacing: '-0.018em'
   title:
-    fontFamily: "Mona Sans Variable, Mona Sans, Segoe UI, sans-serif"
-    fontSize: "1.0625rem"
+    fontFamily: 'Mona Sans Variable, Mona Sans, Segoe UI, sans-serif'
+    fontSize: '1.0625rem'
     fontWeight: 620
     lineHeight: 1.35
-    letterSpacing: "-0.02em"
+    letterSpacing: '-0.02em'
   body:
-    fontFamily: "Mona Sans Variable, Mona Sans, Segoe UI, sans-serif"
-    fontSize: "0.9375rem"
+    fontFamily: 'Mona Sans Variable, Mona Sans, Segoe UI, sans-serif'
+    fontSize: '0.9375rem'
     fontWeight: 400
     lineHeight: 1.6
-    letterSpacing: "normal"
+    letterSpacing: 'normal'
   ui:
-    fontFamily: "Mona Sans Variable, Mona Sans, Segoe UI, sans-serif"
-    fontSize: "0.8125rem"
+    fontFamily: 'Mona Sans Variable, Mona Sans, Segoe UI, sans-serif'
+    fontSize: '0.8125rem'
     fontWeight: 500
     lineHeight: 1.45
-    letterSpacing: "normal"
+    letterSpacing: 'normal'
   caption:
-    fontFamily: "Mona Sans Variable, Mona Sans, Segoe UI, sans-serif"
-    fontSize: "0.75rem"
+    fontFamily: 'Mona Sans Variable, Mona Sans, Segoe UI, sans-serif'
+    fontSize: '0.75rem'
     fontWeight: 500
     lineHeight: 1.4
-    letterSpacing: "normal"
+    letterSpacing: 'normal'
   transcript:
-    fontFamily: "Mona Sans Variable, Mona Sans, Segoe UI, sans-serif"
-    fontSize: "1.125rem"
+    fontFamily: 'Mona Sans Variable, Mona Sans, Segoe UI, sans-serif'
+    fontSize: '1.125rem'
     fontWeight: 450
     lineHeight: 1.72
-    letterSpacing: "-0.01em"
+    letterSpacing: '-0.01em'
   timer:
-    fontFamily: "Mona Sans Variable, Mona Sans, Segoe UI, sans-serif"
-    fontSize: "2.5rem"
+    fontFamily: 'Mona Sans Variable, Mona Sans, Segoe UI, sans-serif'
+    fontSize: '2.5rem'
     fontWeight: 500
     lineHeight: 1
-    letterSpacing: "-0.025em"
+    letterSpacing: '-0.025em'
 rounded:
-  menu-item: "6px"
-  control: "0.625rem"
-  panel: "0.875rem"
-  floating: "1rem"
-  pill: "999px"
+  menu-item: '6px'
+  control: '0.625rem'
+  panel: '0.875rem'
+  floating: '1rem'
+  pill: '999px'
 spacing:
-  xs: "0.25rem"
-  sm: "0.5rem"
-  md: "0.75rem"
-  lg: "1rem"
-  xl: "1.25rem"
-  "2xl": "1.75rem"
-  "3xl": "2rem"
+  xs: '0.25rem'
+  sm: '0.5rem'
+  md: '0.75rem'
+  lg: '1rem'
+  xl: '1.25rem'
+  '2xl': '1.75rem'
+  '3xl': '2rem'
 components:
   button-primary:
-    backgroundColor: "{colors.accent}"
-    textColor: "{colors.surface}"
-    typography: "{typography.ui}"
-    rounded: "{rounded.control}"
-    padding: "0.5rem 0.875rem"
-    height: "2.25rem"
+    backgroundColor: '{colors.accent}'
+    textColor: '{colors.surface}'
+    typography: '{typography.ui}'
+    rounded: '{rounded.control}'
+    padding: '0.5rem 0.875rem'
+    height: '2.25rem'
   button-primary-hover:
-    backgroundColor: "{colors.accent-hover}"
-    textColor: "{colors.surface}"
+    backgroundColor: '{colors.accent-hover}'
+    textColor: '{colors.surface}'
   button-secondary:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.ink}"
-    typography: "{typography.ui}"
-    rounded: "{rounded.control}"
-    padding: "0.5rem 0.875rem"
-    height: "2.25rem"
+    backgroundColor: '{colors.surface}'
+    textColor: '{colors.ink}'
+    typography: '{typography.ui}'
+    rounded: '{rounded.control}'
+    padding: '0.5rem 0.875rem'
+    height: '2.25rem'
   button-ghost:
-    backgroundColor: "transparent"
-    textColor: "{colors.muted}"
-    typography: "{typography.ui}"
-    rounded: "{rounded.control}"
-    padding: "0.5rem 0.875rem"
-    height: "2.25rem"
+    backgroundColor: 'transparent'
+    textColor: '{colors.muted}'
+    typography: '{typography.ui}'
+    rounded: '{rounded.control}'
+    padding: '0.5rem 0.875rem'
+    height: '2.25rem'
   card:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.ink}"
-    rounded: "{rounded.panel}"
-    padding: "1.25rem"
+    backgroundColor: '{colors.surface}'
+    textColor: '{colors.ink}'
+    rounded: '{rounded.panel}'
+    padding: '1.25rem'
   select-trigger:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.ink}"
-    typography: "{typography.ui}"
-    rounded: "{rounded.control}"
-    padding: "0.5rem 2rem 0.5rem 0.75rem"
-    width: "12rem"
+    backgroundColor: '{colors.surface}'
+    textColor: '{colors.ink}'
+    typography: '{typography.ui}'
+    rounded: '{rounded.control}'
+    padding: '0.5rem 2rem 0.5rem 0.75rem'
+    width: '12rem'
   status-badge:
-    backgroundColor: "{colors.surface-subtle}"
-    textColor: "{colors.muted}"
-    typography: "{typography.caption}"
-    rounded: "{rounded.pill}"
-    padding: "0.25rem 0.625rem"
+    backgroundColor: '{colors.surface-subtle}'
+    textColor: '{colors.muted}'
+    typography: '{typography.caption}'
+    rounded: '{rounded.pill}'
+    padding: '0.25rem 0.625rem'
   sidebar-item-active:
-    backgroundColor: "{colors.navigation-raised}"
-    textColor: "{colors.inverse}"
-    typography: "{typography.ui}"
-    rounded: "{rounded.control}"
-    padding: "0 0.75rem"
-    height: "2.5rem"
+    backgroundColor: '{colors.navigation-raised}'
+    textColor: '{colors.inverse}'
+    typography: '{typography.ui}'
+    rounded: '{rounded.control}'
+    padding: '0 0.75rem'
+    height: '2.5rem'
 ---
 
 # Design System: VoxType Desktop
 
-> The project-wide foundations live in [`../../DESIGN_SYSTEM.md`](../../DESIGN_SYSTEM.md) and `@flow/design-system`. This document defines the desktop composition and component adapter; it must not redefine the shared tokens.
+> The project-wide foundations live in [`../../DESIGN_SYSTEM.md`](../../DESIGN_SYSTEM.md) and `@voxtype/design-system`. This document defines the desktop composition and component adapter; it must not redefine the shared tokens.
 
 ## Overview
 
@@ -326,4 +326,4 @@ The system-wide overlay uses a compact 288px by 56px transparent window with a f
 
 ## Brand
 
-The product name is **VoxType**, with capital V and T and no space, and the icon itself contains no letters. Display VoxType beside the icon in the desktop sidebar using Mona Sans Variable, 20px, weight 620, and -0.03em tracking. Hide only the wordmark in the compact navigation rail below 1024px. Use `public/voxtype.svg` as the single scalable mark: five rounded, asymmetric graphite voice bars on an ivory tile, displayed at 32px on desktop and mobile. The bars gently pulse twice on load (under five seconds), then settle; reduced-motion users see the static mark. This decorative entrance does not indicate microphone activity. Keep the accessible name VoxType. Native packaging uses only the existing static 32px, 128px, and 256px PNG exports. Internal package names, application identifier, keyring service, settings file, and GNOME binding path retain their legacy identifiers to preserve existing installations and data.
+The product name is **VoxType**, with capital V and T and no space, and the icon itself contains no letters. Display VoxType beside the icon in the desktop sidebar using Mona Sans Variable, 20px, weight 620, and -0.03em tracking. Hide only the wordmark in the compact navigation rail below 1024px. Use `public/voxtype.svg` as the single scalable mark: five rounded, asymmetric graphite voice bars on an ivory tile, displayed at 32px on desktop and mobile. The bars gently pulse twice on load (under five seconds), then settle; reduced-motion users see the static mark. This decorative entrance does not indicate microphone activity. Keep the accessible name VoxType. Native packaging uses only the existing static 32px, 128px, and 256px PNG exports. Production uses the VoxType application identifier, keyring service, settings file, and GNOME binding path. Development uses the `VoxType Dev` name, a restrained warning-tone `DEV` badge, and `.dev` / `-dev` namespaces for every native identity and storage boundary.

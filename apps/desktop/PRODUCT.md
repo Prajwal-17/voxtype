@@ -21,15 +21,18 @@ VoxType combines an app-level recording workspace with a system-wide Right Alt s
 ## Operating Context
 
 - The primary environment is an Ubuntu desktop wrapped with Tauri.
+- Production and development can run together: development is a separately named and identified app with isolated credentials, settings, history, backend, and shortcut.
 - Users can record from the main Dictation page or through the global Right Alt shortcut.
 - The compact overlay communicates recording, finishing, success, and failure states while another app has focus.
 - History, diagnostics, API key setup, language, microphone, voice detection, cleanup, and paste behavior are managed inside the app.
 
 ## Capabilities and Constraints
 
+- The desktop workspace requires Google sign-in through the system browser; the resulting VoxType session is stored in the operating-system keyring.
 - Microphone audio is streamed to Deepgram for transcription.
 - Finished text can optionally be sent to DeepSeek for cleanup.
 - API keys are stored in the operating-system keyring.
+- The production app uses Right Alt; the development app uses Ctrl Alt Space so both global shortcuts can coexist.
 - Up to 200 transcripts can be stored locally; there is no cloud sync.
 - The browser build is a preview and cannot record.
 - The redesign must preserve current behavior and use the existing React, Tailwind CSS, Radix/shadcn-style component, TanStack Query, Motion, and Tauri stack.

@@ -10,7 +10,7 @@
     "CLIENT_ORIGINS": "http://localhost:1420,http://localhost:5173,tauri://localhost",
   },
   "secrets": {
-    "required": ["BETTER_AUTH_SECRET", "GOOGLE_CLIENT_IDS", "GOOGLE_CLIENT_SECRET"],
+    "required": ["BETTER_AUTH_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"],
   },
   "d1_databases": [
     {
@@ -23,5 +23,30 @@
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1,
+  },
+  "env": {
+    "production": {
+      "name": "voxtype-api-production",
+      "vars": {
+        "ALLOWED_EMAIL": "prajwalreddy.dev@gmail.com",
+        "API_URL": "https://configure-before-deploy.invalid",
+        "CLIENT_ORIGINS": "https://configure-before-deploy.invalid,tauri://localhost",
+      },
+      "secrets": {
+        "required": ["BETTER_AUTH_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"],
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "voxtype-production",
+          "database_id": "00000000-0000-0000-0000-000000000000",
+          "migrations_dir": "migrations",
+        },
+      ],
+      "observability": {
+        "enabled": true,
+        "head_sampling_rate": 1,
+      },
+    },
   },
 }

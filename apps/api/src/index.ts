@@ -3,11 +3,17 @@ import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
 import { secureHeaders } from 'hono/secure-headers';
 import { analyticsController } from './modules/analytics/analytics.controller';
-import { getCurrentUser, handleAuthRequest } from './modules/auth/auth.controller';
+import {
+  finishDesktopAuth,
+  getCurrentUser,
+  handleAuthRequest,
+  startDesktopAuth,
+} from './modules/auth/auth.controller';
 import { requireAuth } from './modules/auth/auth.middleware';
 import { dictationController } from './modules/dictations/dictation.controller';
 import { ApiError } from './shared/errors/api-error';
 import type { ApiEnv } from './shared/http/api.types';
+import { apiEnvironment } from './shared/runtime/environment';
 
 const app = new Hono<ApiEnv>();
 
@@ -44,10 +50,13 @@ app.get('/', (c) =>
     name: 'VoxType API',
     status: 'ok',
     version: 'v1',
+    environment: apiEnvironment(c.env.API_URL),
   }),
 );
-app.get('/health', (c) => c.json({ status: 'ok' }));
+app.get('/health', (c) => c.json({ status: 'ok', environment: apiEnvironment(c.env.API_URL) }));
 
+app.get('/api/desktop-auth/start', startDesktopAuth);
+app.get('/api/desktop-auth/callback', finishDesktopAuth);
 app.all('/api/auth/*', handleAuthRequest);
 
 app.use('/v1/*', requireAuth);

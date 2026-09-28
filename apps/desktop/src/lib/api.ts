@@ -4,11 +4,13 @@ import { listen } from '@tauri-apps/api/event';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { useEffect } from 'react';
 import { toast } from 'sonner';
+import { appEnvironment, isDevelopment, shortcutLabel } from './environment';
 import {
   defaultSettings,
   errorMessage,
   idleSession,
   settingsSchema,
+  type AuthUser,
   type Bootstrap,
   type Diagnostic,
   type HistoryItem,
@@ -18,12 +20,25 @@ import {
 } from './types';
 
 export const native = isTauri();
+const previewUser: AuthUser = {
+  id: 'browser-preview',
+  name: 'Prajwal Reddy',
+  email: 'prajwalreddy.dev@gmail.com',
+};
+const previewSignedOut = new URLSearchParams(location.search).get('auth') === 'login';
+
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: { retry: 1, staleTime: 30_000, refetchOnWindowFocus: false },
-    mutations: { retry: false, onError: (error) => toast.error(errorMessage(error)) },
+    mutations: {
+      retry: false,
+      onError: (error, _variables, _result, context) => {
+        if (context.meta?.suppressErrorToast !== true) toast.error(errorMessage(error));
+      },
+    },
   },
 });
+if (isDevelopment) window.__VOXTYPE_QUERY_CLIENT__ = queryClient;
 
 async function command<T>(name: string, args?: Record<string, unknown>): Promise<T> {
   if (!native) throw new Error('Open the installed VoxType desktop app to use this feature.');
@@ -31,10 +46,17 @@ async function command<T>(name: string, args?: Record<string, unknown>): Promise
 }
 
 export const api = {
+  authUser: () =>
+    native
+      ? command<AuthUser | null>('get_auth_user')
+      : Promise.resolve(previewSignedOut ? null : previewUser),
+  signInWithGoogle: () =>
+    native ? command<AuthUser>('sign_in_with_google') : Promise.resolve(previewUser),
+  signOut: () => (native ? command<void>('sign_out') : Promise.resolve()),
   bootstrap: () =>
     native
       ? command<Bootstrap>('bootstrap')
-      : Promise.resolve({
+      : Promise.resolve<Bootstrap>({
           settings: defaultSettings,
           hasKey: false,
           keyError: null,
@@ -43,6 +65,8 @@ export const api = {
           snapshot: idleSession,
           shortcutRegistered: false,
           version: '0.1.0',
+          environment: appEnvironment,
+          shortcutLabel,
         }),
   history: () => (native ? command<HistoryItem[]>('get_history') : Promise.resolve([])),
   microphones: () => (native ? command<Microphone[]>('get_microphones') : Promise.resolve([])),
@@ -78,6 +102,13 @@ export const api = {
           window.open('https://console.deepgram.com/', '_blank', 'noopener,noreferrer'),
         ),
 };
+export const useAuthUser = () =>
+  useQuery({
+    queryKey: ['auth-user'],
+    queryFn: api.authUser,
+    retry: false,
+    staleTime: Infinity,
+  });
 export const useBootstrap = () => useQuery({ queryKey: ['bootstrap'], queryFn: api.bootstrap });
 export const useHistory = () => useQuery({ queryKey: ['history'], queryFn: api.history });
 export const useSession = () =>
@@ -133,4 +164,18 @@ export function useCopy() {
     mutationFn: api.copy,
     onSuccess: () => toast.success('Copied to clipboard'),
   });
+}
+
+export function useAuthActions() {
+  const client = useQueryClient();
+  const signIn = useMutation({
+    meta: { suppressErrorToast: true },
+    mutationFn: api.signInWithGoogle,
+    onSuccess: (user) => client.setQueryData<AuthUser>(['auth-user'], user),
+  });
+  const signOut = useMutation({
+    mutationFn: api.signOut,
+    onSuccess: () => client.setQueryData<AuthUser | null>(['auth-user'], null),
+  });
+  return { signIn, signOut };
 }

@@ -11,6 +11,7 @@ import {
   Mic,
   Settings2,
   Square,
+  UserRound,
   X,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -20,21 +21,69 @@ import { Button, IconButton, Logo, Shortcut } from './components/ui';
 import { Card } from './components/ui/card';
 import { Skeleton } from './components/ui/skeleton';
 import { Waveform } from './components/waveform';
-import { native, useBootstrap, useCopy, useRecording, useSession } from './lib/api';
-import { duration, isActive, type Bootstrap, type Session } from './lib/types';
+import {
+  native,
+  useAuthActions,
+  useAuthUser,
+  useBootstrap,
+  useCopy,
+  useRecording,
+  useSession,
+} from './lib/api';
+import {
+  duration,
+  errorMessage,
+  isActive,
+  type AuthUser,
+  type Bootstrap,
+  type Session,
+} from './lib/types';
 import { cn } from './lib/utils';
+import { isDevelopment, shortcutLabel } from './lib/environment';
 import { HistoryPage } from './pages/History';
+import { LoginPage } from './pages/Login';
+import { ProfilePage } from './pages/Profile';
 import { SettingsPage } from './pages/Settings';
 
-type Page = 'dictation' | 'history' | 'settings';
+type Page = 'dictation' | 'history' | 'settings' | 'profile';
 
 const navigation = [
   { id: 'dictation', icon: AudioLines, label: 'Dictation' },
   { id: 'history', icon: History, label: 'History' },
   { id: 'settings', icon: Settings2, label: 'Settings' },
+  { id: 'profile', icon: UserRound, label: 'Profile' },
 ] as const;
 
 export function App() {
+  const auth = useAuthUser();
+  const { signIn, signOut } = useAuthActions();
+
+  if (!auth.data) {
+    const error = signIn.error ?? auth.error;
+    return (
+      <LoginPage
+        checking={auth.isPending}
+        pending={signIn.isPending}
+        error={error ? errorMessage(error) : undefined}
+        onSignIn={() => signIn.mutate()}
+      />
+    );
+  }
+
+  return (
+    <Workspace user={auth.data} signingOut={signOut.isPending} onSignOut={() => signOut.mutate()} />
+  );
+}
+
+function Workspace({
+  user,
+  signingOut,
+  onSignOut,
+}: {
+  user: AuthUser;
+  signingOut: boolean;
+  onSignOut: () => void;
+}) {
   const [page, setPage] = useState<Page>('dictation');
   const [preview, setPreview] = useState(false);
   const boot = useBootstrap();
@@ -93,7 +142,7 @@ export function App() {
         </div>
         <div className="mt-auto hidden justify-center max-lg:flex">
           <IconButton
-            label="Right Alt shortcut settings"
+            label={`${shortcutLabel} shortcut settings`}
             onClick={() => setPage('settings')}
             className="text-inverse-muted hover:bg-navigation-raised hover:text-inverse"
           >
@@ -106,6 +155,11 @@ export function App() {
         {!native && (
           <div className="border-b border-warning/15 bg-warning-soft px-5 py-2 text-center text-caption font-medium text-warning">
             Browser preview · Open the desktop app to record.
+          </div>
+        )}
+        {native && isDevelopment && (
+          <div className="border-b border-warning/15 bg-warning-soft px-5 py-2 text-center text-caption font-medium text-warning">
+            Development environment · Local backend and isolated app data
           </div>
         )}
 
@@ -144,6 +198,9 @@ export function App() {
               )}
               {page === 'history' && <HistoryPage onRecord={() => setPage('dictation')} />}
               {page === 'settings' && <SettingsPage boot={boot.data} active={active} />}
+              {page === 'profile' && (
+                <ProfilePage user={user} signingOut={signingOut} onSignOut={onSignOut} />
+              )}
             </>
           ) : null}
         </div>

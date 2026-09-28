@@ -101,4 +101,4 @@ export const nativeTheme = {
   },
 } as const;
 
-export type FlowNativeTheme = typeof nativeTheme;
+export type VoxTypeNativeTheme = typeof nativeTheme;

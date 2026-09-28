@@ -54,6 +54,14 @@ export interface Bootstrap {
   snapshot: Session;
   shortcutRegistered: boolean;
   version: string;
+  environment: 'development' | 'production';
+  shortcutLabel: string;
+}
+export interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+  image?: string | null;
 }
 export interface HistoryItem {
   id: string;

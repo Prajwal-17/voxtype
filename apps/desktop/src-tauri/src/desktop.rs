@@ -1,11 +1,12 @@
 //! Ubuntu adapters. All subprocess arguments are separate: no shell or interpolated commands.
-use crate::model::{Diagnostic, Microphone};
+use crate::{
+    environment,
+    model::{Diagnostic, Microphone},
+};
 use gio::prelude::*;
 use std::{process::Stdio, time::Duration};
 use tokio::{io::AsyncWriteExt, process::Command, time::timeout};
 
-const SHORTCUT_PATH: &str =
-    "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/flow-dictation/";
 const MEDIA_KEYS: &str = "org.gnome.settings-daemon.plugins.media-keys";
 const CUSTOM_KEY: &str = "org.gnome.settings-daemon.plugins.media-keys.custom-keybinding";
 
@@ -17,7 +18,7 @@ fn gnome_settings() -> Result<(gio::Settings, gio::Settings), String> {
     }
     Ok((
         gio::Settings::new(MEDIA_KEYS),
-        gio::Settings::with_path(CUSTOM_KEY, SHORTCUT_PATH),
+        gio::Settings::with_path(CUSTOM_KEY, environment::shortcut_path()),
     ))
 }
 // Linux KEY_RIGHTALT (100) + XKB's offset (8). Mutter accepts physical
@@ -25,7 +26,7 @@ fn gnome_settings() -> Result<(gio::Settings, gio::Settings), String> {
 const RIGHT_ALT: &str = "0x6c";
 
 pub fn install_shortcut() -> Result<(), String> {
-    let accelerator = RIGHT_ALT;
+    let accelerator = environment::shortcut_binding();
     let (settings, binding) = gnome_settings()?;
     let mut paths: Vec<String> = settings
         .strv("custom-keybindings")
@@ -33,15 +34,26 @@ pub fn install_shortcut() -> Result<(), String> {
         .map(|p| p.to_string())
         .collect();
     for path in &paths {
-        if path == SHORTCUT_PATH {
+        if path == environment::shortcut_path() {
             continue;
         }
         let existing = gio::Settings::with_path(CUSTOM_KEY, path);
-        if matches!(
-            existing.string("binding").as_str(),
-            "0x6c" | "0x6C" | "Alt_R" | "ISO_Level3_Shift"
-        ) {
-            return Err(format!("Right Alt is already assigned to {}. Remove that binding in Ubuntu Settings, then enable VoxType’s shortcut again.", existing.string("name")));
+        let existing_binding = existing.string("binding");
+        let conflicts = if environment::is_development() {
+            existing_binding.eq_ignore_ascii_case(accelerator)
+        } else {
+            matches!(
+                existing_binding.as_str(),
+                RIGHT_ALT | "0x6C" | "Alt_R" | "ISO_Level3_Shift"
+            )
+        };
+        if conflicts {
+            return Err(format!(
+                "{} is already assigned to {}. Remove that binding in Ubuntu Settings, then enable {}’s shortcut again.",
+                environment::shortcut_label(),
+                existing.string("name"),
+                environment::app_name(),
+            ));
         }
     }
     let executable =
@@ -51,7 +63,7 @@ pub fn install_shortcut() -> Result<(), String> {
         glib::shell_quote(executable.as_os_str()).to_string_lossy()
     );
     binding
-        .set_string("name", "VoxType dictation")
+        .set_string("name", &format!("{} dictation", environment::app_name()))
         .map_err(|e| e.to_string())?;
     binding
         .set_string("command", &command)
@@ -59,8 +71,8 @@ pub fn install_shortcut() -> Result<(), String> {
     binding
         .set_string("binding", accelerator)
         .map_err(|e| e.to_string())?;
-    if !paths.iter().any(|p| p == SHORTCUT_PATH) {
-        paths.push(SHORTCUT_PATH.into());
+    if !paths.iter().any(|p| p == environment::shortcut_path()) {
+        paths.push(environment::shortcut_path().into());
     }
     settings
         .set_strv("custom-keybindings", paths)
@@ -191,15 +203,15 @@ pub async fn paste(target: Option<&str>) -> Result<(), String> {
     Ok(())
 }
 pub async fn diagnostics(shortcut_registered: bool) -> Vec<Diagnostic> {
+    let shortcut = environment::shortcut_label();
     let mut checks = vec![Diagnostic {
         name: "Desktop session".into(),
         status: "ok".into(),
         detail: if wayland() {
-            "Wayland · GNOME handles the Right Alt toggle."
+            format!("Wayland · GNOME handles the {shortcut} toggle.")
         } else {
-            "X11 · GNOME handles the Right Alt toggle."
-        }
-        .into(),
+            format!("X11 · GNOME handles the {shortcut} toggle.")
+        },
     }];
     for (program, args, name, detail) in [
         (
@@ -267,11 +279,10 @@ pub async fn diagnostics(shortcut_registered: bool) -> Vec<Diagnostic> {
         name: "Global shortcut".into(),
         status: if shortcut_registered { "ok" } else { "warning" }.into(),
         detail: if shortcut_registered {
-            "Right Alt is configured to start and stop dictation."
+            format!("{shortcut} is configured to start and stop dictation.")
         } else {
-            "Enable Right Alt in the shortcut section above."
-        }
-        .into(),
+            format!("Enable {shortcut} in the shortcut section above.")
+        },
     });
     checks
 }

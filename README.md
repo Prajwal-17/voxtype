@@ -20,19 +20,37 @@ sudo apt-get install -y build-essential pkg-config libwebkit2gtk-4.1-dev \
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm dev        # native Tauri app
+pnpm dev        # local Worker + isolated VoxType Dev app
+pnpm dev:desktop
+pnpm dev:api
 pnpm dev:web    # browser preview only, no mic
 ```
 
 1. Settings → save your Deepgram API key.
 2. Start dictation, Finish to copy/paste.
 
-Press Right Alt to record / finish when running natively.
+The installed production app keeps `Right Alt`. VoxType Dev uses `Ctrl Alt Space`, so both can run
+and record independently on the same machine.
+
+Development is intentionally isolated as a second application:
+
+| Surface          | Production              | Development                 |
+| ---------------- | ----------------------- | --------------------------- |
+| App name         | VoxType                 | VoxType Dev                 |
+| Tauri identifier | `com.voxtype.dictation` | `com.voxtype.dictation.dev` |
+| API              | `VOXTYPE_API_URL`       | `http://localhost:8787`     |
+| Keyring service  | `com.voxtype.dictation` | `com.voxtype.dictation.dev` |
+| Local store      | `voxtype.json`          | `voxtype-dev.json`          |
+| Global shortcut  | Right Alt               | Ctrl Alt Space              |
+
+If a pre-VoxType-identity build is still installed, remove that build before installing the newly
+named production package. The renamed production identity starts with a fresh keyring and local
+settings namespace, so sign in and save the desktop preferences once after upgrading.
 
 ## Build
 
 ```sh
-pnpm build:desktop
+VOXTYPE_API_URL=https://api.example.com pnpm build:desktop
 ```
 
 `.deb` lands in `apps/desktop/src-tauri/target/release/bundle/deb/`.
@@ -41,3 +59,11 @@ pnpm build:desktop
 
 The sync/auth API lives in [`apps/api`](apps/api). See its README for D1 creation, Google OAuth,
 migrations, local development, and deployment.
+
+Production builds require an HTTPS API URL and fail during packaging when it is missing. Development
+builds always default to the local Worker:
+
+```sh
+VOXTYPE_API_URL=https://api.example.com pnpm build:desktop
+pnpm --filter @voxtype/desktop build:desktop:dev
+```

@@ -21,22 +21,24 @@
     "build:desktop": {
       "dependsOn": ["build", "check-types"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "env": ["TAURI_*", "VITE_*"],
+      "env": ["TAURI_*", "VITE_*", "VOXTYPE_API_URL", "VOXTYPE_ENV"],
       "outputs": ["src-tauri/target/release/bundle/**"]
     },
     "lint": {
-      "dependsOn": ["^lint"]
+      "dependsOn": ["^lint"],
+      "env": ["PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"]
     },
     "check-types": {
       "dependsOn": ["^check-types"]
     },
     "test": {
       "dependsOn": ["^build"],
-      "env": ["TAURI_WEBVIEW_AUTOMATION"]
+      "env": ["PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH", "TAURI_WEBVIEW_AUTOMATION"]
     },
     "dev": {
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "env": ["TAURI_*", "VITE_*", "VOXTYPE_API_URL", "VOXTYPE_ENV"]
     }
   }
 }

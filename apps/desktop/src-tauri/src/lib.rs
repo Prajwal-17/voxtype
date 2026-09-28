@@ -1,6 +1,8 @@
 mod audio;
+mod auth;
 mod cleanup;
 mod desktop;
+mod environment;
 mod model;
 mod session;
 mod storage;
@@ -15,6 +17,7 @@ use tauri::{Emitter, Manager};
 pub struct AppState {
     pub snapshot: Mutex<Snapshot>,
     pub control: Mutex<Option<tokio::sync::mpsc::Sender<session::Control>>>,
+    pub authenticated: AtomicBool,
     pub shortcut_registered: AtomicBool,
 }
 impl Default for AppState {
@@ -22,6 +25,7 @@ impl Default for AppState {
         Self {
             snapshot: Mutex::new(Snapshot::default()),
             control: Mutex::new(None),
+            authenticated: AtomicBool::new(false),
             shortcut_registered: AtomicBool::new(false),
         }
     }
@@ -38,6 +42,17 @@ pub fn show_main(app: &tauri::AppHandle) {
         let _ = w.show();
         let _ = w.unminimize();
         let _ = w.set_focus();
+    }
+}
+fn require_authenticated(app: &tauri::AppHandle) -> Result<(), String> {
+    if app
+        .state::<AppState>()
+        .authenticated
+        .load(Ordering::Acquire)
+    {
+        Ok(())
+    } else {
+        Err("Sign in with Google to use VoxType dictation.".into())
     }
 }
 
@@ -69,6 +84,13 @@ async fn bootstrap(app: tauri::AppHandle) -> Result<Bootstrap, String> {
         snapshot,
         shortcut_registered: state.shortcut_registered.load(Ordering::Relaxed),
         version: env!("CARGO_PKG_VERSION").into(),
+        environment: if environment::is_development() {
+            "development"
+        } else {
+            "production"
+        }
+        .into(),
+        shortcut_label: environment::shortcut_label().into(),
     })
 }
 async fn key_status(
@@ -105,6 +127,39 @@ async fn remove_api_key() -> Result<(), String> {
     tokio::task::spawn_blocking(storage::delete_key)
         .await
         .map_err(|_| "Keyring request failed.")?
+}
+#[tauri::command]
+async fn get_auth_user(app: tauri::AppHandle) -> Result<Option<AuthUser>, String> {
+    app.state::<AppState>()
+        .authenticated
+        .store(false, Ordering::Release);
+    let user = auth::current_user().await?;
+    app.state::<AppState>()
+        .authenticated
+        .store(user.is_some(), Ordering::Release);
+    Ok(user)
+}
+#[tauri::command]
+async fn sign_in_with_google(app: tauri::AppHandle) -> Result<AuthUser, String> {
+    let user = auth::sign_in(app.clone()).await?;
+    app.state::<AppState>()
+        .authenticated
+        .store(true, Ordering::Release);
+    Ok(user)
+}
+#[tauri::command]
+async fn sign_out(app: tauri::AppHandle) -> Result<(), String> {
+    app.state::<AppState>()
+        .authenticated
+        .store(false, Ordering::Release);
+    let _ = session::signal(&app, session::Control::Cancel).await;
+    if let Err(error) = auth::sign_out().await {
+        app.state::<AppState>()
+            .authenticated
+            .store(true, Ordering::Release);
+        return Err(error);
+    }
+    Ok(())
 }
 #[tauri::command]
 fn update_settings(app: tauri::AppHandle, settings: Settings) -> Result<(), String> {
@@ -174,6 +229,7 @@ async fn copy_text(text: String) -> Result<(), String> {
 }
 #[tauri::command]
 async fn start_dictation(app: tauri::AppHandle, test: bool) -> Result<(), String> {
+    require_authenticated(&app)?;
     session::start(app, test, false).await
 }
 #[tauri::command]
@@ -196,6 +252,13 @@ fn dismiss_overlay(app: tauri::AppHandle) {
 }
 
 fn dispatch(app: &tauri::AppHandle, action: &str) {
+    if action == "toggle" {
+        if let Err(error) = require_authenticated(app) {
+            let _ = app.emit("app-error", error);
+            show_main(app);
+            return;
+        }
+    }
     let app = app.clone();
     match action {
         "toggle" => {
@@ -241,6 +304,9 @@ pub fn run() {
             bootstrap,
             save_api_key,
             remove_api_key,
+            get_auth_user,
+            sign_in_with_google,
+            sign_out,
             save_cleanup_key,
             remove_cleanup_key,
             update_settings,
@@ -258,8 +324,8 @@ pub fn run() {
         ])
         .setup(|app| {
             let handle = app.handle();
-            // Reuse VoxType's existing GNOME entry: this replaces the old chord and
-            // refreshes the executable path when switching between dev/release.
+            // Each environment owns a separate GNOME entry and refreshes only its
+            // own executable path when it starts.
             let shortcut_ready = desktop::install_shortcut().is_ok();
             handle
                 .state::<AppState>()
@@ -277,12 +343,24 @@ pub fn run() {
                         None::<&str>,
                     )?,
                     &MenuItem::with_id(handle, "cancel", "Cancel dictation", true, None::<&str>)?,
-                    &MenuItem::with_id(handle, "settings", "Open VoxType", true, None::<&str>)?,
-                    &MenuItem::with_id(handle, "quit", "Quit VoxType", true, None::<&str>)?,
+                    &MenuItem::with_id(
+                        handle,
+                        "settings",
+                        format!("Open {}", environment::app_name()),
+                        true,
+                        None::<&str>,
+                    )?,
+                    &MenuItem::with_id(
+                        handle,
+                        "quit",
+                        format!("Quit {}", environment::app_name()),
+                        true,
+                        None::<&str>,
+                    )?,
                 ],
             )?;
             let mut tray = tauri::tray::TrayIconBuilder::new()
-                .tooltip("VoxType · voice dictation")
+                .tooltip(format!("{} · voice dictation", environment::app_name()))
                 .menu(&menu)
                 .on_menu_event(|app, event| {
                     if event.id.as_ref() == "quit" {

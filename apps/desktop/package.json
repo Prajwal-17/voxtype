@@ -1,13 +1,14 @@
 {
-  "name": "@flow/desktop",
+  "name": "@voxtype/desktop",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tauri dev",
+    "dev": "VOXTYPE_ENV=development VITE_VOXTYPE_ENV=development tauri dev --config src-tauri/tauri.dev.conf.json",
     "dev:web": "vite --host 127.0.0.1",
     "build": "vite build",
-    "build:desktop": "tauri build --bundles deb",
+    "build:desktop": "VOXTYPE_ENV=production VITE_VOXTYPE_ENV=production tauri build --bundles deb",
+    "build:desktop:dev": "VOXTYPE_ENV=development VITE_VOXTYPE_ENV=development tauri build --bundles deb --config src-tauri/tauri.dev.conf.json",
     "check-types": "tsc --noEmit",
     "typecheck": "pnpm check-types",
     "lint": "eslint . --max-warnings 0 && cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings",
@@ -18,7 +19,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@flow/design-system": "workspace:*",
+    "@voxtype/design-system": "workspace:*",
     "@fontsource-variable/mona-sans": "^5.3.0",
     "@radix-ui/react-alert-dialog": "^1.1.23",
     "@radix-ui/react-dialog": "^1.1.15",
@@ -43,8 +44,8 @@
     "zod": "^4.1.0"
   },
   "devDependencies": {
-    "@flow/eslint-config": "workspace:*",
-    "@flow/typescript-config": "workspace:*",
+    "@voxtype/eslint-config": "workspace:*",
+    "@voxtype/typescript-config": "workspace:*",
     "@playwright/test": "^1.55.0",
     "@tailwindcss/vite": "^4.1.13",
     "@tauri-apps/cli": "^2.8.0",

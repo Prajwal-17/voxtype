@@ -102,6 +102,17 @@ pub struct Bootstrap {
     pub snapshot: Snapshot,
     pub shortcut_registered: bool,
     pub version: String,
+    pub environment: String,
+    pub shortcut_label: String,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthUser {
+    pub id: String,
+    pub name: String,
+    pub email: String,
+    pub image: Option<String>,
 }
 
 #[derive(Serialize)]

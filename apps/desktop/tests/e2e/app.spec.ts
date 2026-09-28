@@ -1,7 +1,32 @@
 import { expect, test } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
-type ApiModule = typeof import('../../src/lib/api');
 const captures = '../../.impeccable/review';
+
+test('sign in and profile screens use desktop authentication', async ({ page }) => {
+  await page.goto('/?auth=login');
+  await expect(page.getByRole('heading', { name: 'Sign in to VoxType Dev' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Sign in with Google' })).toBeVisible();
+  await mkdir(captures, { recursive: true });
+  await page.screenshot({ path: `${captures}/login.png`, fullPage: false });
+  await page.setViewportSize({ width: 760, height: 650 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: `${captures}/login-compact.png`, fullPage: false });
+  await page.setViewportSize({ width: 1100, height: 800 });
+
+  await page.getByRole('button', { name: 'Sign in with Google' }).click();
+  await expect(page.getByRole('heading', { name: 'Dictation' })).toBeVisible();
+  await page.getByRole('button', { name: 'Profile', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Profile' })).toBeFocused();
+  await expect(page.getByText('prajwalreddy.dev@gmail.com')).toBeVisible();
+  await page.screenshot({ path: `${captures}/profile.png`, fullPage: false });
+  await page.setViewportSize({ width: 760, height: 650 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: `${captures}/profile-compact.png`, fullPage: false });
+
+  await page.getByRole('button', { name: 'Sign out' }).click();
+  await expect(page.getByRole('heading', { name: 'Sign in to VoxType Dev' })).toBeFocused();
+});
+
 test('first run, navigation, settings and overlay are usable', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -10,7 +35,7 @@ test('first run, navigation, settings and overlay are usable', async ({ page }) 
   await expect(page.getByText('Browser preview ·')).toBeVisible();
   const shortcuts = page.locator('kbd[data-shortcut][data-slot="kbd"]');
   expect(await shortcuts.count()).toBeGreaterThanOrEqual(2);
-  await expect(shortcuts.first()).toHaveText('Right Alt');
+  await expect(shortcuts.first()).toHaveText('Ctrl Alt Space');
   await expect(shortcuts.first()).toHaveCSS('user-select', 'none');
   await expect(page.getByRole('button', { name: 'Set up dictation' })).toHaveCSS(
     'color',
@@ -54,7 +79,7 @@ test('first run, navigation, settings and overlay are usable', async ({ page }) 
 });
 test('overlay window has transparent background and reduced motion support', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.setViewportSize({ width: 288, height: 56 });
+  await page.setViewportSize({ width: 288, height: 64 });
   await page.goto('/?window=overlay');
   await expect(page.getByRole('button', { name: 'Finish dictation' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Dismiss overlay' })).toBeVisible();
@@ -69,14 +94,14 @@ test('overlay window has transparent background and reduced motion support', asy
   await expect(meter).toHaveCSS('height', '32px');
   await expect(meter.locator('span')).toHaveCount(23);
   await expect(page.getByRole('button', { name: 'Dismiss overlay' })).toHaveCSS('width', '32px');
-  expect(await overlay.boundingBox()).toMatchObject({ x: 8, y: 8, width: 272, height: 40 });
+  expect(await overlay.boundingBox()).toMatchObject({ x: 8, y: 12, width: 272, height: 40 });
   expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe(
     'rgba(0, 0, 0, 0)',
   );
   await page.screenshot({ path: `${captures}/overlay-idle.png` });
-  await page.evaluate(async () => {
-    // @ts-expect-error Vite resolves this browser-only module path during the test.
-    const { queryClient } = (await import('/src/lib/api.ts')) as ApiModule;
+  await page.evaluate(() => {
+    const queryClient = window.__VOXTYPE_QUERY_CLIENT__;
+    if (!queryClient) throw new Error('Development query client is missing');
     queryClient.setQueryData(['session'], {
       sessionId: 'overlay-review',
       phase: 'listening',
@@ -95,9 +120,9 @@ test('overlay window has transparent background and reduced motion support', asy
   await expect(page.getByRole('button', { name: 'Finish dictation' })).toBeEnabled();
   await page.screenshot({ path: `${captures}/overlay.png` });
 
-  await page.evaluate(async () => {
-    // @ts-expect-error Vite resolves this browser-only module path during the test.
-    const { queryClient } = (await import('/src/lib/api.ts')) as ApiModule;
+  await page.evaluate(() => {
+    const queryClient = window.__VOXTYPE_QUERY_CLIENT__;
+    if (!queryClient) throw new Error('Development query client is missing');
     const current = queryClient.getQueryData(['session']) as Record<string, unknown>;
     queryClient.setQueryData(['session'], { ...current, phase: 'finishing' });
   });
@@ -105,9 +130,9 @@ test('overlay window has transparent background and reduced motion support', asy
   await expect(overlay.locator('[data-signal="loading"]')).toBeVisible();
   await page.screenshot({ path: `${captures}/overlay-finishing.png` });
 
-  await page.evaluate(async () => {
-    // @ts-expect-error Vite resolves this browser-only module path during the test.
-    const { queryClient } = (await import('/src/lib/api.ts')) as ApiModule;
+  await page.evaluate(() => {
+    const queryClient = window.__VOXTYPE_QUERY_CLIENT__;
+    if (!queryClient) throw new Error('Development query client is missing');
     const current = queryClient.getQueryData(['session']) as Record<string, unknown>;
     queryClient.setQueryData(['session'], { ...current, phase: 'cleaning' });
   });
@@ -124,9 +149,9 @@ test('review evidence covers compact help, filtering, and recovery states', asyn
   await page.screenshot({ path: `${captures}/compact-tooltip.png`, fullPage: false });
 
   await page.setViewportSize({ width: 1100, height: 800 });
-  await page.evaluate(async () => {
-    // @ts-expect-error Vite resolves this browser-only module path during the test.
-    const { queryClient } = (await import('/src/lib/api.ts')) as ApiModule;
+  await page.evaluate(() => {
+    const queryClient = window.__VOXTYPE_QUERY_CLIENT__;
+    if (!queryClient) throw new Error('Development query client is missing');
     queryClient.setQueryData(
       ['history'],
       [
@@ -154,9 +179,9 @@ test('review evidence covers compact help, filtering, and recovery states', asyn
   await expect(page.getByText('1 of 2 dictations')).toBeVisible();
   await page.screenshot({ path: `${captures}/history-filtered.png`, fullPage: false });
 
-  await page.evaluate(async () => {
-    // @ts-expect-error Vite resolves this browser-only module path during the test.
-    const { queryClient } = (await import('/src/lib/api.ts')) as ApiModule;
+  await page.evaluate(() => {
+    const queryClient = window.__VOXTYPE_QUERY_CLIENT__;
+    if (!queryClient) throw new Error('Development query client is missing');
     const query = queryClient.getQueryCache().find({ queryKey: ['history'] });
     if (!query) throw new Error('History query is missing');
     query.setState({

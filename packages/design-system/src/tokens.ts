@@ -129,6 +129,6 @@ export const tokens = {
   shadow,
 } as const;
 
-export type FlowTokens = typeof tokens;
-export type FlowColor = keyof typeof color;
-export type FlowTypeRole = keyof typeof typography;
+export type VoxTypeTokens = typeof tokens;
+export type VoxTypeColor = keyof typeof color;
+export type VoxTypeTypeRole = keyof typeof typography;

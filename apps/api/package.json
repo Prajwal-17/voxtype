@@ -1,18 +1,19 @@
 {
-  "name": "@flow/api",
+  "name": "@voxtype/api",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
+    "dev": "wrangler dev --local --port 8787",
+    "deploy": "pnpm deploy:production",
+    "deploy:production": "node scripts/validate-production-config.mjs && wrangler deploy --env production",
     "types": "wrangler types",
     "check-types": "wrangler types --check && tsc --noEmit",
     "lint": "tsc --noEmit",
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply voxtype --local",
-    "db:migrate:remote": "wrangler d1 migrations apply voxtype --remote"
+    "db:migrate:remote": "node scripts/validate-production-config.mjs && wrangler d1 migrations apply DB --remote --env production"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "^1.7.6",
@@ -22,7 +23,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@flow/typescript-config": "workspace:*",
+    "@voxtype/typescript-config": "workspace:*",
     "@types/node": "^24.0.0",
     "drizzle-kit": "^0.31.11",
     "typescript": "^5.9.3",

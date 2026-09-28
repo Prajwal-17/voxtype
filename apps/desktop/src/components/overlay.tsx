@@ -3,6 +3,7 @@ import { cn } from '../lib/utils';
 import { toast } from 'sonner';
 import { api, useRecording, useSession } from '../lib/api';
 import { isActive, type Session } from '../lib/types';
+import { isDevelopment } from '../lib/environment';
 import { Waveform } from './waveform';
 
 export function VoiceOverlay({ preview }: { preview?: Session }) {
@@ -38,13 +39,27 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
       className={cn(
         'relative isolate grid h-10 grid-cols-[32px_minmax(0,1fr)_32px] items-center gap-1 rounded-full bg-overlay p-1 text-overlay-text shadow-floating scheme-dark',
         'before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border before:border-overlay-line before:opacity-80',
-        preview ? 'mx-auto mt-2 w-[272px]' : 'm-2 w-[calc(100%-1rem)]',
+        preview
+          ? 'mx-auto mt-2 w-[272px]'
+          : isDevelopment
+            ? 'mx-2 mt-3 w-[calc(100%-1rem)]'
+            : 'm-2 w-[calc(100%-1rem)]',
       )}
       data-phase={session.phase}
       data-speaking={session.speechActive}
-      aria-label="Voice recording controls"
+      aria-label={
+        isDevelopment ? 'Development voice recording controls' : 'Voice recording controls'
+      }
       aria-busy={finishing}
     >
+      {isDevelopment && (
+        <span
+          aria-hidden="true"
+          className="absolute -top-[7px] left-1/2 z-10 -translate-x-1/2 rounded-menu-item bg-warning-soft px-1 py-0.5 text-[0.5rem] font-bold leading-none tracking-[.08em] text-warning"
+        >
+          DEV
+        </span>
+      )}
       <button
         className="inline-flex size-8 items-center justify-center rounded-full border-0 bg-overlay-raised p-0 text-overlay-text transition-[transform,background-color] duration-150 ease-out enabled:active:scale-[.97] enabled:hover:bg-navigation-line enabled:hover:text-white focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-overlay-text disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100"
         title={active ? 'Cancel dictation' : 'Dismiss overlay'}

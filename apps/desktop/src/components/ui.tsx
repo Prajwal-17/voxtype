@@ -1,5 +1,6 @@
 import { useId, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { cn } from '../lib/utils';
+import { appName, isDevelopment, shortcutLabel } from '../lib/environment';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -118,20 +119,48 @@ export function Confirm({
   );
 }
 
-export function Logo({ className }: { className?: string }) {
+export function Logo({
+  className,
+  tone = 'inverse',
+  collapse = true,
+}: {
+  className?: string;
+  tone?: 'inverse' | 'ink';
+  collapse?: boolean;
+}) {
   return (
-    <div role="img" aria-label="VoxType" className={cn('flex items-center gap-2.5', className)}>
+    <div
+      role="img"
+      aria-label={appName}
+      className={cn('relative flex items-center gap-2.5', className)}
+    >
       <img src="/voxtype.svg" alt="" width={32} height={32} className="size-8 shrink-0" />
       <span
         aria-hidden="true"
-        className="font-sans text-subheading font-semibold tracking-[-.03em] text-inverse max-lg:hidden"
+        className={cn(
+          'font-sans text-subheading font-semibold tracking-[-.03em]',
+          tone === 'inverse' ? 'text-inverse' : 'text-ink',
+          collapse && 'max-lg:hidden',
+        )}
       >
         VoxType
       </span>
+      {isDevelopment && (
+        <span
+          aria-hidden="true"
+          className={cn(
+            'rounded-menu-item bg-warning-soft px-1.5 py-0.5 text-[0.625rem] font-semibold leading-none tracking-[.04em] text-warning',
+            collapse &&
+              'max-lg:absolute max-lg:-right-2 max-lg:-bottom-1 max-lg:border max-lg:border-navigation',
+          )}
+        >
+          DEV
+        </span>
+      )}
     </div>
   );
 }
 
 export function Shortcut() {
-  return <Kbd data-shortcut>Right Alt</Kbd>;
+  return <Kbd data-shortcut>{shortcutLabel}</Kbd>;
 }
