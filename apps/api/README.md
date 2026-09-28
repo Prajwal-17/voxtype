@@ -7,25 +7,29 @@ Workers + Hono + D1 + Drizzle + Better Auth (Google, allowlisted).
 ```sh
 cd apps/api
 cp .dev.vars.example .dev.vars
-pnpm wrangler d1 create voxtype # put ID in wrangler.jsonc
 pnpm db:migrate:local
 pnpm dev
 ```
 
-Local development runs on `http://localhost:8787`, reports `environment: development`, and uses
-Wrangler's local-only D1 state. It does not read or write the deployed production D1 database.
+Local: `http://localhost:8787`, reports `environment: development`, uses
+Wrangler's local D1 state.
 
 `.dev.vars`: `BETTER_AUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
 
 Redirect URI: `http://localhost:8787/api/auth/callback/google`
 
-Production is an explicit Wrangler environment. Replace the sentinel `API_URL`, `CLIENT_ORIGINS`,
-and D1 `database_id` values under `env.production`, add
-`https://<api>/api/auth/callback/google`, and configure its secrets with
-`wrangler secret put --env production`. Then run `pnpm db:migrate:remote` and
-`pnpm run deploy`.
-Both commands validate the production block first and cannot fall back to the localhost config. A
-remote `API_URL` reports `environment: production`.
+## Deploy
+
+Dev is local-only — no cloud worker or D1.
+
+Prod (`env.production`) is remote. Fill `API_URL`, `CLIENT_ORIGINS`,
+D1 `database_id` (from `pnpm wrangler d1 create voxtype-production`), set prod
+secrets, add the prod `/api/auth/callback/google` redirect, then:
+
+```sh
+pnpm db:migrate:remote
+pnpm deploy:production
+```
 
 ## Auth
 

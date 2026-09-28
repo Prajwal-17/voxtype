@@ -15,7 +15,7 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "voxtype",
+      "database_name": "voxtype-local",
       "database_id": "00000000-0000-0000-0000-000000000000",
       "migrations_dir": "migrations",
     },
@@ -29,8 +29,8 @@
       "name": "voxtype-api-production",
       "vars": {
         "ALLOWED_EMAIL": "prajwalreddy.dev@gmail.com",
-        "API_URL": "https://configure-before-deploy.invalid",
-        "CLIENT_ORIGINS": "https://configure-before-deploy.invalid,tauri://localhost",
+        "API_URL": "https://voxtype-api-production.prajwalreddy-dev.workers.dev",
+        "CLIENT_ORIGINS": "tauri://localhost",
       },
       "secrets": {
         "required": ["BETTER_AUTH_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"],
@@ -39,7 +39,7 @@
         {
           "binding": "DB",
           "database_name": "voxtype-production",
-          "database_id": "00000000-0000-0000-0000-000000000000",
+          "database_id": "959c8c66-968e-4463-b1af-6ec4cd732e3c",
           "migrations_dir": "migrations",
         },
       ],
