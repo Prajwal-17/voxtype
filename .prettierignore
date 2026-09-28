@@ -10,3 +10,4 @@ pnpm-lock.yaml
 apps/api/migrations/meta/
 apps/api/worker-configuration.d.ts
 apps/api/.wrangler/
+apps/mobile/src/uniwind-types.d.ts
