@@ -3,6 +3,7 @@ package com.voxtype.nativebridge
 import android.Manifest
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.InputMethod
+import android.animation.ValueAnimator
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -85,16 +86,17 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     if (info.packageName != node.packageName?.toString()) return null
     val kind = info.inputType
     if (kind == InputType.TYPE_NULL) return null
+    // Dictation is for prose fields. Excluding numeric, phone and date inputs also blocks
+    // many one-time-code and payment fields that do not expose a password flag.
+    if ((kind and InputType.TYPE_MASK_CLASS) != InputType.TYPE_CLASS_TEXT) return null
     val variation = kind and InputType.TYPE_MASK_VARIATION
-    val textPassword = (kind and InputType.TYPE_MASK_CLASS) == InputType.TYPE_CLASS_TEXT &&
-      variation in setOf(InputType.TYPE_TEXT_VARIATION_PASSWORD,
-        InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD, InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD)
-    val numberPassword = (kind and InputType.TYPE_MASK_CLASS) == InputType.TYPE_CLASS_NUMBER &&
-      variation == InputType.TYPE_NUMBER_VARIATION_PASSWORD
-    if (textPassword || numberPassword) return null
+    if (variation in setOf(InputType.TYPE_TEXT_VARIATION_PASSWORD,
+      InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD, InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD)) return null
     if ((info.imeOptions and android.view.inputmethod.EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING) != 0) return null
     val hint = listOfNotNull(node.hintText?.toString(), node.contentDescription?.toString()).joinToString(" ").lowercase()
-    if (listOf("password", "passcode", "pin code", "security code", "verification code", "one-time code", "cvv").any { hint.contains(it) }) return null
+    if (listOf("password", "passcode", "pin code", "security code", "verification code",
+      "one-time", "one time", "otp", "2fa", "cvv", "cvc", "credit card", "card number",
+      "payment card", "security answer").any { hint.contains(it) }) return null
     return node
   }
 
@@ -149,7 +151,20 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     bubble?.let { try { windows.removeView(it) } catch (_: Exception) {} }
     bubble = null; label = null
   }
-  private fun setStatus(value: String) { status = value; refreshBubble(); VoxTypeNativeModule.changed() }
+  private fun setStatus(value: String) {
+    status = value
+    refreshBubble()
+    bubble?.let { view ->
+      view.animate().cancel()
+      if (ValueAnimator.areAnimatorsEnabled()) {
+        view.scaleX = 0.96f; view.scaleY = 0.96f; view.alpha = 0.86f
+        view.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(150).start()
+      } else {
+        view.scaleX = 1f; view.scaleY = 1f; view.alpha = 1f
+      }
+    }
+    VoxTypeNativeModule.changed()
+  }
 
   private fun startRecording() {
     if (status != "idle" && status != "saved") return
