@@ -23,6 +23,7 @@ import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.LinearLayout
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import okhttp3.MediaType.Companion.toMediaType
@@ -121,6 +122,11 @@ class VoxTypeAccessibilityService : AccessibilityService() {
         setTextColor(Color.WHITE); textSize = 14f
         setPadding(8.dp, 0, 8.dp, 0)
       }
+      container.addView(ImageView(this).apply {
+        setImageResource(R.drawable.voxtype_logo)
+        layoutParams = LinearLayout.LayoutParams(24.dp, 24.dp)
+        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+      })
       container.addView(text)
       label = text
       bubble = container
@@ -135,7 +141,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       "connecting" -> "Connecting…"
       "processing" -> "Processing…"
       "saved" -> when { lastDelivered -> "Inserted  ·  VoxType"; lastCopied -> "Copied  ·  Paste anywhere"; else -> "Saved  ·  Tap to copy" }
-      else -> "✦  VoxType"
+      else -> "VoxType"
     }
     bubble?.contentDescription = when (status) {
       "listening" -> "Stop VoxType recording"

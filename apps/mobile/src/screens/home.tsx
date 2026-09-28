@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AppState,
+  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -26,6 +27,7 @@ import { Text } from '@/components/ui/text';
 import VoxTypeNative from '../../modules/voxtype-native/src/VoxTypeNativeModule';
 import type { Dictation, Snapshot } from '../../modules/voxtype-native/src/VoxTypeNative.types';
 import { currentUser, signIn, signOut, type User } from '@/lib/mobile-api';
+import logo from '../../assets/icon.png';
 
 const c = theme.colors;
 const isWeb = Platform.OS === 'web';
@@ -394,12 +396,11 @@ export default function Home() {
           )}
           <View className="flex-row items-center justify-between">
             <View className="flex-row items-center gap-3">
-              <View
-                className="items-center justify-center"
-                style={{ width: 35, height: 35, borderRadius: 10, backgroundColor: c.chrome }}
-              >
-                <Text style={{ color: c.onChrome, fontSize: 18, fontWeight: '700' }}>V</Text>
-              </View>
+              <Image
+                source={logo}
+                style={{ width: 35, height: 35, borderRadius: 10 }}
+                accessibilityLabel="VoxType logo"
+              />
               <Text style={{ color: c.text, fontSize: 20, fontWeight: '700', letterSpacing: -0.4 }}>
                 VoxType
               </Text>

@@ -1,0 +1,4 @@
+The mobile launcher icon, adaptive foreground, favicon, and native bubble mark
+were rendered from apps/desktop/public/voxtype.svg. No new logo artwork was
+introduced. The adaptive foreground contains only the original five voice bars;
+Android supplies the ivory background and themed icon color.
