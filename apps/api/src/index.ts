@@ -5,12 +5,15 @@ import { secureHeaders } from 'hono/secure-headers';
 import { analyticsController } from './modules/analytics/analytics.controller';
 import {
   finishDesktopAuth,
+  finishMobileAuth,
   getCurrentUser,
   handleAuthRequest,
   startDesktopAuth,
+  startMobileAuth,
 } from './modules/auth/auth.controller';
 import { requireAuth } from './modules/auth/auth.middleware';
 import { dictationController } from './modules/dictations/dictation.controller';
+import { speechController } from './modules/speech/speech.controller';
 import { ApiError } from './shared/errors/api-error';
 import type { ApiEnv } from './shared/http/api.types';
 import { apiEnvironment } from './shared/runtime/environment';
@@ -57,12 +60,15 @@ app.get('/health', (c) => c.json({ status: 'ok', environment: apiEnvironment(c.e
 
 app.get('/api/desktop-auth/start', startDesktopAuth);
 app.get('/api/desktop-auth/callback', finishDesktopAuth);
+app.get('/api/mobile-auth/start', startMobileAuth);
+app.get('/api/mobile-auth/callback', finishMobileAuth);
 app.all('/api/auth/*', handleAuthRequest);
 
 app.use('/v1/*', requireAuth);
 app.get('/v1/me', getCurrentUser);
 app.route('/v1/dictations', dictationController);
 app.route('/v1/analytics', analyticsController);
+app.route('/v1/speech', speechController);
 
 app.notFound((c) => c.json({ error: { code: 'not_found', message: 'Route not found.' } }, 404));
 app.onError((error, c) => {

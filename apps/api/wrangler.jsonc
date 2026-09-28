@@ -10,7 +10,7 @@
     "CLIENT_ORIGINS": "http://localhost:1420,http://localhost:5173,tauri://localhost",
   },
   "secrets": {
-    "required": ["BETTER_AUTH_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"],
+    "required": ["BETTER_AUTH_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "DEEPGRAM_API_KEY", "DEEPSEEK_API_KEY"],
   },
   "d1_databases": [
     {
@@ -33,7 +33,7 @@
         "CLIENT_ORIGINS": "tauri://localhost",
       },
       "secrets": {
-        "required": ["BETTER_AUTH_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"],
+        "required": ["BETTER_AUTH_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "DEEPGRAM_API_KEY", "DEEPSEEK_API_KEY"],
       },
       "d1_databases": [
         {
