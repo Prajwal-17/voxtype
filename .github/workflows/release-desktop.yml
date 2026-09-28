@@ -1,0 +1,94 @@
+name: Release desktop
+
+on:
+  push:
+    tags:
+      - 'desktop-v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  VOXTYPE_API_URL: ${{ vars.VOXTYPE_API_URL }}
+  VOXTYPE_ENV: production
+  VITE_VOXTYPE_ENV: production
+
+jobs:
+  release-linux:
+    name: Build and release Linux desktop app
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            libdbus-1-dev \
+            patchelf \
+            xdg-utils
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate release configuration
+        shell: bash
+        run: |
+          app_version="$(node --print "require('./apps/desktop/src-tauri/tauri.conf.json').version")"
+
+          if [[ "$GITHUB_EVENT_NAME" == "push" && "$GITHUB_REF_NAME" != "desktop-v$app_version" ]]; then
+            echo "Release tag $GITHUB_REF_NAME does not match desktop version desktop-v$app_version." >&2
+            exit 1
+          fi
+
+          if [[ "$VOXTYPE_API_URL" != https://* ]]; then
+            echo "Set the VOXTYPE_API_URL repository variable to the production HTTPS API URL." >&2
+            exit 1
+          fi
+
+      - name: Build and publish VoxType
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: apps/desktop
+          args: --bundles deb
+          tagName: desktop-v__VERSION__
+          releaseName: Desktop v__VERSION__
+          releaseBody: ''
+          generateReleaseNotes: false
+          releaseDraft: false
+          prerelease: false
