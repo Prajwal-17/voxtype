@@ -1,7 +1,7 @@
 //! Ubuntu adapters. All subprocess arguments are separate: no shell or interpolated commands.
 use crate::{
     environment,
-    model::{Diagnostic, Microphone},
+    model::{Diagnostic, Microphone, ShortcutOption},
 };
 use gio::prelude::*;
 use std::{process::Stdio, time::Duration};
@@ -9,6 +9,8 @@ use tokio::{io::AsyncWriteExt, process::Command, time::timeout};
 
 const MEDIA_KEYS: &str = "org.gnome.settings-daemon.plugins.media-keys";
 const CUSTOM_KEY: &str = "org.gnome.settings-daemon.plugins.media-keys.custom-keybinding";
+// Linux KEY_RIGHTALT (100) plus XKB's offset (8). Bind the physical right Alt key.
+const RIGHT_ALT: &str = "0x6c";
 
 fn gnome_settings() -> Result<(gio::Settings, gio::Settings), String> {
     let source =
@@ -21,40 +23,160 @@ fn gnome_settings() -> Result<(gio::Settings, gio::Settings), String> {
         gio::Settings::with_path(CUSTOM_KEY, environment::shortcut_path()),
     ))
 }
-// Linux KEY_RIGHTALT (100) + XKB's offset (8). Mutter accepts physical
-// keycodes on both GNOME Wayland and X11, including AltGr keyboard layouts.
-const RIGHT_ALT: &str = "0x6c";
+pub struct ShortcutSpec {
+    pub id: String,
+    pub label: String,
+    binding: String,
+}
 
-pub fn install_shortcut() -> Result<(), String> {
-    let accelerator = environment::shortcut_binding();
+const SHORTCUTS: [(&str, &str, &str); 6] = [
+    ("right-alt", "Right Alt", RIGHT_ALT),
+    ("ctrl-alt-space", "Ctrl Alt Space", "<Control><Alt>space"),
+    (
+        "ctrl-shift-space",
+        "Ctrl Shift Space",
+        "<Control><Shift>space",
+    ),
+    (
+        "super-shift-space",
+        "Super Shift Space",
+        "<Super><Shift>space",
+    ),
+    ("ctrl-alt-d", "Ctrl Alt D", "<Control><Alt>d"),
+    ("f8", "F8", "F8"),
+];
+
+pub fn shortcut(shortcut_id: &str) -> Option<ShortcutSpec> {
+    if let Some((id, label, binding)) = SHORTCUTS.iter().find(|(id, _, _)| *id == shortcut_id) {
+        return Some(ShortcutSpec {
+            id: (*id).into(),
+            label: (*label).into(),
+            binding: (*binding).into(),
+        });
+    }
+    let binding = shortcut_id.strip_prefix("custom:")?;
+    if binding.is_empty() || binding.len() > 96 || !binding.is_ascii() {
+        return None;
+    }
+    let mut remainder = binding;
+    let mut labels = Vec::new();
+    for (token, label) in [
+        ("<Control>", "Ctrl"),
+        ("<Alt>", "Alt"),
+        ("<Shift>", "Shift"),
+        ("<Super>", "Super"),
+    ] {
+        if let Some(rest) = remainder.strip_prefix(token) {
+            labels.push(label);
+            remainder = rest;
+        }
+    }
+    if remainder.is_empty()
+        || !remainder
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_')
+        || gtk::gdk::keys::Key::from_name(remainder) == gtk::gdk::keys::constants::VoidSymbol
+        || (labels.is_empty() && !is_function_key(remainder))
+    {
+        return None;
+    }
+    let key_label = match remainder {
+        "space" => "Space".into(),
+        "Return" => "Enter".into(),
+        "BackSpace" => "Backspace".into(),
+        "Page_Up" => "Page Up".into(),
+        "Page_Down" => "Page Down".into(),
+        "Escape" => "Esc".into(),
+        "comma" => ",".into(),
+        "period" => ".".into(),
+        "slash" => "/".into(),
+        "semicolon" => ";".into(),
+        "apostrophe" => "'".into(),
+        "bracketleft" => "[".into(),
+        "bracketright" => "]".into(),
+        "backslash" => "\\".into(),
+        "minus" => "-".into(),
+        "equal" => "=".into(),
+        "grave" => "`".into(),
+        other => other.replace('_', " ").to_uppercase(),
+    };
+    labels.push(&key_label);
+    Some(ShortcutSpec {
+        id: shortcut_id.into(),
+        label: labels.join(" "),
+        binding: binding.into(),
+    })
+}
+
+fn is_function_key(key: &str) -> bool {
+    key.strip_prefix('F')
+        .and_then(|number| number.parse::<u8>().ok())
+        .is_some_and(|number| (1..=24).contains(&number))
+}
+
+pub fn default_shortcut() -> ShortcutSpec {
+    shortcut(environment::default_shortcut_id()).expect("default shortcut must be supported")
+}
+
+pub fn shortcut_options() -> Vec<ShortcutOption> {
+    SHORTCUTS
+        .iter()
+        .map(|(id, label, _)| ShortcutOption {
+            id: (*id).into(),
+            label: (*label).into(),
+        })
+        .collect()
+}
+
+// A conflicting entry is stale when its command points at an executable that no
+// longer exists (for example, left behind by a renamed or uninstalled app).
+// Stale entries are evicted so they neither hijack the key nor block registration.
+fn command_executable_missing(binding: &gio::Settings) -> bool {
+    let command = binding.string("command");
+    if command.is_empty() {
+        return false;
+    }
+    match glib::shell_parse_argv(&command) {
+        Ok(argv) => argv
+            .first()
+            .map(|exe| !std::path::Path::new(exe).exists())
+            .unwrap_or(false),
+        Err(_) => false,
+    }
+}
+
+pub fn install_shortcut(shortcut_id: &str) -> Result<(), String> {
+    let shortcut = shortcut(shortcut_id).ok_or("Choose a supported recording shortcut.")?;
+    let accelerator = &shortcut.binding;
     let (settings, binding) = gnome_settings()?;
-    let mut paths: Vec<String> = settings
+    let paths: Vec<String> = settings
         .strv("custom-keybindings")
         .iter()
         .map(|p| p.to_string())
         .collect();
+    let mut kept: Vec<String> = Vec::with_capacity(paths.len());
     for path in &paths {
         if path == environment::shortcut_path() {
+            kept.push(path.clone());
             continue;
         }
         let existing = gio::Settings::with_path(CUSTOM_KEY, path);
         let existing_binding = existing.string("binding");
-        let conflicts = if environment::is_development() {
-            existing_binding.eq_ignore_ascii_case(accelerator)
-        } else {
-            matches!(
-                existing_binding.as_str(),
-                RIGHT_ALT | "0x6C" | "Alt_R" | "ISO_Level3_Shift"
-            )
-        };
+        let conflicts = existing_binding.eq_ignore_ascii_case(accelerator)
+            || (shortcut.id == "right-alt"
+                && matches!(existing_binding.as_str(), "Alt_R" | "ISO_Level3_Shift"));
         if conflicts {
+            if command_executable_missing(&existing) {
+                continue;
+            }
             return Err(format!(
                 "{} is already assigned to {}. Remove that binding in Ubuntu Settings, then enable {}’s shortcut again.",
-                environment::shortcut_label(),
+                shortcut.label,
                 existing.string("name"),
                 environment::app_name(),
             ));
         }
+        kept.push(path.clone());
     }
     let executable =
         std::env::current_exe().map_err(|_| "Could not locate the VoxType executable.")?;
@@ -71,11 +193,11 @@ pub fn install_shortcut() -> Result<(), String> {
     binding
         .set_string("binding", accelerator)
         .map_err(|e| e.to_string())?;
-    if !paths.iter().any(|p| p == environment::shortcut_path()) {
-        paths.push(environment::shortcut_path().into());
+    if !kept.iter().any(|p| p == environment::shortcut_path()) {
+        kept.push(environment::shortcut_path().into());
     }
     settings
-        .set_strv("custom-keybindings", paths)
+        .set_strv("custom-keybindings", kept)
         .map_err(|e| e.to_string())?;
     gio::Settings::sync();
     Ok(())
@@ -122,6 +244,7 @@ pub async fn focused_window() -> Option<String> {
     }
     Some(String::from_utf8_lossy(&out.stdout).trim().to_owned())
 }
+
 pub async fn copy(text: &str) -> Result<(), String> {
     let mut cmd = if wayland() {
         let mut c = Command::new("wl-copy");
@@ -202,8 +325,7 @@ pub async fn paste(target: Option<&str>) -> Result<(), String> {
     }
     Ok(())
 }
-pub async fn diagnostics(shortcut_registered: bool) -> Vec<Diagnostic> {
-    let shortcut = environment::shortcut_label();
+pub async fn diagnostics(shortcut_registered: bool, shortcut: &str) -> Vec<Diagnostic> {
     let mut checks = vec![Diagnostic {
         name: "Desktop session".into(),
         status: "ok".into(),
@@ -301,5 +423,28 @@ mod tests {
             KeySyntax::Symbolic
         );
         assert!(key_syntax("unknown").is_err());
+    }
+
+    #[test]
+    fn exposes_environment_defaults_and_supported_shortcuts() {
+        assert_eq!(default_shortcut().id, environment::default_shortcut_id());
+        assert_eq!(shortcut("right-alt").unwrap().binding, "0x6c");
+        assert!(shortcut("ctrl-alt-space").is_some());
+        assert!(shortcut("ctrl-shift-space").is_some());
+        assert_eq!(shortcut_options().len(), SHORTCUTS.len());
+    }
+
+    #[test]
+    fn validates_custom_shortcuts() {
+        let custom = shortcut("custom:<Control><Shift>k").unwrap();
+        assert_eq!(custom.label, "Ctrl Shift K");
+        assert_eq!(custom.binding, "<Control><Shift>k");
+        assert!(shortcut("custom:<Alt>F12").is_some());
+        assert_eq!(shortcut("custom:<Control>comma").unwrap().label, "Ctrl ,");
+        assert!(shortcut("custom:F9").is_some());
+        assert!(shortcut("custom:k").is_none());
+        assert!(shortcut("custom:<Control>NotAKey").is_none());
+        assert!(shortcut("custom:<Control><Control>k").is_none());
+        assert!(shortcut("custom:<Control>k;touch /tmp/bad").is_none());
     }
 }

@@ -103,7 +103,16 @@ pub struct Bootstrap {
     pub shortcut_registered: bool,
     pub version: String,
     pub environment: String,
+    pub shortcut_id: String,
     pub shortcut_label: String,
+    pub shortcut_options: Vec<ShortcutOption>,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ShortcutOption {
+    pub id: String,
+    pub label: String,
 }
 
 #[derive(Clone, Deserialize, Serialize)]

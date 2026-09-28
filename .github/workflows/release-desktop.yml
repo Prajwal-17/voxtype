@@ -1,6 +1,6 @@
 name: Release desktop
 
-run-name: ${{ github.event.head_commit.message || github.ref_name }}
+run-name: add configurable shortcuts and harden the native overlay
 
 on:
   push:
@@ -22,7 +22,7 @@ env:
 
 jobs:
   release-linux:
-    name: ${{ github.event.head_commit.message || github.ref_name }}
+    name: add configurable shortcuts and harden the native overlay
     runs-on: ubuntu-22.04
     timeout-minutes: 45
 

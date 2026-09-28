@@ -55,7 +55,13 @@ export interface Bootstrap {
   shortcutRegistered: boolean;
   version: string;
   environment: 'development' | 'production';
+  shortcutId: string;
   shortcutLabel: string;
+  shortcutOptions: ShortcutOption[];
+}
+export interface ShortcutOption {
+  id: string;
+  label: string;
 }
 export interface AuthUser {
   id: string;

@@ -197,19 +197,27 @@ pub async fn start(app: AppHandle, test: bool, external: bool) -> Result<(), Str
         }
         publish(&app, &snapshot);
         let id = snapshot.session_id.clone();
-        if snapshot.phase == Phase::Idle {
+        let terminal_phase = snapshot.phase;
+        if terminal_phase == Phase::Idle {
             if let Some(w) = app.get_webview_window("overlay") {
                 let _ = w.hide();
             }
-        } else if snapshot.phase == Phase::Done
-            && (snapshot.delivery == "pasted" || snapshot.text.is_empty())
-        {
-            tokio::time::sleep(Duration::from_millis(1500)).await;
+        } else if external && matches!(terminal_phase, Phase::Done | Phase::Error) {
+            // A completed or failed dictation must not become a permanent
+            // always-on-top window. The transcript remains in VoxType/history.
+            let delay = if terminal_phase == Phase::Error
+                || (terminal_phase == Phase::Done && snapshot.delivery != "pasted")
+            {
+                3000
+            } else {
+                1500
+            };
+            tokio::time::sleep(Duration::from_millis(delay)).await;
             let current = app
                 .state::<AppState>()
                 .snapshot
                 .lock()
-                .map(|s| s.session_id == id && s.phase == Phase::Done)
+                .map(|s| s.session_id == id && s.phase == terminal_phase)
                 .unwrap_or(false);
             if current {
                 if let Some(w) = app.get_webview_window("overlay") {
@@ -236,30 +244,87 @@ fn overlay_position(
     tauri::PhysicalPosition::new(x, y)
 }
 
-fn position_overlay(w: &tauri::WebviewWindow) {
+fn positions_match(
+    actual: tauri::PhysicalPosition<i32>,
+    expected: tauri::PhysicalPosition<i32>,
+) -> bool {
+    actual.x.abs_diff(expected.x) <= 2 && actual.y.abs_diff(expected.y) <= 2
+}
+
+fn overlay_target(w: &tauri::WebviewWindow) -> Option<tauri::PhysicalPosition<i32>> {
     let monitor = w
-        .current_monitor()
+        .cursor_position()
         .ok()
-        .flatten()
+        .and_then(|cursor| w.monitor_from_point(cursor.x, cursor.y).ok().flatten())
+        .or_else(|| w.current_monitor().ok().flatten())
         .or_else(|| w.primary_monitor().ok().flatten());
-    if let (Some(monitor), Ok(size)) = (monitor, w.outer_size()) {
+    if let Some(monitor) = monitor {
+        // Hidden GTK windows have no reliable allocated size before their first
+        // map. Use the capsule's configured logical size at this monitor's scale.
+        let size = tauri::LogicalSize::new(288, crate::environment::overlay_height())
+            .to_physical::<u32>(monitor.scale_factor());
         let area = monitor.work_area();
-        let gap = 0;
-        let _ = w.set_position(overlay_position(area.position, area.size, size, gap));
+        return Some(overlay_position(area.position, area.size, size, 0));
     }
+    None
+}
+
+fn overlay_is_positioned(w: &tauri::WebviewWindow, expected: tauri::PhysicalPosition<i32>) -> bool {
+    w.outer_position()
+        .is_ok_and(|actual| positions_match(actual, expected))
 }
 
 fn show_overlay(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("overlay") {
         let _ = w.set_focusable(false);
-        position_overlay(&w);
+        let _ = w.set_always_on_top(true);
+        let _ = w.set_visible_on_all_workspaces(true);
+        // Queue the initial position before mapping to avoid a centered flash.
+        let expected = overlay_target(&w);
+        if let Some(expected) = expected {
+            let _ = w.set_position(expected);
+        }
         let _ = w.show();
-        // GNOME can override the first position when mapping a new window.
+        // GNOME maps a hidden window asynchronously. Verify its final position
+        // and retry using this exact window handle, never a title/PID search.
+        // Always check after mapping: cached pre-map coordinates are not proof
+        // that the compositor honored the requested placement.
         tauri::async_runtime::spawn(async move {
-            tokio::time::sleep(Duration::from_millis(80)).await;
-            position_overlay(&w);
+            for delay in [32, 64, 128, 256, 384] {
+                tokio::time::sleep(Duration::from_millis(delay)).await;
+                if !w.is_visible().unwrap_or(false) {
+                    break;
+                }
+                if let Some(expected) = expected.or_else(|| overlay_target(&w)) {
+                    let _ = w.set_position(expected);
+                    if overlay_is_positioned(&w, expected) {
+                        break;
+                    }
+                }
+            }
         });
     }
+}
+
+/// Exercise the real native overlay without microphone capture or API calls.
+#[cfg(debug_assertions)]
+pub fn preview_overlay(app: &AppHandle) {
+    show_overlay(app);
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(Duration::from_secs(15)).await;
+        // Do not dismiss an actual recording started during the preview.
+        if app
+            .state::<AppState>()
+            .control
+            .lock()
+            .is_ok_and(|c| c.is_none())
+        {
+            if let Some(w) = app.get_webview_window("overlay") {
+                let _ = w.hide();
+            }
+        }
+    });
 }
 
 pub fn listen_url(settings: &Settings) -> Result<url::Url, String> {
@@ -674,6 +739,29 @@ mod tests {
         );
         assert_eq!(position.x, 2864);
         assert_eq!(position.y, 1280);
+        assert!(positions_match(
+            position,
+            tauri::PhysicalPosition::new(2865, 1278)
+        ));
+        assert!(!positions_match(
+            position,
+            tauri::PhysicalPosition::new(2864, 1277)
+        ));
+    }
+
+    #[test]
+    fn overlay_respects_dock_negative_monitor_origin_and_display_scale() {
+        // 1920x1080 display with a 38px top panel and 64px bottom dock.
+        for scale in [1, 2] {
+            let position = overlay_position(
+                tauri::PhysicalPosition::new(-1920 * scale as i32, 38 * scale as i32),
+                tauri::PhysicalSize::new(1920 * scale, 978 * scale),
+                tauri::PhysicalSize::new(288 * scale, 64 * scale),
+                0,
+            );
+            assert_eq!(position.x, -1104 * scale as i32);
+            assert_eq!(position.y, 952 * scale as i32);
+        }
     }
     use serde_json::json;
     fn frame(text: &str, final_: bool, start: f64) -> serde_json::Value {

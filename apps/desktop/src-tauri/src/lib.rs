@@ -2,6 +2,7 @@ mod audio;
 mod auth;
 mod cleanup;
 mod desktop;
+mod display;
 mod environment;
 mod model;
 mod session;
@@ -59,6 +60,15 @@ fn require_authenticated(app: &tauri::AppHandle) -> Result<(), String> {
 #[tauri::command]
 async fn bootstrap(app: tauri::AppHandle) -> Result<Bootstrap, String> {
     let settings = storage::settings(&app)?;
+    let shortcut_id = storage::shortcut_id(&app)?;
+    let shortcut = desktop::shortcut(&shortcut_id).unwrap_or_else(desktop::default_shortcut);
+    let mut shortcut_options = desktop::shortcut_options();
+    if shortcut.id.starts_with("custom:") {
+        shortcut_options.push(ShortcutOption {
+            id: shortcut.id.clone(),
+            label: shortcut.label.clone(),
+        });
+    }
     let (key, cleanup_key) =
         tokio::join!(key_status(storage::key), key_status(storage::cleanup_key));
     let state = app.state::<AppState>();
@@ -90,7 +100,9 @@ async fn bootstrap(app: tauri::AppHandle) -> Result<Bootstrap, String> {
             "production"
         }
         .into(),
-        shortcut_label: environment::shortcut_label().into(),
+        shortcut_id: shortcut.id,
+        shortcut_label: shortcut.label,
+        shortcut_options,
     })
 }
 async fn key_status(
@@ -197,15 +209,19 @@ async fn get_microphones() -> Result<Vec<Microphone>, String> {
 }
 #[tauri::command]
 async fn get_diagnostics(app: tauri::AppHandle) -> Vec<Diagnostic> {
+    let shortcut_id =
+        storage::shortcut_id(&app).unwrap_or_else(|_| environment::default_shortcut_id().into());
+    let shortcut = desktop::shortcut(&shortcut_id).unwrap_or_else(desktop::default_shortcut);
     desktop::diagnostics(
         app.state::<AppState>()
             .shortcut_registered
             .load(Ordering::Relaxed),
+        &shortcut.label,
     )
     .await
 }
 #[tauri::command]
-async fn enable_shortcut(app: tauri::AppHandle) -> Result<(), String> {
+async fn configure_shortcut(app: tauri::AppHandle, shortcut_id: String) -> Result<(), String> {
     if app
         .state::<AppState>()
         .control
@@ -215,9 +231,11 @@ async fn enable_shortcut(app: tauri::AppHandle) -> Result<(), String> {
     {
         return Err("Finish recording before changing shortcuts.".into());
     }
-    tokio::task::spawn_blocking(desktop::install_shortcut)
+    let shortcut_id_for_install = shortcut_id.clone();
+    tokio::task::spawn_blocking(move || desktop::install_shortcut(&shortcut_id_for_install))
         .await
         .map_err(|_| "Shortcut setup failed.")??;
+    storage::save_shortcut_id(&app, &shortcut_id)?;
     app.state::<AppState>()
         .shortcut_registered
         .store(true, Ordering::Relaxed);
@@ -261,6 +279,8 @@ fn dispatch(app: &tauri::AppHandle, action: &str) {
     }
     let app = app.clone();
     match action {
+        #[cfg(debug_assertions)]
+        "preview-overlay" => session::preview_overlay(&app),
         "toggle" => {
             tauri::async_runtime::spawn(async move {
                 if let Err(error) = session::toggle(app.clone()).await {
@@ -278,13 +298,36 @@ fn dispatch(app: &tauri::AppHandle, action: &str) {
     }
 }
 
-pub fn run() {
-    // GNOME's native Wayland windows cannot be positioned by applications. Use
-    // XWayland when available so the dictation overlay can stay at the bottom.
-    // This does not change the desktop session or its clipboard/input adapters.
-    if desktop::wayland() && std::env::var_os("DISPLAY").is_some() {
-        std::env::set_var("GDK_BACKEND", "x11");
+fn prepare_overlay_window(window: &tauri::WebviewWindow) {
+    use gtk::prelude::*;
+
+    let width = 288;
+    let height = environment::overlay_height();
+    if let Ok(container) = window.default_vbox() {
+        container.set_size_request(width, height);
+        for child in container.children() {
+            child.set_size_request(width, height);
+        }
     }
+    if let Ok(native_window) = window.gtk_window() {
+        // Tauri's cross-platform flags are not sufficient for Mutter/XWayland:
+        // without native EWMH hints GNOME treats the overlay as a normal app
+        // window and includes it in Alt-Tab. This is a transient notification,
+        // not a second VoxType window.
+        native_window.set_type_hint(gtk::gdk::WindowTypeHint::Notification);
+        native_window.set_skip_taskbar_hint(true);
+        native_window.set_skip_pager_hint(true);
+        native_window.set_accept_focus(false);
+        native_window.set_focus_on_map(false);
+        native_window.set_keep_above(true);
+        native_window.stick();
+        native_window.set_size_request(width, height);
+        native_window.resize(width, height);
+    }
+}
+
+pub fn run() {
+    display::configure();
     // WebSocket TLS has multiple optional crypto backends; select one explicitly.
     let _ = rustls::crypto::ring::default_provider().install_default();
     let mut builder = tauri::Builder::default();
@@ -320,13 +363,18 @@ pub fn run() {
             cancel_dictation,
             open_main,
             dismiss_overlay,
-            enable_shortcut
+            configure_shortcut
         ])
         .setup(|app| {
             let handle = app.handle();
+            if let Some(overlay) = handle.get_webview_window("overlay") {
+                prepare_overlay_window(&overlay);
+            }
             // Each environment owns a separate GNOME entry and refreshes only its
             // own executable path when it starts.
-            let shortcut_ready = desktop::install_shortcut().is_ok();
+            let shortcut_id = storage::shortcut_id(handle)
+                .unwrap_or_else(|_| environment::default_shortcut_id().into());
+            let shortcut_ready = desktop::install_shortcut(&shortcut_id).is_ok();
             handle
                 .state::<AppState>()
                 .shortcut_registered
@@ -375,11 +423,7 @@ pub fn run() {
             // A missing GNOME tray extension must not prevent the main app from opening.
             let _ = tray.build(app);
             let initial = std::env::args().nth(1).unwrap_or_default();
-            if initial == "toggle" {
-                dispatch(handle, "toggle");
-            } else if initial != "cancel" {
-                show_main(handle);
-            }
+            dispatch(handle, &initial);
             Ok(())
         })
         .on_window_event(|window, event| {

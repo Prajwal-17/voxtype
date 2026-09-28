@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "VoxType",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "identifier": "com.voxtype.dictation",
   "mainBinaryName": "voxtype-desktop",
   "build": {
@@ -37,11 +37,7 @@
         "skipTaskbar": true,
         "focus": false,
         "focusable": false,
-        "visible": false,
-        "minWidth": 288,
-        "maxWidth": 288,
-        "minHeight": 56,
-        "maxHeight": 56
+        "visible": false
       }
     ],
     "security": {

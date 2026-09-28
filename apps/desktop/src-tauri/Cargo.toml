@@ -31,6 +31,7 @@ keyring = { version = "3.6", features = ["sync-secret-service", "crypto-rust"] }
 nix = { version = "0.30", features = ["signal"] }
 gio = "0.18"
 glib = "0.18"
+gtk = "0.18"
 
 [profile.release]
 strip = true

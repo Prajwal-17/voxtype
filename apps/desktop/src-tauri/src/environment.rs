@@ -38,24 +38,28 @@ pub fn shortcut_path() -> &'static str {
     }
 }
 
-pub fn shortcut_binding() -> &'static str {
-    if is_development() {
-        "<Control><Alt>space"
-    } else {
-        "0x6c"
-    }
+pub fn default_shortcut_id() -> &'static str {
+    shortcut_id_for(is_development())
 }
 
-pub fn shortcut_label() -> &'static str {
-    if is_development() {
-        "Ctrl Alt Space"
+fn shortcut_id_for(development: bool) -> &'static str {
+    if development {
+        "ctrl-shift-space"
     } else {
-        "Right Alt"
+        "right-alt"
     }
 }
 
 pub fn audio_client_name() -> &'static str {
     app_name()
+}
+
+pub fn overlay_height() -> i32 {
+    if is_development() {
+        64
+    } else {
+        56
+    }
 }
 
 #[cfg(test)]
@@ -68,6 +72,8 @@ mod tests {
         assert_eq!(app_name(), "VoxType Dev");
         assert_eq!(keyring_service(), "com.voxtype.dictation.dev");
         assert_eq!(store_file(), "voxtype-dev.json");
-        assert_eq!(shortcut_label(), "Ctrl Alt Space");
+        assert_eq!(default_shortcut_id(), "ctrl-shift-space");
+        assert_eq!(shortcut_id_for(false), "right-alt");
+        assert_eq!(overlay_height(), 64);
     }
 }

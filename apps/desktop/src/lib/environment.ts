@@ -7,4 +7,5 @@ export const appEnvironment: AppEnvironment =
 
 export const isDevelopment = appEnvironment === 'development';
 export const appName = isDevelopment ? 'VoxType Dev' : 'VoxType';
-export const shortcutLabel = isDevelopment ? 'Ctrl Alt Space' : 'Right Alt';
+export const shortcutId = isDevelopment ? 'ctrl-shift-space' : 'right-alt';
+export const shortcutLabel = isDevelopment ? 'Ctrl Shift Space' : 'Right Alt';

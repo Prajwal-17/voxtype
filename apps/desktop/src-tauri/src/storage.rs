@@ -89,6 +89,24 @@ pub fn save_settings(app: &AppHandle, settings: &Settings) -> Result<(), String>
     );
     store.save().map_err(|e| e.to_string())
 }
+
+pub fn shortcut_id(app: &AppHandle) -> Result<String, String> {
+    let store = app
+        .store(environment::store_file())
+        .map_err(|e| e.to_string())?;
+    Ok(store
+        .get("shortcutId")
+        .and_then(|value| value.as_str().map(str::to_owned))
+        .unwrap_or_else(|| environment::default_shortcut_id().into()))
+}
+
+pub fn save_shortcut_id(app: &AppHandle, shortcut_id: &str) -> Result<(), String> {
+    let store = app
+        .store(environment::store_file())
+        .map_err(|e| e.to_string())?;
+    store.set("shortcutId", serde_json::Value::String(shortcut_id.into()));
+    store.save().map_err(|e| e.to_string())
+}
 pub fn history(app: &AppHandle) -> Result<Vec<HistoryItem>, String> {
     let store = app
         .store(environment::store_file())

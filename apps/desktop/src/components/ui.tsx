@@ -161,6 +161,6 @@ export function Logo({
   );
 }
 
-export function Shortcut() {
-  return <Kbd data-shortcut>{shortcutLabel}</Kbd>;
+export function Shortcut({ label = shortcutLabel }: { label?: string }) {
+  return <Kbd data-shortcut>{label}</Kbd>;
 }

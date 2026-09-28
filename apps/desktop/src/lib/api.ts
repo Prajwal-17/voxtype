@@ -4,7 +4,7 @@ import { listen } from '@tauri-apps/api/event';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { useEffect } from 'react';
 import { toast } from 'sonner';
-import { appEnvironment, isDevelopment, shortcutLabel } from './environment';
+import { appEnvironment, isDevelopment, shortcutId, shortcutLabel } from './environment';
 import {
   defaultSettings,
   errorMessage,
@@ -66,7 +66,16 @@ export const api = {
           shortcutRegistered: false,
           version: '0.1.0',
           environment: appEnvironment,
+          shortcutId,
           shortcutLabel,
+          shortcutOptions: [
+            { id: 'right-alt', label: 'Right Alt' },
+            { id: 'ctrl-alt-space', label: 'Ctrl Alt Space' },
+            { id: 'ctrl-shift-space', label: 'Ctrl Shift Space' },
+            { id: 'super-shift-space', label: 'Super Shift Space' },
+            { id: 'ctrl-alt-d', label: 'Ctrl Alt D' },
+            { id: 'f8', label: 'F8' },
+          ],
         }),
   history: () => (native ? command<HistoryItem[]>('get_history') : Promise.resolve([])),
   microphones: () => (native ? command<Microphone[]>('get_microphones') : Promise.resolve([])),
@@ -80,7 +89,7 @@ export const api = {
             detail: 'Desktop checks run in the installed Tauri app.',
           },
         ]),
-  enableShortcut: () => command<void>('enable_shortcut'),
+  configureShortcut: (shortcutId: string) => command<void>('configure_shortcut', { shortcutId }),
   settings: (settings: Settings) =>
     command<void>('update_settings', { settings: settingsSchema.parse(settings) }),
   saveKey: (key: string) => command<void>('save_api_key', { key }),

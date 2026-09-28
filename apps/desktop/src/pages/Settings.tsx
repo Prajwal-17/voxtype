@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, native, useRecording, useSession } from '../lib/api';
+import { captureShortcut } from '../lib/shortcuts';
 import { cn } from '../lib/utils';
 import { parseVocabulary, settingsSchema, type Bootstrap, type Settings } from '../lib/types';
 import { Button, IconButton, Shortcut, Toggle } from '../components/ui';
@@ -40,7 +41,7 @@ export function SettingsPage({ boot, active }: { boot: Bootstrap; active: boolea
       <div className="max-w-5xl">
         <ApiKey boot={boot} active={active} />
         <Preferences key={JSON.stringify(boot.settings)} settings={boot.settings} active={active} />
-        <DesktopSetup registered={boot.shortcutRegistered} active={active} />
+        <DesktopSetup boot={boot} active={active} />
         <ApiKey boot={boot} active={active} provider="deepseek" />
       </div>
     </>
@@ -431,15 +432,23 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
   );
 }
 
-function DesktopSetup({ registered, active }: { registered: boolean; active: boolean }) {
+function DesktopSetup({ boot, active }: { boot: Bootstrap; active: boolean }) {
   const [expanded, setExpanded] = useState(false);
+  const [shortcutId, setShortcutId] = useState(boot.shortcutId);
+  const [recordingShortcut, setRecordingShortcut] = useState(false);
+  const [customLabel, setCustomLabel] = useState<string | null>(null);
+  const customOption =
+    shortcutId.startsWith('custom:') &&
+    !boot.shortcutOptions.some((option) => option.id === shortcutId)
+      ? { id: shortcutId, label: customLabel ?? 'Custom shortcut' }
+      : null;
   const client = useQueryClient();
-  const enable = useMutation({
-    mutationFn: api.enableShortcut,
+  const configure = useMutation({
+    mutationFn: api.configureShortcut,
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: ['bootstrap'] });
       void client.invalidateQueries({ queryKey: ['diagnostics'] });
-      toast.success('Recording shortcut enabled');
+      toast.success('Recording shortcut updated');
     },
   });
   const checks = useQuery({
@@ -464,21 +473,77 @@ function DesktopSetup({ registered, active }: { registered: boolean; active: boo
         <div className="min-w-0">
           <Label>Recording shortcut</Label>
           <p className="mt-1 max-w-lg text-ui text-muted">
-            {registered
+            {boot.shortcutRegistered
               ? 'Press once to record. Press again to finish.'
-              : 'Enable the key below to start and stop dictation from any app.'}
+              : 'Choose a key combination to start and stop dictation from any app.'}
           </p>
-          <span className="mt-2 block">
-            <Shortcut />
-          </span>
+          <div className="mt-3 flex items-center gap-3 max-md:flex-wrap">
+            <Select
+              value={shortcutId}
+              onValueChange={setShortcutId}
+              disabled={active || configure.isPending}
+            >
+              <SelectTrigger aria-label="Recording shortcut" className="w-56 max-md:w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {boot.shortcutOptions.map((option) => (
+                  <SelectItem key={option.id} value={option.id}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+                {customOption && (
+                  <SelectItem value={customOption.id}>{customOption.label}</SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              disabled={active || configure.isPending || !native}
+              aria-pressed={recordingShortcut}
+              onClick={() => setRecordingShortcut(true)}
+              onBlur={() => setRecordingShortcut(false)}
+              onKeyDown={(event) => {
+                if (!recordingShortcut) return;
+                event.preventDefault();
+                event.stopPropagation();
+                if (event.key === 'Escape') {
+                  setRecordingShortcut(false);
+                  return;
+                }
+                const captured = captureShortcut(event.nativeEvent);
+                if (captured) {
+                  setShortcutId(captured.id);
+                  setCustomLabel(captured.label);
+                  setRecordingShortcut(false);
+                }
+              }}
+              onKeyUp={(event) => {
+                if (recordingShortcut && event.code === 'AltRight') {
+                  event.preventDefault();
+                  setShortcutId('right-alt');
+                  setRecordingShortcut(false);
+                }
+              }}
+            >
+              {recordingShortcut ? 'Press shortcut…' : 'Record custom shortcut'}
+            </Button>
+          </div>
+          {recordingShortcut && (
+            <p className="mt-2 text-caption text-muted" role="status">
+              Press a key combination. Esc cancels. Right Alt works by itself.
+            </p>
+          )}
         </div>
         <Button
-          onClick={() => enable.mutate()}
-          variant={registered ? 'secondary' : 'primary'}
-          disabled={!native || active}
-          loading={enable.isPending}
+          onClick={() => configure.mutate(shortcutId)}
+          variant={boot.shortcutRegistered ? 'secondary' : 'primary'}
+          disabled={
+            !native || active || (boot.shortcutRegistered && shortcutId === boot.shortcutId)
+          }
+          loading={configure.isPending}
         >
-          {registered ? 'Reapply shortcut' : 'Enable shortcut'}
+          Save shortcut
         </Button>
       </div>
       <div className="grid grid-cols-2 gap-x-6 gap-y-5 max-md:grid-cols-1">
@@ -521,8 +586,9 @@ function DesktopSetup({ registered, active }: { registered: boolean; active: boo
       {expanded && (
         <div className="pt-4">
           <p className="mb-3 text-ui text-muted">
-            <Shortcut /> toggles recording. Use the cancel button in the voice overlay to discard a
-            recording. Keep your cursor in the destination field while recording.
+            <Shortcut label={boot.shortcutLabel} /> toggles recording. Use the cancel button in the
+            voice overlay to discard a recording. Keep your cursor in the destination field while
+            recording.
           </p>
           <p className="mb-3 text-ui text-muted">
             Wayland paste needs <code className="text-caption text-accent-ink">ydotoold</code>{' '}

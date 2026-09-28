@@ -35,7 +35,7 @@ test('first run, navigation, settings and overlay are usable', async ({ page }) 
   await expect(page.getByText('Browser preview ·')).toBeVisible();
   const shortcuts = page.locator('kbd[data-shortcut][data-slot="kbd"]');
   expect(await shortcuts.count()).toBeGreaterThanOrEqual(2);
-  await expect(shortcuts.first()).toHaveText('Ctrl Alt Space');
+  await expect(shortcuts.first()).toHaveText('Ctrl Shift Space');
   await expect(shortcuts.first()).toHaveCSS('user-select', 'none');
   await expect(page.getByRole('button', { name: 'Set up dictation' })).toHaveCSS(
     'color',
@@ -68,6 +68,10 @@ test('first run, navigation, settings and overlay are usable', async ({ page }) 
   await expect(page.getByRole('button', { name: 'Save preferences' })).toBeDisabled();
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: `${captures}/settings.png`, fullPage: false });
+  const shortcutSelect = page.getByRole('combobox', { name: 'Recording shortcut' });
+  await shortcutSelect.scrollIntoViewIfNeeded();
+  await expect(shortcutSelect).toHaveText('Ctrl Shift Space');
+  await page.screenshot({ path: `${captures}/settings-shortcut.png`, fullPage: false });
   await page.getByRole('heading', { name: 'Personal vocabulary' }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: `${captures}/settings-lower.png`, fullPage: false });
   await page.setViewportSize({ width: 760, height: 650 });

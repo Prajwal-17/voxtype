@@ -26,11 +26,17 @@ pnpm dev:api
 pnpm dev:web    # browser preview only, no mic
 ```
 
+With the desktop development app running, `apps/desktop/src-tauri/target/debug/voxtype-desktop preview-overlay`
+shows the native overlay for 15 seconds without recording or calling transcription services.
+It should stay above other apps at the bottom of the monitor under the pointer, clear of the dock,
+without taking keyboard focus or appearing in Alt-Tab. The command is debug-only.
+
 1. Settings → save your Deepgram API key.
 2. Start dictation, Finish to copy/paste.
 
-The installed production app keeps `Right Alt`. VoxType Dev uses `Ctrl Alt Space`, so both can run
-and record independently on the same machine.
+The installed production app defaults to `Right Alt`. VoxType Dev defaults to
+`Ctrl Shift Space`. Each shortcut can be changed independently in Settings by choosing a preset
+or recording a custom key combination.
 
 Development is intentionally isolated as a second application:
 
@@ -41,7 +47,7 @@ Development is intentionally isolated as a second application:
 | API              | `VOXTYPE_API_URL`       | `http://localhost:8787`     |
 | Keyring service  | `com.voxtype.dictation` | `com.voxtype.dictation.dev` |
 | Local store      | `voxtype.json`          | `voxtype-dev.json`          |
-| Global shortcut  | Right Alt               | Ctrl Alt Space              |
+| Global shortcut  | Right Alt               | Ctrl Shift Space            |
 
 If a pre-VoxType-identity build is still installed, remove that build before installing the newly
 named production package. The renamed production identity starts with a fresh keyring and local

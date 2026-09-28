@@ -39,7 +39,7 @@ import {
   type Session,
 } from './lib/types';
 import { cn } from './lib/utils';
-import { isDevelopment, shortcutLabel } from './lib/environment';
+import { isDevelopment } from './lib/environment';
 import { HistoryPage } from './pages/History';
 import { LoginPage } from './pages/Login';
 import { ProfilePage } from './pages/Profile';
@@ -136,13 +136,13 @@ function Workspace({
               <Keyboard size={16} /> Dictate anywhere
             </span>
             <span className="mt-2.5 block">
-              <Shortcut />
+              <Shortcut label={boot.data?.shortcutLabel} />
             </span>
           </button>
         </div>
         <div className="mt-auto hidden justify-center max-lg:flex">
           <IconButton
-            label={`${shortcutLabel} shortcut settings`}
+            label={`${boot.data?.shortcutLabel ?? 'Recording'} shortcut settings`}
             onClick={() => setPage('settings')}
             className="text-inverse-muted hover:bg-navigation-raised hover:text-inverse"
           >
@@ -409,7 +409,7 @@ function Dictation({
                   {boot.hasKey ? 'Start dictation' : 'Set up dictation'}
                 </Button>
                 <div className="flex min-h-9 items-center justify-center gap-2 text-caption text-muted">
-                  Or press <Shortcut />
+                  Or press <Shortcut label={boot.shortcutLabel} />
                 </div>
               </>
             )}
