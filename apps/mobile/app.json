@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "scheme": "voxtype",
+    "userInterfaceStyle": "light",
+    "orientation": "default",
+    "platforms": ["android", "web"],
+    "android": {
+      "package": "com.voxtype.dictation.mobile",
+      "permissions": ["RECORD_AUDIO", "SYSTEM_ALERT_WINDOW", "FOREGROUND_SERVICE", "FOREGROUND_SERVICE_MICROPHONE"]
+    },
+    "web": {
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-status-bar"
+    ],
+    "name": "VoxType",
+    "slug": "voxtype-mobile"
+  }
+}
