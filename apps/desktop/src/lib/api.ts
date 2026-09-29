@@ -64,7 +64,7 @@ export const api = {
           cleanupKeyError: null,
           snapshot: idleSession,
           shortcutRegistered: false,
-          version: '0.1.0',
+          version: '0.1.2',
           environment: appEnvironment,
           shortcutId,
           shortcutLabel,
