@@ -1,7 +1,7 @@
 //! Stateless Responses API cleanup: send only the finalized transcript and instructions.
 //! The provider key is used only for authentication. No audio, history, or app context.
 use crate::storage;
-use reqwest::{redirect::Policy, Client};
+use reqwest::{redirect::Policy, Client, StatusCode};
 use serde_json::{json, Value};
 use std::{sync::OnceLock, time::Duration};
 
@@ -75,13 +75,7 @@ async fn request(text: &str) -> Result<String, String> {
         .map_err(|_| "Could not reach DeepSeek for text cleanup.")?;
     drop(key);
     if !response.status().is_success() {
-        return Err(match response.status().as_u16() {
-            401 | 403 => "DeepSeek rejected the API key. Replace it in Settings.",
-            402 => "Your DeepSeek account needs credit.",
-            429 => "DeepSeek is rate limiting requests. Try again shortly.",
-            _ => "DeepSeek could not complete text cleanup.",
-        }
-        .into());
+        return Err(http_error(response.status()));
     }
     // Bound memory even if the provider returns a malformed or oversized body.
     let mut body = Vec::new();
@@ -134,4 +128,43 @@ async fn request(text: &str) -> Result<String, String> {
         return Err("DeepSeek returned an unusable cleanup result.".into());
     }
     Ok(cleaned.to_owned())
+}
+
+fn http_error(status: StatusCode) -> String {
+    match status.as_u16() {
+        401 => "DeepSeek could not authenticate this request (HTTP 401). If this keeps happening, check your saved API key in Settings.".into(),
+        402 => "Your DeepSeek account needs credit (HTTP 402). Check your balance in DeepSeek.".into(),
+        403 => "DeepSeek denied this cleanup request (HTTP 403). Try again; if it persists, check your account access in DeepSeek.".into(),
+        400 | 422 => format!(
+            "DeepSeek could not accept the cleanup request (HTTP {}). Please report this error to VoxType.",
+            status.as_u16()
+        ),
+        429 => "DeepSeek is rate limiting requests (HTTP 429). Try again shortly.".into(),
+        500 | 503 => format!(
+            "DeepSeek is temporarily unavailable (HTTP {}). Try again shortly.",
+            status.as_u16()
+        ),
+        _ => format!(
+            "DeepSeek could not complete text cleanup (HTTP {}). Try again or check your DeepSeek account.",
+            status.as_u16()
+        ),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::http_error;
+    use reqwest::StatusCode;
+
+    #[test]
+    fn provider_errors_do_not_confuse_access_with_invalid_credentials() {
+        assert!(http_error(StatusCode::UNAUTHORIZED).contains("HTTP 401"));
+        assert!(http_error(StatusCode::UNAUTHORIZED).contains("API key"));
+        assert!(http_error(StatusCode::FORBIDDEN).contains("HTTP 403"));
+        assert!(!http_error(StatusCode::FORBIDDEN).contains("API key"));
+        assert!(http_error(StatusCode::PAYMENT_REQUIRED).contains("balance"));
+        assert!(http_error(StatusCode::TOO_MANY_REQUESTS).contains("HTTP 429"));
+        assert!(http_error(StatusCode::BAD_REQUEST).contains("HTTP 400"));
+        assert!(http_error(StatusCode::UNPROCESSABLE_ENTITY).contains("HTTP 422"));
+    }
 }
