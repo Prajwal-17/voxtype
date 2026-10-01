@@ -1,0 +1,33 @@
+@import 'tailwindcss';
+@import 'uniwind';
+@import '@voxtype/design-system/web.css';
+
+@theme inline {
+  --color-background: var(--palette-canvas);
+  --color-foreground: var(--palette-ink);
+  --color-primary: var(--palette-accent);
+  --color-primary-foreground: var(--palette-inverse);
+  --color-secondary: var(--palette-surface-subtle);
+  --color-secondary-foreground: var(--palette-ink);
+  --color-muted-foreground: var(--palette-muted);
+  --color-border: var(--palette-line);
+  --color-ring: var(--palette-accent);
+  --color-destructive: var(--palette-danger);
+  --color-accent: var(--palette-accent-soft);
+  --color-accent-foreground: var(--palette-accent-ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+::selection {
+  background: #c8cbc3;
+  color: #22231f;
+}

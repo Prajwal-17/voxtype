@@ -8,3 +8,8 @@ export const desktopAuthQuerySchema = z.object({
 export const desktopAuthCallbackQuerySchema = desktopAuthQuerySchema.extend({
   error: z.string().max(128).optional(),
 });
+
+export const mobileAuthQuerySchema = z.object({ state: z.uuid() });
+export const mobileAuthCallbackQuerySchema = mobileAuthQuerySchema.extend({
+  error: z.string().max(128).optional(),
+});

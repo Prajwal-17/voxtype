@@ -1,0 +1,37 @@
+{
+  "expo": {
+    "version": "0.0.1",
+    "icon": "./assets/icon.png",
+    "scheme": "voxtype",
+    "userInterfaceStyle": "light",
+    "orientation": "default",
+    "platforms": ["android"],
+    "android": {
+      "package": "com.voxtype.dictation.mobile",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "monochromeImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#F6F6F2"
+      },
+      "permissions": ["RECORD_AUDIO", "FOREGROUND_SERVICE", "FOREGROUND_SERVICE_MICROPHONE"]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-status-bar",
+      "expo-web-browser",
+      "expo-audio",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 33
+          }
+        }
+      ],
+      "expo-font"
+    ],
+    "name": "VoxType",
+    "slug": "voxtype-mobile"
+  }
+}

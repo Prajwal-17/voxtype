@@ -1,0 +1,80 @@
+name: Release mobile
+
+run-name: ${{ github.event.head_commit.message || github.ref_name }}
+
+on:
+  push:
+    tags:
+      - 'mobile-v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mobile-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate native Android project
+        run: pnpm --dir apps/mobile exec expo prebuild --platform android --clean --no-install
+
+      - name: Build release APK
+        working-directory: apps/mobile/android
+        run: ./gradlew --no-daemon :app:assembleRelease
+
+      - name: Stage APK
+        shell: bash
+        run: |
+          version="$(node --print "require('./apps/mobile/app.json').expo.version")"
+          mkdir -p release
+          cp apps/mobile/android/app/build/outputs/apk/release/app-release.apk "release/VoxType-mobile-$version.apk"
+          ls -lh release/
+
+      - name: Create release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME already exists." >&2
+            exit 1
+          fi
+          title="$(git log -1 --pretty=%s)"
+          gh release create "$GITHUB_REF_NAME" --title "$title" --notes "" --repo "$GITHUB_REPOSITORY"
+
+      - name: Upload APK
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="$(node --print "require('./apps/mobile/app.json').expo.version")"
+          gh release upload "$GITHUB_REF_NAME" "release/VoxType-mobile-$version.apk" --repo "$GITHUB_REPOSITORY"

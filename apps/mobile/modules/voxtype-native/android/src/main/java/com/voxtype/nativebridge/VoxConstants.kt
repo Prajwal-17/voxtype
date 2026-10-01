@@ -1,0 +1,43 @@
+package com.voxtype.nativebridge
+
+/** Central constants. No magic numbers/URLs scattered in service or network code. */
+object VoxConstants {
+  const val NOTIFICATION_ID = 7341
+  const val CHANNEL_ID = "voxtype_recording"
+  const val CHANNEL_NAME = "VoxType recording"
+
+  const val SOCKET_KEEP_ALIVE_MS = 420_000L
+  const val MAINTENANCE_INTERVAL_MS = 4_000L
+  const val FINALIZE_TIMEOUT_MS = 2_500L
+  const val FINALIZE_RESULT_DELAY_MS = 700L
+  const val FINALIZE_RESULT_DELAY_FROM_FINALIZE_MS = 250L
+  const val SAVED_AUTO_DISMISS_DELIVERED_MS = 1_600L
+  const val SAVED_AUTO_DISMISS_MS = 5_000L
+  const val MIC_PERMISSION_RESET_MS = 2_000L
+  const val BUBBLE_PRESS_ANIM_MS = 150L
+  const val RECONNECT_BASE_MS = 1_000L
+  const val RECONNECT_MAX_MS = 8_000L
+  const val RECONNECT_MAX_SHIFT = 3
+
+  const val TOKEN_PATH = "/v1/speech/token"
+  const val CLEANUP_PATH = "/v1/speech/cleanup"
+
+  // Deepgram live transcription endpoint. Model params are versioned here on purpose.
+  const val DEEPGRAM_WS_URL =
+    "wss://api.deepgram.com/v1/listen?model=nova-3&encoding=linear16&sample_rate=16000&channels=1&interim_results=true&punctuate=true&smart_format=true"
+
+  const val SAMPLE_RATE = 16_000
+  const val BYTES_PER_SECOND = 32_000
+  const val AUDIO_BUFFER_BYTES = 3_200
+  const val BYTE_RATE = 32_000
+  const val WAV_HEADER_BYTES = 44
+
+  val BUBBLE_COLOR = 0xFF20221F.toInt()
+  const val BUBBLE_RADIUS_DP = 32
+  const val BUBBLE_ELEVATION_DP = 8
+  const val BUBBLE_ICON_DP = 24
+  const val BUBBLE_EDGE_DP = 12
+  const val BUBBLE_PAD_H_DP = 16
+  const val BUBBLE_PAD_V_DP = 10
+  const val BUBBLE_TEXT_DP = 8
+}

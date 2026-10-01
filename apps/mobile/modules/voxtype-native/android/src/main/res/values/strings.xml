@@ -1,0 +1,3 @@
+<resources>
+  <string name="voxtype_accessibility_description">Shows a voice bubble beside editable text fields. Dictation inserts at the cursor without changing your keyboard. Password fields are excluded.</string>
+</resources>

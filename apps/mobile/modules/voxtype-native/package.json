@@ -1,0 +1,9 @@
+{
+  "name": "voxtype-native",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local Expo module bridging the VoxType Android bubble, dictation engine, and store.",
+  "main": "./src/VoxTypeNativeModule.ts",
+  "types": "./src/VoxTypeNative.types.ts",
+  "license": "UNLICENSED"
+}

@@ -133,3 +133,62 @@ export async function finishDesktopSignIn(
   loopbackUrl.searchParams.set('token', token);
   return loopbackUrl.toString();
 }
+
+/** The OAuth callback is fixed server-side; only the one-time grant reaches the app. */
+export async function startMobileSignIn(
+  env: Env,
+  executionContext: BackgroundContext,
+  headers: Headers,
+  state: string,
+): Promise<Response> {
+  const callbackUrl = new URL('/api/mobile-auth/callback', env.API_URL);
+  callbackUrl.searchParams.set('state', state);
+  const response = await createAuthService(env, executionContext).api.signInSocial({
+    headers,
+    body: {
+      provider: 'google',
+      callbackURL: callbackUrl.toString(),
+      errorCallbackURL: callbackUrl.toString(),
+      disableRedirect: true,
+    },
+    asResponse: true,
+  });
+  const body: unknown = await response.json();
+  const url =
+    typeof body === 'object' && body !== null && 'url' in body && typeof body.url === 'string'
+      ? body.url
+      : null;
+  if (!url) throw new ApiError(502, 'oauth_start_failed', 'Google sign-in could not be started.');
+  const responseHeaders = new Headers(response.headers);
+  responseHeaders.set('location', url);
+  responseHeaders.delete('content-length');
+  responseHeaders.delete('content-type');
+  return new Response(null, { status: 302, headers: responseHeaders });
+}
+
+export async function finishMobileSignIn(
+  env: Env,
+  executionContext: BackgroundContext,
+  headers: Headers,
+  state: string,
+  oauthError?: string,
+): Promise<string> {
+  const callbackUrl = new URL('voxtype://auth/callback');
+  callbackUrl.searchParams.set('state', state);
+  if (oauthError) {
+    callbackUrl.searchParams.set(
+      'error',
+      oauthError === 'email_not_allowed' ? 'account_not_allowed' : 'sign_in_failed',
+    );
+    return callbackUrl.toString();
+  }
+  const auth = createAuthService(env, executionContext);
+  const session = await auth.api.getSession({ headers });
+  if (!session) {
+    callbackUrl.searchParams.set('error', 'sign_in_failed');
+    return callbackUrl.toString();
+  }
+  const { token } = await auth.api.generateOneTimeToken({ headers });
+  callbackUrl.searchParams.set('token', token);
+  return callbackUrl.toString();
+}

@@ -14,7 +14,7 @@ pnpm dev
 Local: `http://localhost:8787`, reports `environment: development`, uses
 Wrangler's local D1 state.
 
-`.dev.vars`: `BETTER_AUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
+`.dev.vars`: `BETTER_AUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `DEEPGRAM_API_KEY`, `DEEPSEEK_API_KEY`
 
 Redirect URI: `http://localhost:8787/api/auth/callback/google`
 
@@ -38,6 +38,15 @@ pnpm deploy:production
 Desktop Google sign-in opens `/api/desktop-auth/start` in the system browser. The callback sends a
 short-lived, single-use token to VoxType's loopback listener; Rust exchanges it for the signed
 session and stores that session only in the operating-system keyring.
+
+Android sign-in opens `/api/mobile-auth/start?state=<uuid>` in the system browser. The fixed
+callback returns a single-use grant to `voxtype://auth/callback`; the app checks the state,
+exchanges the grant, and stores the bearer session in Android secure storage.
+
+`POST /v1/speech/token` grants a 60-second Deepgram JWT for a direct Android WebSocket.
+`POST /v1/speech/cleanup` optionally cleans text with DeepSeek and returns the original on
+provider failure. Neither endpoint stores audio or transcripts. Set provider keys as Worker
+secrets with `wrangler secret put ...`; never place them in Expo configuration.
 
 ## Endpoints
 

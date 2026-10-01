@@ -1,0 +1,118 @@
+package com.voxtype.nativebridge
+
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.provider.Settings
+import android.os.Handler
+import android.os.Looper
+import androidx.core.content.ContextCompat
+import expo.modules.kotlin.modules.Module
+import expo.modules.kotlin.modules.ModuleDefinition
+import java.lang.ref.WeakReference
+
+class VoxTypeNativeModule : Module() {
+  companion object {
+    private var active = WeakReference<VoxTypeNativeModule>(null)
+    private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
+    fun changed() { mainHandler.post { active.get()?.sendEvent("onChange", mapOf("changed" to true)) } }
+    private fun refreshBubble() {
+      mainHandler.post { VoxTypeAccessibilityService.instance?.refreshBubble() }
+    }
+  }
+
+  override fun definition() = ModuleDefinition {
+    Name("VoxTypeNative")
+    Events("onChange")
+    OnCreate { active = WeakReference(this@VoxTypeNativeModule) }
+
+    AsyncFunction("getSnapshot") {
+      val context = requireNotNull(appContext.reactContext)
+      val store = VoxTypeStore(context)
+      val enabled = Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
+        ?.contains("${context.packageName}/${VoxTypeAccessibilityService::class.java.name}", true) == true
+      mapOf(
+        "accessibilityEnabled" to enabled,
+        "microphoneGranted" to (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED),
+        "bubbleEnabled" to store.bubbleEnabled,
+        "cleanupEnabled" to store.cleanupEnabled,
+        "audioLimit" to store.audioLimit,
+        "status" to (VoxTypeAccessibilityService.instance?.status ?: DictationStatus.IDLE.bridge),
+        "dictations" to store.dictations(),
+      )
+    }
+
+    AsyncFunction("openAccessibilitySettings") {
+      val context = requireNotNull(appContext.reactContext)
+      try {
+        context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+      } catch (e: Exception) {
+        VoxLog.e("openAccessibilitySettings failed", e)
+        throw e
+      }
+    }
+
+    AsyncFunction("setSession") { token: String, userId: String, apiUrl: String ->
+      val context = requireNotNull(appContext.reactContext)
+      NativeSession(context).save(token, userId, apiUrl)
+      refreshBubble()
+    }
+
+    AsyncFunction("getSession") {
+      val session = NativeSession(requireNotNull(appContext.reactContext))
+      mapOf("token" to session.token, "userId" to session.userId)
+    }
+
+    AsyncFunction("signOut") {
+      val context = requireNotNull(appContext.reactContext)
+      NativeSession(context).clear()
+      mainHandler.post { VoxTypeAccessibilityService.instance?.onSignOut() }
+    }
+
+    AsyncFunction("setPreference") { key: String, value: String ->
+      val context = requireNotNull(appContext.reactContext)
+      val store = VoxTypeStore(context)
+      when (key) {
+        "bubbleEnabled" -> store.bubbleEnabled =
+          value.toBooleanStrictOrNull() ?: throw IllegalArgumentException("bubbleEnabled must be 'true' or 'false'")
+        "cleanupEnabled" -> store.cleanupEnabled =
+          value.toBooleanStrictOrNull() ?: throw IllegalArgumentException("cleanupEnabled must be 'true' or 'false'")
+        "audioLimit" -> {
+          val limit = value.toIntOrNull()
+            ?: throw IllegalArgumentException("audioLimit must be one of ${VoxTypeStore.VALID_AUDIO_LIMITS}")
+          store.audioLimit = limit
+        }
+        else -> throw IllegalArgumentException("Unknown preference: $key")
+      }
+      refreshBubble()
+      changed()
+    }
+
+    // Typed alternatives to the generic string-based setPreference. Additive only.
+    AsyncFunction("setBubbleEnabled") { enabled: Boolean ->
+      VoxTypeStore(requireNotNull(appContext.reactContext)).bubbleEnabled = enabled
+      refreshBubble()
+      changed()
+    }
+
+    AsyncFunction("setCleanupEnabled") { enabled: Boolean ->
+      VoxTypeStore(requireNotNull(appContext.reactContext)).cleanupEnabled = enabled
+      refreshBubble()
+      changed()
+    }
+
+    AsyncFunction("setAudioLimit") { limit: Int ->
+      VoxTypeStore(requireNotNull(appContext.reactContext)).audioLimit = limit
+      refreshBubble()
+      changed()
+    }
+
+    AsyncFunction("copyTranscript") { id: String ->
+      VoxTypeStore(requireNotNull(appContext.reactContext)).copyToClipboard(id)
+    }
+
+    AsyncFunction("stopRecording") {
+      mainHandler.post { VoxTypeAccessibilityService.instance?.stopRecording() }
+    }
+  }
+}

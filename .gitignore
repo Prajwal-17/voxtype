@@ -18,3 +18,5 @@ playwright-report/
 
 .agents/
 .impeccable/
+
+apps/mobile/dist-web/
