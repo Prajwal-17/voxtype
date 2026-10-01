@@ -315,7 +315,15 @@ export default function Home() {
       void refresh();
     });
     const appState = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void refresh();
+      if (state === 'active') {
+        // Picks up a session stored by the auth-callback route on cold-start redirects.
+        void currentUser()
+          .then((account) => {
+            if (mounted) setUser(account);
+          })
+          .catch(() => {});
+        void refresh();
+      }
     });
     return () => {
       mounted = false;

@@ -44,6 +44,11 @@ export async function signIn(): Promise<User> {
   if (callback.searchParams.has('error')) throw new Error('This Google account could not sign in.');
   const grant = callback.searchParams.get('token');
   if (!grant) throw new Error('Sign-in link expired. Try again.');
+  return exchangeGrant(grant);
+}
+
+/** Exchange the single-use grant from `voxtype://auth/callback` for a native session. */
+export async function exchangeGrant(grant: string): Promise<User> {
   const response = await fetch(`${API_URL}/api/auth/one-time-token/verify`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
