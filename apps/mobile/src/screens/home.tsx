@@ -122,6 +122,13 @@ function RecordingPanel({
         : status === 'saved'
           ? 'Dictation saved'
           : 'Ready when you are';
+  const badge = listening
+    ? 'Recording'
+    : processing
+      ? 'Working'
+      : status === 'saved'
+        ? 'Saved'
+        : 'Ready';
   return (
     <Animated.View
       style={[
@@ -143,7 +150,7 @@ function RecordingPanel({
             }}
           />
           <Text style={{ color: c.onChromeMuted, fontSize: 13, fontWeight: '600' }}>
-            {listening ? 'Recording' : processing ? 'Working' : 'Voice bubble'}
+            {badge}
           </Text>
         </Animated.View>
         <View
