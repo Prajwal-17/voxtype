@@ -68,4 +68,14 @@ class VoxTypeNativeModule extends NativeModule<VoxTypeNativeModuleEvents> {
   }
 }
 
-export default registerWebModule(VoxTypeNativeModule, 'VoxTypeNative');
+const WebVoxTypeNativeModule = registerWebModule(VoxTypeNativeModule, 'VoxTypeNative');
+
+export function getVoxTypeNative() {
+  return WebVoxTypeNativeModule;
+}
+
+export function isVoxTypeNativeAvailable() {
+  return true;
+}
+
+export default WebVoxTypeNativeModule;

@@ -16,4 +16,57 @@ declare class VoxTypeNativeModule extends NativeModule<VoxTypeNativeModuleEvents
   stopRecording(): Promise<void>;
 }
 
-export default requireNativeModule<VoxTypeNativeModule>('VoxTypeNative');
+let cached: VoxTypeNativeModule | null | undefined;
+
+export function getVoxTypeNative(): VoxTypeNativeModule | null {
+  if (cached === undefined) {
+    try {
+      cached = requireNativeModule<VoxTypeNativeModule>('VoxTypeNative');
+    } catch {
+      cached = null;
+    }
+  }
+  return cached;
+}
+
+export function isVoxTypeNativeAvailable(): boolean {
+  return getVoxTypeNative() !== null;
+}
+
+function missingModuleError(): Error {
+  return new Error(
+    'VoxType native code is missing from this build. Run a VoxType dev client instead of Expo Go.',
+  );
+}
+
+function requireVoxTypeModule(): VoxTypeNativeModule {
+  const module = getVoxTypeNative();
+  if (!module) {
+    throw missingModuleError();
+  }
+  return module;
+}
+
+/**
+ * Lazily resolved native module. Importing this file never throws, even in
+ * Expo Go where the native side cannot exist; calls throw a dev-build hint
+ * when the native side is absent.
+ */
+const VoxTypeNative = {
+  getSnapshot: (): Promise<Snapshot> => requireVoxTypeModule().getSnapshot(),
+  getSession: () => requireVoxTypeModule().getSession(),
+  setSession: (token: string, userId: string, apiUrl: string) =>
+    requireVoxTypeModule().setSession(token, userId, apiUrl),
+  signOut: () => requireVoxTypeModule().signOut(),
+  openAccessibilitySettings: () => requireVoxTypeModule().openAccessibilitySettings(),
+  setPreference: (key: 'bubbleEnabled' | 'cleanupEnabled' | 'audioLimit', value: string) =>
+    requireVoxTypeModule().setPreference(key, value),
+  copyTranscript: (id: string) => requireVoxTypeModule().copyTranscript(id),
+  stopRecording: () => requireVoxTypeModule().stopRecording(),
+  addListener: <EventName extends keyof VoxTypeNativeModuleEvents>(
+    eventName: EventName,
+    listener: VoxTypeNativeModuleEvents[EventName],
+  ) => requireVoxTypeModule().addListener(eventName, listener),
+};
+
+export default VoxTypeNative;

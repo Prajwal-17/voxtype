@@ -24,7 +24,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { nativeTheme as theme } from '@voxtype/design-system/native';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import VoxTypeNative from '../../modules/voxtype-native/src/VoxTypeNativeModule';
+import VoxTypeNative, {
+  isVoxTypeNativeAvailable,
+} from '../../modules/voxtype-native/src/VoxTypeNativeModule';
 import type { Dictation, Snapshot } from '../../modules/voxtype-native/src/VoxTypeNative.types';
 import { currentUser, signIn, signOut, type User } from '@/lib/mobile-api';
 import logo from '../../assets/icon.png';
@@ -290,20 +292,28 @@ export default function Home() {
   const { width } = useWindowDimensions();
   const [user, setUser] = useState<User | null>(null);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
-  const [loading, setLoading] = useState(true);
+  const nativeAvailable = isWeb || isVoxTypeNativeAvailable();
+  const [loading, setLoading] = useState(nativeAvailable);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [demoStatus, setDemoStatus] = useState<Snapshot['status'] | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const refresh = useCallback(async () => {
+    if (!nativeAvailable) return;
     try {
       setSnapshot(await VoxTypeNative.getSnapshot());
     } catch {
       setMessage('Could not read this phone’s VoxType data. Reopen the app.');
     }
-  }, []);
+  }, [nativeAvailable]);
   useEffect(() => {
+    if (!nativeAvailable) {
+      const pendingTimers = timers.current;
+      return () => {
+        pendingTimers.forEach(clearTimeout);
+      };
+    }
     let mounted = true;
     void (async () => {
       try {
@@ -330,7 +340,7 @@ export default function Home() {
       appState.remove();
       pendingTimers.forEach(clearTimeout);
     };
-  }, [refresh]);
+  }, [refresh, nativeAvailable]);
 
   const run = async (task: () => Promise<void>) => {
     setBusy(true);
@@ -391,6 +401,22 @@ export default function Home() {
             >
               <Text style={{ color: c.warning, fontSize: 12, fontWeight: '600' }}>
                 Web preview · Dummy data · Android features are unavailable here
+              </Text>
+            </View>
+          )}
+          {!isWeb && !nativeAvailable && (
+            <View
+              style={{
+                backgroundColor: c.warningContainer,
+                borderRadius: 8,
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+                marginBottom: 22,
+              }}
+            >
+              <Text style={{ color: c.warning, fontSize: 12, fontWeight: '600' }}>
+                Dev build required · This build has no VoxType native code (for example Expo Go).
+                Install a VoxType dev client to use the bubble and dictation.
               </Text>
             </View>
           )}

@@ -241,6 +241,9 @@ importers:
       uniwind:
         specifier: ~1.12.0
         version: 1.12.0(@expo/metro-config@57.0.12(expo@57.0.25)(typescript@5.9.3))(metro-cache@0.87.1)(metro-transform-worker@0.87.1)(metro@0.87.1)(react-native@0.86.0(@babel/core@7.29.7)(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)(tailwindcss@4.1.18)
+      voxtype-native:
+        specifier: file:./modules/voxtype-native
+        version: file:apps/mobile/modules/voxtype-native
     devDependencies:
       '@types/react':
         specifier: ~19.2.14
@@ -5637,6 +5640,9 @@ packages:
 
   vlq@1.0.1:
     resolution: {integrity: sha512-gQpnTgkubC6hQgdIcRdYGDSDc+SaujOdyesZQMv6JlfQee/9Mp0Qhnys6WxDWvQnL5WZdT7o2Ul187aSt0Rq+w==}
+
+  voxtype-native@file:apps/mobile/modules/voxtype-native:
+    resolution: {directory: apps/mobile/modules/voxtype-native, type: directory}
 
   walker@1.0.8:
     resolution: {integrity: sha512-ts/8E8l5b7kY0vlWLewOkDXMmPdLcVV4GmOQLyxuSswIJsweeFZtAsMF7k1Nszz+TYBQrlYRmzOnr398y1JemQ==}
@@ -11461,6 +11467,8 @@ snapshots:
       - yaml
 
   vlq@1.0.1: {}
+
+  voxtype-native@file:apps/mobile/modules/voxtype-native: {}
 
   walker@1.0.8:
     dependencies:
