@@ -17,10 +17,9 @@ The Deepgram socket remains open for seven minutes after the last dictation. Idl
 pnpm --filter @voxtype/mobile check-types
 pnpm --filter @voxtype/mobile lint
 pnpm --filter @voxtype/mobile test
-pnpm --filter @voxtype/mobile web
 ```
 
-The Expo web route is a UI preview only. It displays a banner saying **Dummy data** and never uses Android overlay, microphone, or cross-app insertion.
+Android-only. There is no web preview and no sample data; every transcript shown comes from this phone's local store.
 
 ## Android device test steps
 

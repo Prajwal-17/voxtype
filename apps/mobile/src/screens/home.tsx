@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   AppState,
   Image,
-  Platform,
   Pressable,
   ScrollView,
   Switch,
@@ -11,7 +10,6 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { requestRecordingPermissionsAsync } from 'expo-audio';
-import * as Clipboard from 'expo-clipboard';
 import Animated, {
   useAnimatedStyle,
   useReducedMotion,
@@ -32,13 +30,6 @@ import { currentUser, signIn, signOut, type User } from '@/lib/mobile-api';
 import logo from '../../assets/icon.png';
 
 const c = theme.colors;
-const isWeb = Platform.OS === 'web';
-const previewUser: User = {
-  id: 'demo',
-  name: 'Preview account',
-  email: 'dummy@example.com',
-  image: null,
-};
 
 function Action({
   title,
@@ -93,11 +84,9 @@ function WaveBar({
 function RecordingPanel({
   status,
   onStop,
-  onPreview,
 }: {
   status: Snapshot['status'];
   onStop: () => void;
-  onPreview: () => void;
 }) {
   const reduced = useReducedMotion();
   const motion = useSharedValue(0);
@@ -194,11 +183,11 @@ function RecordingPanel({
               ? 'Open a transcript below if you need to copy or paste it.'
               : 'Focus a text field in another app, then tap the VoxType bubble.'}
       </Text>
-      {(listening || isWeb) && (
+      {listening && (
         <View style={{ marginTop: 20, alignSelf: 'flex-start' }}>
           <Action
-            title={listening ? 'Stop recording' : 'Preview dummy recording'}
-            onPress={listening ? onStop : onPreview}
+            title="Stop recording"
+            onPress={onStop}
             disabled={processing}
             secondary
           />
@@ -292,12 +281,10 @@ export default function Home() {
   const { width } = useWindowDimensions();
   const [user, setUser] = useState<User | null>(null);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
-  const nativeAvailable = isWeb || isVoxTypeNativeAvailable();
+  const nativeAvailable = isVoxTypeNativeAvailable();
   const [loading, setLoading] = useState(nativeAvailable);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
-  const [demoStatus, setDemoStatus] = useState<Snapshot['status'] | null>(null);
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const refresh = useCallback(async () => {
     if (!nativeAvailable) return;
@@ -309,15 +296,12 @@ export default function Home() {
   }, [nativeAvailable]);
   useEffect(() => {
     if (!nativeAvailable) {
-      const pendingTimers = timers.current;
-      return () => {
-        pendingTimers.forEach(clearTimeout);
-      };
+      return;
     }
     let mounted = true;
     void (async () => {
       try {
-        const account = isWeb ? previewUser : await currentUser();
+        const account = await currentUser();
         if (mounted) setUser(account);
         if (account) await refresh();
       } catch {
@@ -333,12 +317,10 @@ export default function Home() {
     const appState = AppState.addEventListener('change', (state) => {
       if (state === 'active') void refresh();
     });
-    const pendingTimers = timers.current;
     return () => {
       mounted = false;
       event.remove();
       appState.remove();
-      pendingTimers.forEach(clearTimeout);
     };
   }, [refresh, nativeAvailable]);
 
@@ -362,20 +344,10 @@ export default function Home() {
       await refresh();
     });
   };
-  const stopPreview = () => {
-    if (!isWeb) {
-      void VoxTypeNative.stopRecording();
-      return;
-    }
-    setDemoStatus('processing');
-    timers.current.push(
-      setTimeout(() => {
-        setDemoStatus('saved');
-        timers.current.push(setTimeout(() => setDemoStatus('idle'), 1600));
-      }, 1000),
-    );
+  const stopRecording = () => {
+    void VoxTypeNative.stopRecording();
   };
-  const status = demoStatus || snapshot?.status || 'idle';
+  const status = snapshot?.status || 'idle';
 
   return (
     <View className="flex-1" style={{ backgroundColor: c.background }}>
@@ -389,37 +361,6 @@ export default function Home() {
         }}
       >
         <View style={{ width: '100%', maxWidth: width >= 700 ? 760 : 480 }}>
-          {isWeb && (
-            <View
-              style={{
-                backgroundColor: c.warningContainer,
-                borderRadius: 8,
-                paddingHorizontal: 12,
-                paddingVertical: 10,
-                marginBottom: 22,
-              }}
-            >
-              <Text style={{ color: c.warning, fontSize: 12, fontWeight: '600' }}>
-                Web preview · Dummy data · Android features are unavailable here
-              </Text>
-            </View>
-          )}
-          {!isWeb && !nativeAvailable && (
-            <View
-              style={{
-                backgroundColor: c.warningContainer,
-                borderRadius: 8,
-                paddingHorizontal: 12,
-                paddingVertical: 10,
-                marginBottom: 22,
-              }}
-            >
-              <Text style={{ color: c.warning, fontSize: 12, fontWeight: '600' }}>
-                Dev build required · This build has no VoxType native code (for example Expo Go).
-                Install a VoxType dev client to use the bubble and dictation.
-              </Text>
-            </View>
-          )}
           <View className="flex-row items-center justify-between">
             <View className="flex-row items-center gap-3">
               <Image
@@ -435,7 +376,7 @@ export default function Home() {
               <Pressable
                 onPress={() =>
                   void run(async () => {
-                    if (!isWeb) await signOut();
+                    await signOut();
                     setUser(null);
                     setSnapshot(null);
                   })
@@ -492,11 +433,11 @@ export default function Home() {
                 apps.
               </Text>
               <Action
-                title={isWeb ? 'Open dummy preview' : 'Sign in with Google'}
+                title="Sign in with Google"
                 disabled={busy}
                 onPress={() =>
                   void run(async () => {
-                    setUser(isWeb ? previewUser : await signIn());
+                    setUser(await signIn());
                     await refresh();
                   })
                 }
@@ -535,8 +476,7 @@ export default function Home() {
               </View>
               <RecordingPanel
                 status={status}
-                onStop={stopPreview}
-                onPreview={() => setDemoStatus('listening')}
+                onStop={stopRecording}
               />
               <View style={{ marginTop: 34 }}>
                 <Text style={{ color: c.text, fontSize: 19, fontWeight: '600' }}>
@@ -600,8 +540,7 @@ export default function Home() {
                       item={item}
                       onCopy={() =>
                         void run(async () => {
-                          if (isWeb) await Clipboard.setStringAsync(item.text);
-                          else await VoxTypeNative.copyTranscript(item.id);
+                          await VoxTypeNative.copyTranscript(item.id);
                           setMessage('Transcript copied. Paste it where you need it.');
                           await refresh();
                         })
@@ -682,7 +621,6 @@ export default function Home() {
               </View>
               <Text style={{ color: c.textMuted, fontSize: 12, lineHeight: 18, marginTop: 42 }}>
                 {user.email}
-                {isWeb ? ' · dummy account' : ''}
               </Text>
             </>
           )}

@@ -1,6 +1,6 @@
 {
   "name": "@voxtype/mobile",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "main": "expo-router/entry",
   "dependencies": {
     "@rn-primitives/slot": "^1.5.2",
@@ -37,7 +37,6 @@
   "private": true,
   "scripts": {
     "start": "expo start",
-    "web": "expo start --web",
     "check-types": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0",
     "test:storage": "node --test test/storage.test.mjs",
