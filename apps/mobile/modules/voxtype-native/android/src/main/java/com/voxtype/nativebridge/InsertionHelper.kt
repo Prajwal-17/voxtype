@@ -1,7 +1,7 @@
 package com.voxtype.nativebridge
 
+import android.accessibilityservice.InputMethod
 import android.view.accessibility.AccessibilityNodeInfo
-import android.view.inputmethod.InputConnection
 
 /**
  * Input-connection helpers. Kept separate so the service never
@@ -24,7 +24,7 @@ object InsertionHelper {
   }
 
   /** Commits text and verifies it actually landed, otherwise reports false. */
-  fun commitAndVerify(connection: InputConnection, text: String): Boolean {
+  fun commitAndVerify(connection: InputMethod.AccessibilityInputConnection, text: String): Boolean {
     return try {
       val before = connection.getSurroundingText(text.length, 0, 0)?.text?.toString()
       connection.commitText(text, 1, null)
