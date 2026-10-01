@@ -14,7 +14,11 @@ import java.lang.ref.WeakReference
 class VoxTypeNativeModule : Module() {
   companion object {
     private var active = WeakReference<VoxTypeNativeModule>(null)
-    fun changed() { Handler(Looper.getMainLooper()).post { active.get()?.sendEvent("onChange", mapOf("changed" to true)) } }
+    private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
+    fun changed() { mainHandler.post { active.get()?.sendEvent("onChange", mapOf("changed" to true)) } }
+    private fun refreshBubble() {
+      mainHandler.post { VoxTypeAccessibilityService.instance?.refreshBubble() }
+    }
   }
 
   override fun definition() = ModuleDefinition {
@@ -33,20 +37,25 @@ class VoxTypeNativeModule : Module() {
         "bubbleEnabled" to store.bubbleEnabled,
         "cleanupEnabled" to store.cleanupEnabled,
         "audioLimit" to store.audioLimit,
-        "status" to (VoxTypeAccessibilityService.instance?.status ?: "idle"),
+        "status" to (VoxTypeAccessibilityService.instance?.status ?: DictationStatus.IDLE.bridge),
         "dictations" to store.dictations(),
       )
     }
 
     AsyncFunction("openAccessibilitySettings") {
       val context = requireNotNull(appContext.reactContext)
-      context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+      try {
+        context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+      } catch (e: Exception) {
+        VoxLog.e("openAccessibilitySettings failed", e)
+        throw e
+      }
     }
 
     AsyncFunction("setSession") { token: String, userId: String, apiUrl: String ->
       val context = requireNotNull(appContext.reactContext)
       NativeSession(context).save(token, userId, apiUrl)
-      Handler(Looper.getMainLooper()).post { VoxTypeAccessibilityService.instance?.refreshBubble() }
+      refreshBubble()
     }
 
     AsyncFunction("getSession") {
@@ -57,19 +66,44 @@ class VoxTypeNativeModule : Module() {
     AsyncFunction("signOut") {
       val context = requireNotNull(appContext.reactContext)
       NativeSession(context).clear()
-      Handler(Looper.getMainLooper()).post { VoxTypeAccessibilityService.instance?.onSignOut() }
+      mainHandler.post { VoxTypeAccessibilityService.instance?.onSignOut() }
     }
 
     AsyncFunction("setPreference") { key: String, value: String ->
       val context = requireNotNull(appContext.reactContext)
       val store = VoxTypeStore(context)
       when (key) {
-        "bubbleEnabled" -> store.bubbleEnabled = value.toBooleanStrict()
-        "cleanupEnabled" -> store.cleanupEnabled = value.toBooleanStrict()
-        "audioLimit" -> store.audioLimit = value.toInt()
-        else -> throw IllegalArgumentException("Unknown preference")
+        "bubbleEnabled" -> store.bubbleEnabled =
+          value.toBooleanStrictOrNull() ?: throw IllegalArgumentException("bubbleEnabled must be 'true' or 'false'")
+        "cleanupEnabled" -> store.cleanupEnabled =
+          value.toBooleanStrictOrNull() ?: throw IllegalArgumentException("cleanupEnabled must be 'true' or 'false'")
+        "audioLimit" -> {
+          val limit = value.toIntOrNull()
+            ?: throw IllegalArgumentException("audioLimit must be one of ${VoxTypeStore.VALID_AUDIO_LIMITS}")
+          store.audioLimit = limit
+        }
+        else -> throw IllegalArgumentException("Unknown preference: $key")
       }
-      Handler(Looper.getMainLooper()).post { VoxTypeAccessibilityService.instance?.refreshBubble() }
+      refreshBubble()
+      changed()
+    }
+
+    // Typed alternatives to the generic string-based setPreference. Additive only.
+    AsyncFunction("setBubbleEnabled") { enabled: Boolean ->
+      VoxTypeStore(requireNotNull(appContext.reactContext)).bubbleEnabled = enabled
+      refreshBubble()
+      changed()
+    }
+
+    AsyncFunction("setCleanupEnabled") { enabled: Boolean ->
+      VoxTypeStore(requireNotNull(appContext.reactContext)).cleanupEnabled = enabled
+      refreshBubble()
+      changed()
+    }
+
+    AsyncFunction("setAudioLimit") { limit: Int ->
+      VoxTypeStore(requireNotNull(appContext.reactContext)).audioLimit = limit
+      refreshBubble()
       changed()
     }
 
@@ -78,7 +112,7 @@ class VoxTypeNativeModule : Module() {
     }
 
     AsyncFunction("stopRecording") {
-      Handler(Looper.getMainLooper()).post { VoxTypeAccessibilityService.instance?.stopRecording() }
+      mainHandler.post { VoxTypeAccessibilityService.instance?.stopRecording() }
     }
   }
 }

@@ -23,12 +23,15 @@ class AudioCapture(private val context: Context, private val onAudio: (ByteArray
 
   @SuppressLint("MissingPermission")
   fun start() {
-    check(ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED)
-    check(running.compareAndSet(false, true))
-    val minSize = AudioRecord.getMinBufferSize(16000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
-    check(minSize > 0)
-    val audio = AudioRecord(MediaRecorder.AudioSource.VOICE_RECOGNITION, 16000,
-      AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, maxOf(minSize, 3200))
+    check(ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+      "RECORD_AUDIO not granted"
+    }
+    check(running.compareAndSet(false, true)) { "already started" }
+    val minSize = AudioRecord.getMinBufferSize(
+      VoxConstants.SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
+    check(minSize > 0) { "no microphone buffer size" }
+    val audio = AudioRecord(MediaRecorder.AudioSource.VOICE_RECOGNITION, VoxConstants.SAMPLE_RATE,
+      AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, maxOf(minSize, VoxConstants.AUDIO_BUFFER_BYTES))
     if (audio.state != AudioRecord.STATE_INITIALIZED) {
       audio.release()
       running.set(false)
@@ -45,37 +48,42 @@ class AudioCapture(private val context: Context, private val onAudio: (ByteArray
         val writer = RandomAccessFile(file, "rw")
         output = writer
         writer.setLength(0)
-        writer.write(ByteArray(44))
+        writer.write(ByteArray(VoxConstants.WAV_HEADER_BYTES))
         audio.startRecording()
-        val buffer = ByteArray(3200)
+        val buffer = ByteArray(VoxConstants.AUDIO_BUFFER_BYTES)
         while (running.get()) {
           val count = audio.read(buffer, 0, buffer.size)
           if (count > 0) {
             val chunk = buffer.copyOf(count)
             writer.write(chunk)
             dataSize += count
-            onAudio(chunk)
-          } else if (count < 0) break
+            try { onAudio(chunk) } catch (e: Exception) { VoxLog.w("onAudio callback failed", e) }
+          } else if (count < 0) {
+            VoxLog.w("AudioRecord read error: $count")
+            break
+          }
         }
-      } catch (_: Exception) {
+      } catch (e: Exception) {
         // Finalize any audio already sent and keep the transcript recoverable.
+        VoxLog.e("microphone loop failed", e)
       } finally {
         running.set(false)
-        try { audio.stop() } catch (_: Exception) {}
+        try { audio.stop() } catch (e: Exception) { VoxLog.w("AudioRecord.stop failed", e) }
         audio.release()
         recorder = null
-        try { output?.let { writeWavHeader(it, dataSize) } } catch (_: Exception) {}
-        try { output?.close() } catch (_: Exception) {}
+        try { output?.let { writeWavHeader(it, dataSize) } } catch (e: Exception) { VoxLog.w("wav header failed", e) }
+        try { output?.close() } catch (e: Exception) { VoxLog.w("wav close failed", e) }
         val savedFile = file.takeIf { it.exists() && dataSize > 0 }
         if (savedFile == null) file.delete()
-        onStopped(savedFile, System.currentTimeMillis() - startedAt)
+        try { onStopped(savedFile, System.currentTimeMillis() - startedAt) }
+        catch (e: Exception) { VoxLog.e("onStopped callback failed", e) }
       }
     }.apply { name = "VoxType microphone"; start() }
   }
 
   fun stop() {
     running.set(false)
-    try { recorder?.stop() } catch (_: Exception) {}
+    try { recorder?.stop() } catch (e: Exception) { VoxLog.w("AudioRecord.stop failed", e) }
   }
 
   private fun writeWavHeader(file: RandomAccessFile, bytes: Long) {
@@ -86,8 +94,8 @@ class AudioCapture(private val context: Context, private val onAudio: (ByteArray
     writeInt(file, 16)
     writeShort(file, 1)
     writeShort(file, 1)
-    writeInt(file, 16000)
-    writeInt(file, 32000)
+    writeInt(file, VoxConstants.SAMPLE_RATE)
+    writeInt(file, VoxConstants.BYTE_RATE)
     writeShort(file, 2)
     writeShort(file, 16)
     file.writeBytes("data")

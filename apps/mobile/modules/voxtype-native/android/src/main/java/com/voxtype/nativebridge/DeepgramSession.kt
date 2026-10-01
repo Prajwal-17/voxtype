@@ -2,7 +2,6 @@ package com.voxtype.nativebridge
 
 import android.os.Handler
 import android.os.Looper
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
@@ -11,69 +10,79 @@ import okio.ByteString.Companion.toByteString
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.util.TreeMap
-import java.util.concurrent.TimeUnit
 
 /** One socket across dictations. A new recording cannot start until Finalize has drained. */
 class DeepgramSession(private val token: () -> String?,
                       private val apiUrl: () -> String?,
                       private val onLost: () -> Unit) {
-  private val client = OkHttpClient.Builder().readTimeout(0, TimeUnit.MILLISECONDS).build()
+  private val client = HttpClients.streaming
   private val main = Handler(Looper.getMainLooper())
-  private var socket: WebSocket? = null
-  private var connecting = false
-  private var ready = false
-  private var closed = false
+
+  // Touched from mic thread (audio) and main thread: must be volatile.
+  @Volatile private var socket: WebSocket? = null
+  @Volatile private var connecting = false
+  @Volatile private var ready = false
+  @Volatile private var closed = false
+  @Volatile private var recording = false
+  @Volatile private var byteCount = 0L
+
+  // Main-thread only state.
   private var pendingReady: (() -> Unit)? = null
   private var pendingDone: ((String) -> Unit)? = null
   private val segments = TreeMap<Double, String>()
   private var boundary = 0.0
-  private var byteCount = 0L
   private var keepUntil = 0L
   private var finishGeneration = 0
   private var reconnectAttempt = 0
-  private var recording = false
 
   private val maintenance = object : Runnable {
     override fun run() {
       if (closed) return
       if (System.currentTimeMillis() >= keepUntil && pendingReady == null && pendingDone == null) {
-        socket?.send("{\"type\":\"CloseStream\"}")
-        socket?.close(1000, "idle timeout")
+        try { socket?.send("{\"type\":\"CloseStream\"}") } catch (e: Exception) { VoxLog.w("CloseStream failed", e) }
+        try { socket?.close(1000, "idle timeout") } catch (e: Exception) { VoxLog.w("socket close failed", e) }
         socket = null; ready = false
         return
       }
-      if (ready && !recording && pendingReady == null && pendingDone == null) socket?.send("{\"type\":\"KeepAlive\"}")
+      if (ready && !recording && pendingReady == null && pendingDone == null) {
+        try { socket?.send("{\"type\":\"KeepAlive\"}") } catch (e: Exception) { VoxLog.w("KeepAlive failed", e) }
+      }
       if (!ready && !connecting && System.currentTimeMillis() < keepUntil) connect()
-      main.postDelayed(this, 4000)
+      main.postDelayed(this, VoxConstants.MAINTENANCE_INTERVAL_MS)
     }
   }
 
   fun begin(onReady: () -> Unit) {
-    check(pendingReady == null && pendingDone == null)
-    keepUntil = System.currentTimeMillis() + 420_000
+    check(pendingReady == null && pendingDone == null) { "already started" }
+    keepUntil = System.currentTimeMillis() + VoxConstants.SOCKET_KEEP_ALIVE_MS
     pendingReady = {
-      boundary = byteCount / 32000.0
+      boundary = byteCount / VoxConstants.BYTES_PER_SECOND.toDouble()
       segments.clear()
       recording = true
       onReady()
     }
     if (ready) pendingReady?.also { pendingReady = null; it() } else connect()
     main.removeCallbacks(maintenance)
-    main.postDelayed(maintenance, 4000)
+    main.postDelayed(maintenance, VoxConstants.MAINTENANCE_INTERVAL_MS)
   }
 
   fun audio(bytes: ByteArray) {
-    if (ready && pendingDone == null && socket?.send(bytes.toByteString()) == true) byteCount += bytes.size
+    if (!ready || pendingDone != null) return
+    try {
+      if (socket?.send(bytes.toByteString()) == true) byteCount += bytes.size
+    } catch (e: Exception) {
+      VoxLog.w("audio send failed", e)
+    }
   }
 
   fun finalize(onDone: (String) -> Unit) {
     recording = false
     if (!ready) { onDone(segments.values.joinToString(" ").trim()); return }
     pendingDone = onDone
-    keepUntil = System.currentTimeMillis() + 420_000
-    socket?.send("{\"type\":\"Finalize\"}")
+    keepUntil = System.currentTimeMillis() + VoxConstants.SOCKET_KEEP_ALIVE_MS
+    try { socket?.send("{\"type\":\"Finalize\"}") } catch (e: Exception) { VoxLog.w("Finalize send failed", e) }
     val generation = ++finishGeneration
-    main.postDelayed({ if (pendingDone != null && generation == finishGeneration) complete() }, 2500)
+    main.postDelayed({ if (pendingDone != null && generation == finishGeneration) complete() }, VoxConstants.FINALIZE_TIMEOUT_MS)
   }
 
   private fun complete() {
@@ -90,22 +99,35 @@ class DeepgramSession(private val token: () -> String?,
     val bearer = token() ?: run { pendingReady = null; return }
     val url = apiUrl() ?: run { pendingReady = null; return }
     connecting = true
-    Thread {
+    Thread({
       try {
-        val response = client.newCall(Request.Builder().url("$url/v1/speech/token")
-          .header("Authorization", "Bearer $bearer").post(ByteArray(0).toRequestBody()).build()).execute()
-        val jwt = JSONObject(response.body?.string() ?: "{}").optJSONObject("data")?.optString("token")
-        response.close()
-        if (response.code == 401 || response.code == 403) keepUntil = 0
-        if (!response.isSuccessful || jwt.isNullOrBlank()) throw IllegalStateException("Token unavailable")
+        val request = Request.Builder().url("$url${VoxConstants.TOKEN_PATH}")
+          .header("Authorization", "Bearer $bearer").post(ByteArray(0).toRequestBody()).build()
+        // Never log bearer or jwt.
+        val (code, successful, jwt) = HttpClients.default.newCall(request).execute().use { response ->
+          val body = try { response.body?.string() } catch (e: Exception) {
+            VoxLog.w("token body read failed", e); null
+          }
+          val parsed = try {
+            JSONObject(body ?: "{}").optJSONObject("data")?.optString("token")
+          } catch (e: Exception) {
+            VoxLog.w("token json parse failed", e); null
+          }
+          Triple(response.code, response.isSuccessful, parsed)
+        }
+        if (code == 401 || code == 403) keepUntil = 0
+        if (!successful || jwt.isNullOrBlank()) throw IllegalStateException("Token unavailable ($code)")
         main.post {
           if (closed || System.currentTimeMillis() >= keepUntil) { connecting = false; return@post }
-          val request = Request.Builder().url("wss://api.deepgram.com/v1/listen?model=nova-3&encoding=linear16&sample_rate=16000&channels=1&interim_results=true&punctuate=true&smart_format=true")
+          val ws = Request.Builder().url(VoxConstants.DEEPGRAM_WS_URL)
             .header("Authorization", "Bearer $jwt").build()
-          socket = client.newWebSocket(request, listener)
+          socket = client.newWebSocket(ws, listener)
         }
-      } catch (_: Exception) { main.post { lost() } }
-    }.start()
+      } catch (e: Exception) {
+        VoxLog.w("deepgram connect failed", e)
+        main.post { lost() }
+      }
+    }, "VoxType deepgram-connect").start()
   }
 
   private val listener = object : WebSocketListener() {
@@ -129,16 +151,20 @@ class DeepgramSession(private val token: () -> String?,
           segments[start] = words
           if (pendingDone != null) {
             val generation = ++finishGeneration
-            main.postDelayed({ if (pendingDone != null && generation == finishGeneration) complete() },
-              if (data.optBoolean("from_finalize")) 250 else 700)
+            val delay = if (data.optBoolean("from_finalize")) VoxConstants.FINALIZE_RESULT_DELAY_FROM_FINALIZE_MS else VoxConstants.FINALIZE_RESULT_DELAY_MS
+            main.postDelayed({ if (pendingDone != null && generation == finishGeneration) complete() }, delay)
           }
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+          VoxLog.w("deepgram message parse failed", e)
+        }
       }
     }
     override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+      VoxLog.d("deepgram closed $code")
       main.post { if (socket === webSocket) lost() }
     }
     override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+      VoxLog.w("deepgram socket failure", t)
       main.post { if (socket === webSocket) lost() }
     }
   }
@@ -146,9 +172,12 @@ class DeepgramSession(private val token: () -> String?,
   private fun lost() {
     socket = null; ready = false; connecting = false; recording = false; byteCount = 0
     pendingReady = null
-    if (pendingDone != null) complete() else onLost()
+    if (pendingDone != null) complete() else {
+      try { onLost() } catch (e: Exception) { VoxLog.w("onLost failed", e) }
+    }
     if (!closed && System.currentTimeMillis() < keepUntil) {
-      val delay = minOf(8000L, 1000L shl minOf(reconnectAttempt++, 3))
+      val shift = minOf(reconnectAttempt++, VoxConstants.RECONNECT_MAX_SHIFT)
+      val delay = minOf(VoxConstants.RECONNECT_MAX_MS, VoxConstants.RECONNECT_BASE_MS shl shift)
       main.postDelayed({ connect() }, delay)
     }
   }
@@ -156,7 +185,7 @@ class DeepgramSession(private val token: () -> String?,
   fun close() {
     closed = true
     main.removeCallbacks(maintenance)
-    socket?.close(1000, "sign out")
+    try { socket?.close(1000, "sign out") } catch (e: Exception) { VoxLog.w("socket close failed", e) }
     socket = null; ready = false; recording = false
   }
 }

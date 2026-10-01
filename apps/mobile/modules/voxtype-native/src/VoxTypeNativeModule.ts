@@ -12,6 +12,10 @@ declare class VoxTypeNativeModule extends NativeModule<VoxTypeNativeModuleEvents
     key: 'bubbleEnabled' | 'cleanupEnabled' | 'audioLimit',
     value: string,
   ): Promise<void>;
+  // Typed alternatives (added natively, optional on older builds).
+  setBubbleEnabled?: (enabled: boolean) => Promise<void>;
+  setCleanupEnabled?: (enabled: boolean) => Promise<void>;
+  setAudioLimit?: (limit: number) => Promise<void>;
   copyTranscript(id: string): Promise<boolean>;
   stopRecording(): Promise<void>;
 }
@@ -61,6 +65,15 @@ const VoxTypeNative = {
   openAccessibilitySettings: () => requireVoxTypeModule().openAccessibilitySettings(),
   setPreference: (key: 'bubbleEnabled' | 'cleanupEnabled' | 'audioLimit', value: string) =>
     requireVoxTypeModule().setPreference(key, value),
+  setBubbleEnabled: (enabled: boolean) =>
+    requireVoxTypeModule().setBubbleEnabled?.(enabled) ??
+    requireVoxTypeModule().setPreference('bubbleEnabled', String(enabled)),
+  setCleanupEnabled: (enabled: boolean) =>
+    requireVoxTypeModule().setCleanupEnabled?.(enabled) ??
+    requireVoxTypeModule().setPreference('cleanupEnabled', String(enabled)),
+  setAudioLimit: (limit: number) =>
+    requireVoxTypeModule().setAudioLimit?.(limit) ??
+    requireVoxTypeModule().setPreference('audioLimit', String(limit)),
   copyTranscript: (id: string) => requireVoxTypeModule().copyTranscript(id),
   stopRecording: () => requireVoxTypeModule().stopRecording(),
   addListener: <EventName extends keyof VoxTypeNativeModuleEvents>(

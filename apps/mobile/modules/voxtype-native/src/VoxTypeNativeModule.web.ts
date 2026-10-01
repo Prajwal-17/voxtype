@@ -59,6 +59,18 @@ class VoxTypeNativeModule extends NativeModule<VoxTypeNativeModuleEvents> {
     else snapshot[key] = value === 'true';
     return Promise.resolve();
   }
+  setBubbleEnabled(enabled: boolean) {
+    snapshot.bubbleEnabled = enabled;
+    return Promise.resolve();
+  }
+  setCleanupEnabled(enabled: boolean) {
+    snapshot.cleanupEnabled = enabled;
+    return Promise.resolve();
+  }
+  setAudioLimit(limit: number) {
+    snapshot.audioLimit = limit as 5 | 10 | 15;
+    return Promise.resolve();
+  }
   copyTranscript(id: string) {
     return Promise.resolve(snapshot.dictations.some((item) => item.id === id));
   }
