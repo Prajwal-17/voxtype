@@ -75,6 +75,14 @@ class DeepgramSession(private val token: () -> String?,
     }
   }
 
+  /** Drop the current take without finalizing: pending callbacks are invalidated. */
+  fun abort() {
+    recording = false
+    pendingReady = null
+    pendingDone = null
+    finishGeneration++
+  }
+
   fun finalize(onDone: (String) -> Unit) {
     recording = false
     if (!ready) { onDone(segments.values.joinToString(" ").trim()); return }

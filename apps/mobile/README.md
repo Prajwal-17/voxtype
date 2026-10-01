@@ -1,6 +1,6 @@
 # VoxType for Android
 
-The app keeps the active keyboard. Its accessibility service shows a native bubble near an editable field. A tap starts a microphone foreground session, sends 16 kHz PCM directly to Deepgram, and saves a private WAV file. Stopping sends Deepgram `Finalize`; the finished transcript is inserted through Android 13's accessibility input connection if the same safe field still has focus. A transcript stays in local SQLite when insertion cannot be verified, with Copy and Paste recovery in the app. Password and sensitive fields are excluded.
+The app keeps the active keyboard. Its accessibility service shows a small muted bubble near an editable field. The bubble is draggable; dropping it on the ✕ close mark turns it off, and it remembers its position. A tap starts a microphone foreground session, sends 16 kHz PCM directly to Deepgram, and saves a private WAV file. While listening the bubble expands to ✕ cancel and ✓ finish controls with animated level bars, mirroring the desktop overlay. Finishing sends Deepgram `Finalize`; the finished transcript is inserted through Android 13's accessibility input connection if the same safe field still has focus. A transcript stays in local SQLite when insertion cannot be verified, with Copy and Paste recovery in the app. Password and sensitive fields are excluded.
 
 ## Configuration
 
