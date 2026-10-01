@@ -1,6 +1,6 @@
 name: Release desktop
 
-run-name: add configurable shortcuts and harden the native overlay
+run-name: ${{ github.event.head_commit.message || github.ref_name }}
 
 on:
   push:
@@ -22,7 +22,7 @@ env:
 
 jobs:
   release-linux:
-    name: add configurable shortcuts and harden the native overlay
+    name: Build Linux .deb
     runs-on: ubuntu-22.04
     timeout-minutes: 45
 
@@ -87,8 +87,8 @@ jobs:
           if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "Release $GITHUB_REF_NAME already exists."
           else
-            title="$(git log -1 --pretty=%s)"
-            gh release create "$GITHUB_REF_NAME" --title "$title" --notes "" --repo "$GITHUB_REPOSITORY"
+            version="${GITHUB_REF_NAME#desktop-}"
+            gh release create "$GITHUB_REF_NAME" --title "Desktop $version" --notes "" --repo "$GITHUB_REPOSITORY"
           fi
 
       - name: Build and publish VoxType

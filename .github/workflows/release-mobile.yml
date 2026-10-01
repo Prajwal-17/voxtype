@@ -69,8 +69,8 @@ jobs:
             echo "Release $GITHUB_REF_NAME already exists." >&2
             exit 1
           fi
-          title="$(git log -1 --pretty=%s)"
-          gh release create "$GITHUB_REF_NAME" --title "$title" --notes "" --repo "$GITHUB_REPOSITORY"
+          version="${GITHUB_REF_NAME#mobile-}"
+          gh release create "$GITHUB_REF_NAME" --title "Mobile $version" --notes "" --repo "$GITHUB_REPOSITORY"
 
       - name: Upload APK
         env:
