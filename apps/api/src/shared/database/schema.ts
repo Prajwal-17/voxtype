@@ -100,7 +100,7 @@ export const dictation = sqliteTable(
       .notNull(),
     durationMs: integer('duration_ms').notNull(),
     wordCount: integer('word_count').notNull(),
-    delivery: text('delivery', { enum: ['saved', 'copied', 'pasted'] }).notNull(),
+    source: text('source', { enum: ['desktop', 'mobile'] }),
   },
   (table) => [index('dictation_user_created_idx').on(table.userId, table.createdAt)],
 );

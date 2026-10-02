@@ -94,4 +94,4 @@ Use native switches, select or picker controls, dialogs, and sheets. Do not repr
 
 Add a shared token only when the same intent appears across platforms or at least three times in one platform. Add platform-specific values in the adapter, not the core token set. Component APIs describe purpose and state rather than visual trivia.
 
-Changes to `tokens.ts` and `web.css` must remain synchronized; the package test enforces color and typography coverage. App-level design documents may add composition rules, but they cannot redefine shared foundations.
+Changes to `tokens.ts` and `web.css` must remain synchronized. App-level design documents may add composition rules, but they cannot redefine shared foundations.

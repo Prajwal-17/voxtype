@@ -2,12 +2,12 @@ import { z } from 'zod';
 
 export const dictationIdSchema = z.uuid();
 
-export const dictationInputSchema = z.object({
+export const dictationInputSchema = z.strictObject({
   text: z.string().trim().min(1).max(100_000),
   originalText: z.string().trim().min(1).max(100_000).nullish(),
   createdAt: z.number().int().nonnegative(),
   durationMs: z.number().int().min(0).max(86_400_000),
-  delivery: z.enum(['saved', 'copied', 'pasted']),
+  source: z.enum(['desktop', 'mobile']),
 });
 
 export const createDictationSchema = dictationInputSchema.extend({

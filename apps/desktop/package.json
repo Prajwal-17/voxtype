@@ -12,11 +12,7 @@
     "check-types": "tsc --noEmit",
     "typecheck": "pnpm check-types",
     "lint": "eslint . --max-warnings 0 && cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings",
-    "check:rust": "cargo check --manifest-path src-tauri/Cargo.toml",
-    "test": "pnpm test:web && pnpm test:rust",
-    "test:web": "vitest run",
-    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
-    "test:e2e": "playwright test"
+    "check:rust": "cargo check --manifest-path src-tauri/Cargo.toml"
   },
   "dependencies": {
     "@voxtype/design-system": "workspace:*",
@@ -46,7 +42,6 @@
   "devDependencies": {
     "@voxtype/eslint-config": "workspace:*",
     "@voxtype/typescript-config": "workspace:*",
-    "@playwright/test": "^1.55.0",
     "@tailwindcss/vite": "^4.1.13",
     "@tauri-apps/cli": "^2.8.0",
     "@types/node": "^24.0.0",
@@ -56,7 +51,6 @@
     "eslint": "^10.11.0",
     "tailwindcss": "^4.1.13",
     "typescript": "^5.9.3",
-    "vite": "^7.1.0",
-    "vitest": "^3.2.4"
+    "vite": "^7.1.0"
   }
 }

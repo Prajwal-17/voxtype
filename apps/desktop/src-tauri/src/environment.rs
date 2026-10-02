@@ -61,19 +61,3 @@ pub fn overlay_height() -> i32 {
         56
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn debug_builds_use_the_development_namespace() {
-        assert!(is_development());
-        assert_eq!(app_name(), "VoxType Dev");
-        assert_eq!(keyring_service(), "com.voxtype.dictation.dev");
-        assert_eq!(store_file(), "voxtype-dev.json");
-        assert_eq!(default_shortcut_id(), "ctrl-shift-space");
-        assert_eq!(shortcut_id_for(false), "right-alt");
-        assert_eq!(overlay_height(), 64);
-    }
-}

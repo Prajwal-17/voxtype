@@ -87,7 +87,10 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     session = NativeSession(this)
   }
 
-  override fun onServiceConnected() { super.onServiceConnected(); refreshBubble() }
+  override fun onServiceConnected() {
+    super.onServiceConnected(); refreshBubble()
+    store.pruneAudio()
+  }
   override fun onCreateInputMethod(): InputMethod = InputMethod(this)
 
   override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -599,6 +602,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       releaseTarget()
       return
     }
+    val recordingApiUrl = session.apiUrl ?: run { recordingUserId = null; releaseTarget(); return }
     val stream = engine ?: DeepgramSession({ session.token }, { session.apiUrl }, {
       main.post {
         if (status == DictationStatus.LISTENING.bridge) stopRecording()
@@ -628,7 +632,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
           recordingDuration = duration
           stopForeground(STOP_FOREGROUND_REMOVE)
           setStatus(DictationStatus.PROCESSING)
-          stream.finalize { finishDictation(it) }
+          stream.finalize { finishDictation(it, recordingApiUrl) }
         }
       }).also { it.start() }
       setStatus(DictationStatus.LISTENING)
@@ -677,7 +681,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     }
   }
 
-  private fun finishDictation(original: String) {
+  private fun finishDictation(original: String, apiUrl: String) {
     val userId = recordingUserId ?: return
     val generation = lifecycleGeneration
     val audio = recordingFile
@@ -686,7 +690,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     serviceScope.launch(Dispatchers.IO) {
       val cleaned = if (store.cleanupEnabled) cleanup(original) else original
       val id = try {
-        store.save(userId, cleaned, original, duration, audio)
+        store.save(userId, cleaned, original, duration, audio, apiUrl)
       } catch (e: Exception) {
         VoxLog.e("dictation save failed", e)
         return@launch
@@ -702,6 +706,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
         val delay = if (delivered) VoxConstants.SAVED_AUTO_DISMISS_DELIVERED_MS else VoxConstants.SAVED_AUTO_DISMISS_MS
         main.postDelayed({ if (status == DictationStatus.SAVED.bridge) setStatus(DictationStatus.IDLE) }, delay)
       }
+      if (cleaned.isNotBlank()) TranscriptUploads.sendPending(applicationContext)
     }
   }
 

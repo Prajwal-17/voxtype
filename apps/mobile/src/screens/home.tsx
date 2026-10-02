@@ -81,13 +81,7 @@ function WaveBar({
   );
 }
 
-function RecordingPanel({
-  status,
-  onStop,
-}: {
-  status: Snapshot['status'];
-  onStop: () => void;
-}) {
+function RecordingPanel({ status, onStop }: { status: Snapshot['status']; onStop: () => void }) {
   const reduced = useReducedMotion();
   const motion = useSharedValue(0);
   const scale = useSharedValue(1);
@@ -149,9 +143,7 @@ function RecordingPanel({
               backgroundColor: listening ? '#c5d8cb' : c.onChromeMuted,
             }}
           />
-          <Text style={{ color: c.onChromeMuted, fontSize: 13, fontWeight: '600' }}>
-            {badge}
-          </Text>
+          <Text style={{ color: c.onChromeMuted, fontSize: 13, fontWeight: '600' }}>{badge}</Text>
         </Animated.View>
         <View
           className="flex-row items-center gap-1"
@@ -192,12 +184,7 @@ function RecordingPanel({
       </Text>
       {listening && (
         <View style={{ marginTop: 20, alignSelf: 'flex-start' }}>
-          <Action
-            title="Stop recording"
-            onPress={onStop}
-            disabled={processing}
-            secondary
-          />
+          <Action title="Stop recording" onPress={onStop} disabled={processing} secondary />
         </View>
       )}
     </Animated.View>
@@ -350,10 +337,7 @@ export default function Home() {
       setBusy(false);
     }
   };
-  const updatePreference = (
-    key: 'bubbleEnabled' | 'cleanupEnabled' | 'audioLimit',
-    value: boolean | number,
-  ) => {
+  const updatePreference = (key: 'bubbleEnabled' | 'cleanupEnabled', value: boolean | number) => {
     void run(async () => {
       await VoxTypeNative.setPreference(key, String(value));
       await refresh();
@@ -489,10 +473,7 @@ export default function Home() {
                   finished text.
                 </Text>
               </View>
-              <RecordingPanel
-                status={status}
-                onStop={stopRecording}
-              />
+              <RecordingPanel status={status} onStop={stopRecording} />
               <View style={{ marginTop: 34 }}>
                 <Text style={{ color: c.text, fontSize: 19, fontWeight: '600' }}>
                   Set up your bubble
@@ -601,36 +582,11 @@ export default function Home() {
                   />
                 </View>
                 <View style={{ paddingTop: 18 }}>
-                  <Text style={{ color: c.text, fontSize: 14 }}>Keep newest recording files</Text>
-                  <View className="flex-row gap-2" style={{ marginTop: 12 }}>
-                    {([5, 10, 15] as const).map((count) => (
-                      <Pressable
-                        key={count}
-                        onPress={() => updatePreference('audioLimit', count)}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Keep ${count} recording files`}
-                        accessibilityState={{ selected: snapshot?.audioLimit === count }}
-                        className="min-h-12 flex-1 items-center justify-center"
-                        style={{
-                          borderRadius: 10,
-                          backgroundColor: snapshot?.audioLimit === count ? c.primary : c.surface,
-                          borderWidth: 1,
-                          borderColor: snapshot?.audioLimit === count ? c.primary : c.border,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color: snapshot?.audioLimit === count ? c.onPrimary : c.text,
-                            fontWeight: '600',
-                          }}
-                        >
-                          {count}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
+                  <Text style={{ color: c.text, fontSize: 14 }}>Local history and recordings</Text>
                   <Text style={{ color: c.textMuted, fontSize: 12, lineHeight: 18, marginTop: 10 }}>
-                    Older audio files are deleted automatically. Transcripts remain available.
+                    All transcripts stay on this phone. The newest 10 audio recordings are kept;
+                    older audio is deleted automatically. Transcripts are also sent to your account
+                    with a mobile tag. Audio files stay on this phone.
                   </Text>
                 </View>
               </View>

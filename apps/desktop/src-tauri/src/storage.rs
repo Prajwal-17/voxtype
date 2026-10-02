@@ -1,9 +1,10 @@
-//! Preferences/history use Tauri Store. Credentials never enter that file or leave Rust.
+//! All transcripts and the durable upload queue live locally. Audio stays in private WAV files.
 use crate::{
     environment,
     model::{HistoryItem, Settings},
+    recordings, AppState,
 };
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_store::StoreExt;
 
 fn entry(account: &str) -> Result<keyring::Entry, String> {
@@ -91,7 +92,30 @@ pub fn history(app: &AppHandle) -> Result<Vec<HistoryItem>, String> {
         None => Ok(vec![]),
     }
 }
-pub fn write_history(app: &AppHandle, items: Vec<HistoryItem>) -> Result<(), String> {
+pub fn delete_history(app: &AppHandle, id: Option<&str>) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let _lock = state
+        .local_data
+        .lock()
+        .map_err(|_| "Local data unavailable.")?;
+    let old = history(app)?;
+    let items = old
+        .iter()
+        .filter(|item| id.is_some_and(|id| item.id != id))
+        .cloned()
+        .collect::<Vec<_>>();
+    write_history_unlocked(app, items.clone())?;
+    for removed in old
+        .iter()
+        .filter(|old| !items.iter().any(|item| item.id == old.id))
+    {
+        if let Some(path) = &removed.audio_file {
+            recordings::remove(app, path);
+        }
+    }
+    Ok(())
+}
+fn write_history_unlocked(app: &AppHandle, items: Vec<HistoryItem>) -> Result<(), String> {
     let store = app
         .store(environment::store_file())
         .map_err(|e| e.to_string())?;
@@ -104,8 +128,152 @@ pub fn write_history(app: &AppHandle, items: Vec<HistoryItem>) -> Result<(), Str
     Ok(())
 }
 pub fn append_history(app: &AppHandle, item: HistoryItem) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let _lock = state
+        .local_data
+        .lock()
+        .map_err(|_| "Local data unavailable.")?;
     let mut items = history(app)?;
+    let mut pending = pending_uploads_unlocked(app)?;
+    pending.retain(|queued| queued.id != item.id);
+    if !item.text.trim().is_empty() && item.user_id.is_some() {
+        pending.push(item.clone());
+    }
+    items.retain(|existing| existing.id != item.id);
     items.insert(0, item);
-    items.truncate(200);
-    write_history(app, items)
+    let store = app
+        .store(environment::store_file())
+        .map_err(|e| e.to_string())?;
+    store.set(
+        "uploads",
+        serde_json::to_value(pending).map_err(|e| e.to_string())?,
+    );
+    write_history_unlocked(app, items)?;
+    Ok(())
+}
+
+pub fn pending_uploads(app: &AppHandle) -> Result<Vec<HistoryItem>, String> {
+    let state = app.state::<AppState>();
+    let _lock = state
+        .local_data
+        .lock()
+        .map_err(|_| "Local data unavailable.")?;
+    pending_uploads_unlocked(app)
+}
+fn pending_uploads_unlocked(app: &AppHandle) -> Result<Vec<HistoryItem>, String> {
+    let store = app
+        .store(environment::store_file())
+        .map_err(|e| e.to_string())?;
+    match store.get("uploads") {
+        Some(value) => serde_json::from_value(value)
+            .map_err(|_| "Local upload queue could not be read.".into()),
+        None => Ok(vec![]),
+    }
+}
+
+pub fn acknowledge_upload(app: &AppHandle, uploaded: &HistoryItem) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let _lock = state
+        .local_data
+        .lock()
+        .map_err(|_| "Local data unavailable.")?;
+    let mut pending = pending_uploads_unlocked(app)?;
+    retain_unacknowledged(&mut pending, uploaded);
+    let store = app
+        .store(environment::store_file())
+        .map_err(|e| e.to_string())?;
+    store.set(
+        "uploads",
+        serde_json::to_value(pending).map_err(|e| e.to_string())?,
+    );
+    store.save().map_err(|e| e.to_string())
+}
+
+fn retain_unacknowledged(pending: &mut Vec<HistoryItem>, uploaded: &HistoryItem) {
+    pending.retain(|item| item.id != uploaded.id);
+}
+
+pub fn update_delivery(app: &AppHandle, id: &str, delivery: &str) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let _lock = state
+        .local_data
+        .lock()
+        .map_err(|_| "Local data unavailable.")?;
+    let mut items = history(app)?;
+    let Some(item) = items.iter_mut().find(|item| item.id == id) else {
+        return Ok(());
+    };
+    if item.delivery == delivery {
+        return Ok(());
+    }
+    item.delivery = delivery.into();
+    let mut pending = pending_uploads_unlocked(app)?;
+    if let Some(queued) = pending.iter_mut().find(|queued| queued.id == id) {
+        queued.delivery = delivery.into();
+    }
+    let store = app
+        .store(environment::store_file())
+        .map_err(|e| e.to_string())?;
+    store.set(
+        "uploads",
+        serde_json::to_value(pending).map_err(|e| e.to_string())?,
+    );
+    write_history_unlocked(app, items)?;
+    Ok(())
+}
+
+pub fn claim_legacy_history(app: &AppHandle, user_id: &str) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let _lock = state
+        .local_data
+        .lock()
+        .map_err(|_| "Local data unavailable.")?;
+    let mut items = history(app)?;
+    let mut pending = pending_uploads_unlocked(app)?;
+    let mut changed = false;
+    for item in items.iter_mut().filter(|item| item.user_id.is_none()) {
+        item.user_id = Some(user_id.into());
+        item.upload_api_url = Some(crate::auth::api_url());
+        if !item.text.trim().is_empty() {
+            pending.push(item.clone());
+        }
+        changed = true;
+    }
+    if changed {
+        let store = app
+            .store(environment::store_file())
+            .map_err(|e| e.to_string())?;
+        store.set(
+            "uploads",
+            serde_json::to_value(pending).map_err(|e| e.to_string())?,
+        );
+        write_history_unlocked(app, items)?;
+    }
+    Ok(())
+}
+
+pub fn prune_audio(app: &AppHandle) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let _lock = state
+        .local_data
+        .lock()
+        .map_err(|_| "Local data unavailable.")?;
+    prune_audio_unlocked(app)
+}
+fn prune_audio_unlocked(app: &AppHandle) -> Result<(), String> {
+    let removed = recordings::prune_directory(&recordings::directory(app)?)?;
+    if removed.is_empty() {
+        return Ok(());
+    }
+    let mut items = history(app)?;
+    for item in &mut items {
+        if item
+            .audio_file
+            .as_ref()
+            .is_some_and(|p| removed.contains(p))
+        {
+            item.audio_file = None;
+        }
+    }
+    write_history_unlocked(app, items)
 }

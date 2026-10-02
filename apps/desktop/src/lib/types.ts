@@ -4,7 +4,6 @@ export const settingsSchema = z.object({
   language: z.enum(['en', 'en-US', 'en-GB', 'hi', 'multi', 'es', 'fr', 'de', 'pt', 'ja']),
   microphone: z.string().max(512),
   autoPaste: z.boolean(),
-  keepHistory: z.boolean(),
   cleanupEnabled: z.boolean().default(false),
   voiceDetection: z.boolean().default(true),
   vocabulary: z.array(z.string().trim().min(1).max(100)).max(100),
@@ -14,7 +13,6 @@ export const defaultSettings: Settings = {
   language: 'en',
   microphone: '',
   autoPaste: true,
-  keepHistory: true,
   cleanupEnabled: false,
   voiceDetection: true,
   vocabulary: [],
@@ -73,6 +71,8 @@ export interface HistoryItem {
   durationMs: number;
   words: number;
   delivery: string;
+  userId?: string;
+  audioFile?: string;
 }
 export interface Microphone {
   id: string;

@@ -1,0 +1,1 @@
+ALTER TABLE `dictation` ADD `source` text;

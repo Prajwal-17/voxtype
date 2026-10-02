@@ -18,7 +18,7 @@ export function toNewDictation(userId: string, id: string, input: DictationInput
     createdAt: new Date(input.createdAt),
     durationMs: input.durationMs,
     wordCount: countWords(input.text),
-    delivery: input.delivery,
+    source: input.source,
   };
 }
 
@@ -31,7 +31,7 @@ export function toDictationResponse(item: Dictation): DictationResponse {
     updatedAt: item.updatedAt.getTime(),
     durationMs: item.durationMs,
     words: item.wordCount,
-    delivery: item.delivery,
+    source: item.source,
   };
 }
 

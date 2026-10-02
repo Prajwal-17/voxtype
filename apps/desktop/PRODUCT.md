@@ -33,7 +33,8 @@ VoxType combines an app-level recording workspace with a system-wide Right Alt s
 - Finished text can optionally be sent to DeepSeek for cleanup.
 - Provider API keys stay on the server. Desktop requests a fresh temporary Deepgram token for each connection; optional cleanup uses the authenticated server endpoint.
 - Production defaults to Right Alt and development defaults to Ctrl Shift Space; each can be changed independently.
-- Up to 200 transcripts can be stored locally; there is no cloud sync.
+- All transcripts are stored locally. The newest 10 audio recordings are retained on the device.
+- Each new transcript sends itself and any previously unsent transcripts to the account with a desktop tag. Failed sends stay local until the next new transcript; there are no timer or sign-in uploads. History is read only from this device; audio files are never stored on the server.
 - The browser build is a preview and cannot record.
 - The redesign must preserve current behavior and use the existing React, Tailwind CSS, Radix/shadcn-style component, TanStack Query, Motion, and Tauri stack.
 

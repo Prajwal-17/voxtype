@@ -230,13 +230,11 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
           onChange={(v) => set('cleanupEnabled', v)}
           disabled={active}
         />
-        <Toggle
-          label="Keep local history"
-          description="Save up to 200 dictations on this device. Existing history stays until you delete it."
-          checked={draft.keepHistory}
-          onChange={(v) => set('keepHistory', v)}
-          disabled={active}
-        />
+        <p className="pt-4 text-caption text-muted">
+          All transcripts stay on this device. The newest 10 audio recordings are kept locally;
+          older audio is deleted automatically. Transcripts are also sent to your account with a
+          desktop tag. Audio files stay on this device.
+        </p>
       </section>
       <section className="mb-5 rounded-panel border border-line bg-surface p-5 max-md:p-4">
         <SectionHeader

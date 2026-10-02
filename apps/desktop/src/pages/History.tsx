@@ -97,7 +97,7 @@ export function HistoryPage({ onRecord }: { onRecord: () => void }) {
             <p className="mt-2 mb-6 max-w-sm text-body text-muted">
               {search
                 ? 'Try another word or clear the search to see all transcripts.'
-                : 'Finished dictations will appear here when local history is enabled.'}
+                : 'Your dictations are saved on this device and will appear here.'}
             </p>
             {search ? (
               <Button variant="outline" onClick={() => setSearch('')}>
@@ -180,7 +180,9 @@ export function HistoryPage({ onRecord }: { onRecord: () => void }) {
       </Card>
 
       <p className="mt-4 text-caption text-muted">
-        VoxType keeps up to 200 dictations locally. Nothing is synced to the cloud.
+        All transcripts stay on this device. The newest 10 audio recordings are kept locally.
+        Transcripts are sent to your account with a desktop tag; history is always read from this
+        device.
       </p>
     </>
   );

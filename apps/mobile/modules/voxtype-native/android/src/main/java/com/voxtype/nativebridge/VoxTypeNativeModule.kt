@@ -24,11 +24,14 @@ class VoxTypeNativeModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("VoxTypeNative")
     Events("onChange")
-    OnCreate { active = WeakReference(this@VoxTypeNativeModule) }
+    OnCreate {
+      active = WeakReference(this@VoxTypeNativeModule)
+    }
 
     AsyncFunction("getSnapshot") {
       val context = requireNotNull(appContext.reactContext)
       val store = VoxTypeStore(context)
+      store.pruneAudio()
       val enabled = Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
         ?.contains("${context.packageName}/${VoxTypeAccessibilityService::class.java.name}", true) == true
       mapOf(
@@ -36,7 +39,7 @@ class VoxTypeNativeModule : Module() {
         "microphoneGranted" to (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED),
         "bubbleEnabled" to store.bubbleEnabled,
         "cleanupEnabled" to store.cleanupEnabled,
-        "audioLimit" to store.audioLimit,
+        "audioLimit" to VoxTypeStore.AUDIO_LIMIT,
         "status" to (VoxTypeAccessibilityService.instance?.status ?: DictationStatus.IDLE.bridge),
         "dictations" to store.dictations(),
       )
@@ -77,11 +80,6 @@ class VoxTypeNativeModule : Module() {
           value.toBooleanStrictOrNull() ?: throw IllegalArgumentException("bubbleEnabled must be 'true' or 'false'")
         "cleanupEnabled" -> store.cleanupEnabled =
           value.toBooleanStrictOrNull() ?: throw IllegalArgumentException("cleanupEnabled must be 'true' or 'false'")
-        "audioLimit" -> {
-          val limit = value.toIntOrNull()
-            ?: throw IllegalArgumentException("audioLimit must be one of ${VoxTypeStore.VALID_AUDIO_LIMITS}")
-          store.audioLimit = limit
-        }
         else -> throw IllegalArgumentException("Unknown preference: $key")
       }
       refreshBubble()
@@ -97,12 +95,6 @@ class VoxTypeNativeModule : Module() {
 
     AsyncFunction("setCleanupEnabled") { enabled: Boolean ->
       VoxTypeStore(requireNotNull(appContext.reactContext)).cleanupEnabled = enabled
-      refreshBubble()
-      changed()
-    }
-
-    AsyncFunction("setAudioLimit") { limit: Int ->
-      VoxTypeStore(requireNotNull(appContext.reactContext)).audioLimit = limit
       refreshBubble()
       changed()
     }

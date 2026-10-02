@@ -74,6 +74,7 @@ export function createDictationService(database: D1Database) {
       }
 
       const saved = await repository.upsert(toNewDictation(userId, id, input));
+      if (!saved) throw new ApiError(404, 'not_found', 'Dictation not found.');
       return { data: toDictationResponse(saved), created: !existing };
     },
 

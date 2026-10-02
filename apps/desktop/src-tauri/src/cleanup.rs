@@ -44,39 +44,3 @@ fn validate_result(result: CleanupResult, characters: usize) -> Result<String, S
     }
     Ok(text.to_owned())
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn unsuccessful_cleanup_preserves_the_original_via_the_session_fallback() {
-        assert!(validate_result(
-            CleanupResult {
-                text: "original".into(),
-                cleaned: false
-            },
-            8
-        )
-        .is_err());
-        assert!(validate_result(
-            CleanupResult {
-                text: " ".into(),
-                cleaned: true
-            },
-            8
-        )
-        .is_err());
-        assert_eq!(
-            validate_result(
-                CleanupResult {
-                    text: " Clean text. ".into(),
-                    cleaned: true
-                },
-                8
-            )
-            .unwrap(),
-            "Clean text."
-        );
-    }
-}

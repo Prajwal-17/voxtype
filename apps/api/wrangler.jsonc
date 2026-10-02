@@ -4,9 +4,14 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-09-27",
   "compatibility_flags": ["nodejs_compat"],
+  "dev": {
+    // Keep VoxType separate from other local Workers using Wrangler's default ports.
+    "port": 8788,
+    "inspector_port": 9230,
+  },
   "vars": {
     "ALLOWED_EMAIL": "prajwalreddy.dev@gmail.com",
-    "API_URL": "http://localhost:8787",
+    "API_URL": "http://localhost:8788",
     "CLIENT_ORIGINS": "http://localhost:1420,http://localhost:5173,tauri://localhost",
   },
   "secrets": {

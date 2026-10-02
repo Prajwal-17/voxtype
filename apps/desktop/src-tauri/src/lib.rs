@@ -5,9 +5,11 @@ mod desktop;
 mod display;
 mod environment;
 mod model;
+mod recordings;
 mod session;
 mod speech;
 mod storage;
+mod uploads;
 
 use model::*;
 use std::sync::{
@@ -20,6 +22,9 @@ pub struct AppState {
     pub snapshot: Mutex<Snapshot>,
     pub control: Mutex<Option<tokio::sync::mpsc::Sender<session::Control>>>,
     pub authenticated: AtomicBool,
+    pub user: Mutex<Option<AuthUser>>,
+    pub local_data: Mutex<()>,
+    pub upload_lock: tokio::sync::Mutex<()>,
     pub shortcut_registered: AtomicBool,
 }
 impl Default for AppState {
@@ -28,6 +33,9 @@ impl Default for AppState {
             snapshot: Mutex::new(Snapshot::default()),
             control: Mutex::new(None),
             authenticated: AtomicBool::new(false),
+            user: Mutex::new(None),
+            local_data: Mutex::new(()),
+            upload_lock: tokio::sync::Mutex::new(()),
             shortcut_registered: AtomicBool::new(false),
         }
     }
@@ -98,6 +106,10 @@ async fn get_auth_user(app: tauri::AppHandle) -> Result<Option<AuthUser>, String
         .authenticated
         .store(false, Ordering::Release);
     let user = auth::current_user().await?;
+    *app.state::<AppState>()
+        .user
+        .lock()
+        .map_err(|_| "Account unavailable.")? = user.clone();
     app.state::<AppState>()
         .authenticated
         .store(user.is_some(), Ordering::Release);
@@ -106,6 +118,10 @@ async fn get_auth_user(app: tauri::AppHandle) -> Result<Option<AuthUser>, String
 #[tauri::command]
 async fn sign_in_with_google(app: tauri::AppHandle) -> Result<AuthUser, String> {
     let user = auth::sign_in(app.clone()).await?;
+    *app.state::<AppState>()
+        .user
+        .lock()
+        .map_err(|_| "Account unavailable.")? = Some(user.clone());
     app.state::<AppState>()
         .authenticated
         .store(true, Ordering::Release);
@@ -123,6 +139,10 @@ async fn sign_out(app: tauri::AppHandle) -> Result<(), String> {
             .store(true, Ordering::Release);
         return Err(error);
     }
+    *app.state::<AppState>()
+        .user
+        .lock()
+        .map_err(|_| "Account unavailable.")? = None;
     Ok(())
 }
 #[tauri::command]
@@ -146,14 +166,7 @@ fn get_history(app: tauri::AppHandle) -> Result<Vec<HistoryItem>, String> {
 }
 #[tauri::command]
 fn delete_history(app: tauri::AppHandle, id: Option<String>) -> Result<(), String> {
-    let items = match id {
-        Some(id) => storage::history(&app)?
-            .into_iter()
-            .filter(|item| item.id != id)
-            .collect(),
-        None => vec![],
-    };
-    storage::write_history(&app, items)
+    storage::delete_history(&app, id.as_deref())
 }
 #[tauri::command]
 async fn get_microphones() -> Result<Vec<Microphone>, String> {
@@ -282,16 +295,10 @@ pub fn run() {
     display::configure();
     // WebSocket TLS has multiple optional crypto backends; select one explicitly.
     let _ = rustls::crypto::ring::default_provider().install_default();
-    let mut builder = tauri::Builder::default();
-    // Debug-only WebDriver sessions can run independently of the user's open app.
-    // Release builds always enforce a single instance.
-    if !cfg!(debug_assertions) || std::env::var("TAURI_WEBVIEW_AUTOMATION").as_deref() != Ok("true")
-    {
-        builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _| {
+    tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, args, _| {
             dispatch(app, args.get(1).map(String::as_str).unwrap_or("settings"));
-        }));
-    }
-    builder
+        }))
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_opener::init())
         .manage(AppState::default())
@@ -315,6 +322,11 @@ pub fn run() {
         ])
         .setup(|app| {
             let handle = app.handle();
+            if let Err(error) =
+                recordings::recover(handle).and_then(|_| storage::prune_audio(handle))
+            {
+                let _ = handle.emit("app-error", error);
+            }
             if let Some(overlay) = handle.get_webview_window("overlay") {
                 prepare_overlay_window(&overlay);
             }

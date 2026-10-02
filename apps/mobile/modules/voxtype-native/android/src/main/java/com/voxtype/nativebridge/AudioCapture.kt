@@ -39,7 +39,9 @@ class AudioCapture(private val context: Context, private val onAudio: (ByteArray
     }
     recorder = audio
     val dir = File(context.filesDir, "recordings").apply { mkdirs() }
-    val file = File(dir, "${UUID.randomUUID()}.wav")
+    // Active takes cannot be mistaken for completed recordings during pruning.
+    val completedFile = File(dir, "${UUID.randomUUID()}.wav")
+    val file = File(dir, "${completedFile.name}.part")
     startedAt = System.currentTimeMillis()
     thread = Thread {
       var output: RandomAccessFile? = null
@@ -73,7 +75,7 @@ class AudioCapture(private val context: Context, private val onAudio: (ByteArray
         recorder = null
         try { output?.let { writeWavHeader(it, dataSize) } } catch (e: Exception) { VoxLog.w("wav header failed", e) }
         try { output?.close() } catch (e: Exception) { VoxLog.w("wav close failed", e) }
-        val savedFile = file.takeIf { it.exists() && dataSize > 0 }
+        val savedFile = completedFile.takeIf { file.exists() && dataSize > 0 && file.renameTo(it) }
         if (savedFile == null) file.delete()
         try { onStopped(savedFile, System.currentTimeMillis() - startedAt) }
         catch (e: Exception) { VoxLog.e("onStopped callback failed", e) }

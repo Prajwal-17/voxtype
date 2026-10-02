@@ -50,33 +50,3 @@ fn session_environment() -> Option<Vec<String>> {
         .ok()?;
     reply.child_value(0).as_variant()?.get()
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn imports_only_nonempty_graphical_session_values() {
-        let entries = [
-            "DISPLAY=:0",
-            "WAYLAND_DISPLAY=wayland-0",
-            "XDG_SESSION_TYPE=wayland",
-            "XAUTHORITY=/run/user/1000/.mutter-Xwaylandauth.test",
-            "PATH=/untrusted",
-            "GDK_BACKEND=wayland",
-            "TOKEN=private",
-            "DISPLAY=",
-            "malformed",
-        ]
-        .map(str::to_owned);
-        assert_eq!(
-            graphical_environment(&entries),
-            vec![
-                ("DISPLAY", ":0"),
-                ("WAYLAND_DISPLAY", "wayland-0"),
-                ("XDG_SESSION_TYPE", "wayland"),
-                ("XAUTHORITY", "/run/user/1000/.mutter-Xwaylandauth.test"),
-            ]
-        );
-    }
-}

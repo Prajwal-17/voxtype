@@ -1,0 +1,1 @@
+ALTER TABLE `dictation` DROP COLUMN `delivery`;

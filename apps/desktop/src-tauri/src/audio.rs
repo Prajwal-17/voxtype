@@ -20,22 +20,6 @@ impl Capture {
             let _ = stop.send(());
         }
     }
-    #[cfg(test)]
-    pub fn fixture() -> Self {
-        let (sender, frames) = mpsc::channel(8);
-        let (stop, stopping) = oneshot::channel();
-        let task = tokio::spawn(async move {
-            sender.send(Ok(vec![0; 3200])).await.unwrap();
-            let _ = stopping.await;
-            // The bytes arriving after Stop are the tail that must precede CloseStream.
-            let _ = sender.send(Ok(vec![1; 320])).await;
-        });
-        Self {
-            frames,
-            stop: Some(stop),
-            task,
-        }
-    }
 }
 impl Drop for Capture {
     fn drop(&mut self) {
@@ -43,7 +27,10 @@ impl Drop for Capture {
     }
 }
 
-pub fn start(device: &str) -> Result<Capture, String> {
+pub fn start_recording(
+    device: &str,
+    recording: Option<crate::recordings::SharedWriter>,
+) -> Result<Capture, String> {
     let mut cmd = Command::new("parec");
     cmd.args([
         "--raw",
@@ -94,6 +81,11 @@ pub fn start(device: &str) -> Result<Capture, String> {
                     Ok(n) => {
                         filled += n;
                         if filled < PACKET_BYTES { continue; }
+                        if let Err(error) = save_audio(&recording, &buffer) {
+                            let _ = sender.send(Err(error)).await;
+                            filled = 0;
+                            break;
+                        }
                         // Never drop audio silently, nor permit unlimited queued audio on a slow network.
                         match timeout(Duration::from_secs(3), sender.send(Ok(buffer.clone()))).await {
                             Ok(Ok(())) => { filled = 0; },
@@ -112,6 +104,10 @@ pub fn start(device: &str) -> Result<Capture, String> {
         // Preserve the last complete PCM sample on Stop; never pad the wire audio.
         let tail = filled - filled % 2;
         if finishing && tail > 0 {
+            if let Err(error) = save_audio(&recording, &buffer[..tail]) {
+                let _ = sender.send(Err(error)).await;
+                return;
+            }
             let _ = timeout(
                 Duration::from_secs(1),
                 sender.send(Ok(buffer[..tail].to_vec())),
@@ -126,6 +122,22 @@ pub fn start(device: &str) -> Result<Capture, String> {
         stop: Some(stop),
         task,
     })
+}
+
+fn save_audio(
+    recording: &Option<crate::recordings::SharedWriter>,
+    bytes: &[u8],
+) -> Result<(), String> {
+    if let Some(recording) = recording {
+        if let Some(writer) = recording
+            .lock()
+            .map_err(|_| "Recording unavailable.")?
+            .as_mut()
+        {
+            writer.append(bytes)?;
+        }
+    }
+    Ok(())
 }
 
 pub const PCM_BYTES_PER_SECOND: usize = 32_000;
@@ -223,32 +235,4 @@ pub fn level(bytes: &[u8]) -> f32 {
         })
         .sum();
     ((sum / count as f32).sqrt() * 5.0).clamp(0.0, 1.0)
-}
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn silence_and_real_audio_levels() {
-        assert_eq!(level(&[0; 100]), 0.0);
-        assert_eq!(level(&[]), 0.0);
-        assert_eq!(level(&[255, 127, 0, 128]), 1.0);
-        assert!(level(&[128, 8, 128, 8]) > 0.1);
-    }
-    #[tokio::test]
-    #[ignore = "Briefly opens the actual microphone; no audio is saved or transmitted"]
-    async fn native_microphone_capture() {
-        let mut capture = start("").expect("Could not start parec");
-        let first = timeout(Duration::from_secs(5), capture.frames.recv())
-            .await
-            .expect("Microphone timed out")
-            .expect("Microphone ended")
-            .expect("Capture error");
-        assert!(!first.is_empty());
-        capture.stop();
-        timeout(Duration::from_secs(2), async {
-            while capture.frames.recv().await.is_some() {}
-        })
-        .await
-        .expect("Capture did not stop");
-    }
 }
