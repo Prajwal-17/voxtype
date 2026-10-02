@@ -46,3 +46,9 @@ export const emptyAnalytics: Analytics = {
 };
 export const money = (value: number) =>
   value > 0 && value < 0.01 ? '<$0.01' : `$${value.toFixed(2)}`;
+
+export function moneyRange(min: number, max: number) {
+  const lower = money(min),
+    upper = money(max);
+  return lower === upper ? lower : `${lower}–${upper}`;
+}

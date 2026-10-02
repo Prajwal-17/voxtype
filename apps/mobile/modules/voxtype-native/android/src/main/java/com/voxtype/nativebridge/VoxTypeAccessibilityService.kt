@@ -379,6 +379,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   private fun animateBubbleWidth(target: Int) {
     val params = bubbleParams ?: return
     val root = bubble ?: return
+    params.x = params.x.coerceIn(0, (screenBounds().width() - target).coerceAtLeast(0))
     if (params.width == target) return
     if (!ValueAnimator.areAnimatorsEnabled()) {
       params.width = target
@@ -395,23 +396,6 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     }
     motionAnims += anim
     anim.start()
-  }
-
-  /** Desktop-style level bars: five springy bars while listening. */
-  private fun startBars() {
-    if (!ValueAnimator.areAnimatorsEnabled()) return
-    barViews.forEachIndexed { index, bar ->
-      bar.pivotY = (VoxConstants.BUBBLE_BAR_HEIGHT_DP.dp / 2).toFloat()
-      val anim = ObjectAnimator.ofFloat(bar, "scaleY", 0.25f, 1f).apply {
-        duration = VoxConstants.BUBBLE_BAR_ANIM_MS
-        repeatMode = ObjectAnimator.REVERSE
-        repeatCount = ObjectAnimator.INFINITE
-        startDelay = (index * 90).toLong()
-        interpolator = DecelerateInterpolator()
-      }
-      motionAnims += anim
-      anim.start()
-    }
   }
 
   private fun startSpin() {

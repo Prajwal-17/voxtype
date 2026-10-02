@@ -14,16 +14,14 @@ import { StatusBar } from 'expo-status-bar';
 import { requestRecordingPermissionsAsync } from 'expo-audio';
 import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  WaveformIcon,
-  FileTextIcon,
-  SlidersHorizontalIcon,
-  MicrophoneIcon,
-  StopIcon,
-  CopyIcon,
-} from 'phosphor-react-native';
+import { WaveformIcon } from 'phosphor-react-native/src/icons/Waveform';
+import { FileTextIcon } from 'phosphor-react-native/src/icons/FileText';
+import { SlidersHorizontalIcon } from 'phosphor-react-native/src/icons/SlidersHorizontal';
+import { MicrophoneIcon } from 'phosphor-react-native/src/icons/Microphone';
+import { StopIcon } from 'phosphor-react-native/src/icons/Stop';
+import { CopyIcon } from 'phosphor-react-native/src/icons/Copy';
 import { nativeTheme as theme } from '@voxtype/shared';
-import { emptyAnalytics, money, type Analytics } from '@voxtype/shared/analytics';
+import { emptyAnalytics, money, moneyRange, type Analytics } from '@voxtype/shared/analytics';
 import { Action, Card, Loader, Setting, Text } from '../components/primitives';
 import { currentUser, getAnalytics, signIn, signOut, type User } from '../lib/mobile-api';
 import Native, {
@@ -294,7 +292,14 @@ export default function Home() {
                         {[
                           ['Words', analytics.summary.totalWords.toLocaleString()],
                           ['Minutes', (analytics.summary.totalDurationMs / 60000).toFixed(1)],
-                          ['Avg. recording', seconds(analytics.summary.averageDurationMs)],
+                          [
+                            'Avg. recording',
+                            seconds(
+                              analytics.summary.averageDurationMs ??
+                                analytics.summary.totalDurationMs /
+                                  Math.max(1, analytics.summary.dictations),
+                            ),
+                          ],
                           ['Transcripts', analytics.summary.dictations.toLocaleString()],
                         ].map(([label, value]) => (
                           <Card key={label} style={s.stat}>
@@ -306,12 +311,14 @@ export default function Home() {
                       <Text style={[ui.muted, { marginTop: 16 }]}>
                         {analytics.summary.averageWordsPerMinute} words / min
                       </Text>
-                      <Text style={[ui.muted, { marginTop: 8 }]}>
-                        Estimated cost · Deepgram {money(analytics.costs.deepgramMin)}–
-                        {money(analytics.costs.deepgramMax)} · DeepSeek{' '}
-                        {money(analytics.costs.deepseek)}
-                        {analytics.costs.unmeteredRequests ? ' (partial)' : ''}
-                      </Text>
+                      {analytics.costs && (
+                        <Text style={[ui.muted, { marginTop: 8 }]}>
+                          Estimated cost · Deepgram{' '}
+                          {moneyRange(analytics.costs.deepgramMin, analytics.costs.deepgramMax)} ·
+                          DeepSeek {money(analytics.costs.deepseek)}
+                          {analytics.costs.unmeteredRequests ? ' (partial)' : ''}
+                        </Text>
+                      )}
                     </>
                   )}
                   <Card style={{ marginTop: 28, gap: 16 }}>
@@ -471,6 +478,7 @@ export default function Home() {
                 accessibilityRole="tab"
                 accessibilityLabel={label}
                 accessibilityState={{ selected: tab === id }}
+                aria-selected={tab === id}
                 onPress={() => changeTab(id)}
                 style={s.tab}
               >
@@ -505,6 +513,7 @@ function Transcript({ item, onCopy }: { item: Dictation; onCopy: () => void }) {
         accessibilityRole="button"
         accessibilityLabel={expanded ? 'Collapse transcript' : 'Expand transcript'}
         accessibilityState={{ expanded }}
+        aria-expanded={expanded}
         onPress={() => setExpanded(!expanded)}
       >
         <Text numberOfLines={expanded ? undefined : 3}>{item.text || 'Empty transcript'}</Text>

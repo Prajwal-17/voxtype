@@ -19,9 +19,14 @@ export type Snapshot = {
   audioLimit: 10;
   status:
     'idle' | 'connecting' | 'listening' | 'processing' | 'saved' | 'microphone_permission_needed';
-  inApp: {status: 'idle' | 'listening' | 'processing' | 'saved' | 'error'; text: string; error: string; durationMs: number};
+  inApp: {
+    status: 'idle' | 'listening' | 'processing' | 'saved' | 'error';
+    text: string;
+    error: string;
+    durationMs: number;
+  };
 };
 
 export type VoxTypeNativeModuleEvents = { onChange: (params: { changed: boolean }) => void };
 
-export type TranscriptPage = {items: Dictation[]; nextCursor: string | null};
+export type TranscriptPage = { items: Dictation[]; nextCursor: string | null };

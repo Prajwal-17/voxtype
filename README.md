@@ -4,7 +4,7 @@ Personal dictation app. Streams mic audio to Deepgram and pastes the transcript 
 
 ## Design system
 
-Shared color, typography, spacing, motion, and component contracts live in [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md) and `packages/design-system`. Desktop consumes the Tailwind adapter today; future Expo or React Native clients can consume the native theme from the same package.
+Shared color, typography, spacing, motion, and component contracts live in [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md) and `packages/shared/theme.ts`. Desktop, mobile and the Android bubble use this shared palette.
 
 ## Requirements
 

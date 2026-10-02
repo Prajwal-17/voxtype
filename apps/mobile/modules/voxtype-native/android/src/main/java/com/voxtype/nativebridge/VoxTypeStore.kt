@@ -99,7 +99,7 @@ class VoxTypeStore(
   fun setDelivery(id: String, delivery: String) {
     require(delivery in VALID_DELIVERIES) { "delivery must be one of $VALID_DELIVERIES" }
     writableDatabase.execSQL("UPDATE dictations SET delivery = ?, updated_at = ? WHERE id = ?",
-      arrayOf(delivery, System.currentTimeMillis(), id))
+      arrayOf<Any>(delivery, System.currentTimeMillis(), id))
     onChanged()
   }
 

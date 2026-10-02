@@ -61,9 +61,11 @@ export function HistoryPage({ onRecord }: { onRecord: () => void }) {
                     {duration(item.durationMs)} · {item.words} words
                   </span>
                 </div>
-                <details className="mt-3">
+                <details className="group mt-3">
                   <summary className="cursor-pointer list-none whitespace-pre-wrap text-body [overflow-wrap:anywhere]">
-                    <span className="line-clamp-2">{item.text || 'Empty transcript'}</span>
+                    <span className="line-clamp-2 group-open:hidden">
+                      {item.text || 'Empty transcript'}
+                    </span>
                   </summary>
                   <p className="mt-3 whitespace-pre-wrap text-body [overflow-wrap:anywhere]">
                     {item.text}

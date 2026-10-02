@@ -175,30 +175,13 @@ fn get_history(
         .as_ref()
         .map(|u| u.id.clone())
         .ok_or("Sign in again.")?;
-    let mut items: Vec<_> = storage::history(&app)?
-        .into_iter()
-        .filter(|item| item.user_id.as_deref() == Some(user_id.as_str()))
-        .collect();
-    items.sort_by(|a, b| b.created_at.cmp(&a.created_at).then(b.id.cmp(&a.id)));
-    let query = query.unwrap_or_default().to_lowercase();
-    items.retain(|item| item.text.to_lowercase().contains(&query));
-    if let Some(cursor) = cursor {
-        let (time, id) = cursor.split_once(':').ok_or("Invalid cursor.")?;
-        let time: u64 = time.parse().map_err(|_| "Invalid cursor.")?;
-        items.retain(|item| {
-            item.created_at < time || (item.created_at == time && item.id.as_str() < id)
-        });
-    }
-    let more = items.len() > 12;
-    items.truncate(12);
-    let next = if more {
-        items
-            .last()
-            .map(|item| format!("{}:{}", item.created_at, item.id))
-    } else {
-        None
-    };
-    Ok(serde_json::json!({"items": items, "nextCursor": next}))
+    storage::claim_legacy_history(&app, &user_id)?;
+    storage::history_page(
+        storage::history(&app)?,
+        &user_id,
+        cursor.as_deref(),
+        query.as_deref(),
+    )
 }
 #[tauri::command]
 async fn get_analytics(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
@@ -263,9 +246,17 @@ async fn copy_text(text: String) -> Result<(), String> {
     desktop::copy(&text).await
 }
 #[tauri::command]
-async fn start_dictation(app: tauri::AppHandle, test: bool) -> Result<(), String> {
+async fn start_dictation(app: tauri::AppHandle, test: bool) -> Result<String, String> {
     require_authenticated(&app)?;
-    session::start(app, test, false).await
+    session::start(app.clone(), test, false).await?;
+    let id = app
+        .state::<AppState>()
+        .snapshot
+        .lock()
+        .map_err(|_| "Session unavailable.")?
+        .session_id
+        .clone();
+    Ok(id)
 }
 #[tauri::command]
 async fn stop_dictation(app: tauri::AppHandle) -> Result<(), String> {

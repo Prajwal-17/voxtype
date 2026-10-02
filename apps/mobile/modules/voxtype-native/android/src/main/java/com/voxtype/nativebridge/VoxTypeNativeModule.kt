@@ -31,19 +31,20 @@ class VoxTypeNativeModule : Module() {
 
     AsyncFunction("getSnapshot") {
       val context = requireNotNull(appContext.reactContext)
-      val store = VoxTypeStore(context)
-      store.pruneAudio()
-      val enabled = Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
-        ?.contains("${context.packageName}/${VoxTypeAccessibilityService::class.java.name}", true) == true
-      mapOf(
-        "accessibilityEnabled" to enabled,
-        "microphoneGranted" to (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED),
-        "bubbleEnabled" to store.bubbleEnabled,
-        "cleanupEnabled" to store.cleanupEnabled,
-        "audioLimit" to VoxTypeStore.AUDIO_LIMIT,
-        "status" to (VoxTypeAccessibilityService.instance?.status ?: DictationStatus.IDLE.bridge),
-        "inApp" to InAppRecorder.snapshot(),
-      )
+      VoxTypeStore(context).use { store ->
+        store.pruneAudio()
+        val enabled = Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
+          ?.contains("${context.packageName}/${VoxTypeAccessibilityService::class.java.name}", true) == true
+        mapOf(
+          "accessibilityEnabled" to enabled,
+          "microphoneGranted" to (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED),
+          "bubbleEnabled" to store.bubbleEnabled,
+          "cleanupEnabled" to store.cleanupEnabled,
+          "audioLimit" to VoxTypeStore.AUDIO_LIMIT,
+          "status" to (VoxTypeAccessibilityService.instance?.status ?: DictationStatus.IDLE.bridge),
+          "inApp" to InAppRecorder.snapshot(),
+        )
+      }
     }
 
     AsyncFunction("openAccessibilitySettings") {

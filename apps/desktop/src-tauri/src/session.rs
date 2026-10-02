@@ -142,6 +142,8 @@ pub async fn start(app: AppHandle, test: bool, external: bool) -> Result<(), Str
             Ok(false) => {
                 snapshot = Snapshot {
                     session_id: snapshot.session_id.clone(),
+                    external,
+                    is_test: test,
                     ..Snapshot::default()
                 };
             }

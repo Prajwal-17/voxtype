@@ -102,7 +102,7 @@ export const api = {
   settings: (settings: Settings) =>
     command<void>('update_settings', { settings: settingsSchema.parse(settings) }),
   deleteHistory: (id: string | null) => command<void>('delete_history', { id }),
-  start: (test = false) => command<void>('start_dictation', { test }),
+  start: (test = false) => command<string>('start_dictation', { test }),
   stop: () => command<void>('stop_dictation'),
   cancel: () => command<void>('cancel_dictation'),
   copy: (text: string) =>

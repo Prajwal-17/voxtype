@@ -11,3 +11,7 @@ apps/api/.wrangler/
 apps/mobile/src/uniwind-types.d.ts
 
 packages/shared/web.css
+
+apps/mobile/android/
+apps/mobile/modules/voxtype-native/android/build/
+apps/mobile/.expo/

@@ -21,3 +21,5 @@ apps/mobile/dist-web/
 
 apps/mobile/android/
 apps/mobile/.expo/
+
+apps/mobile/modules/voxtype-native/android/build/

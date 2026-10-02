@@ -1,19 +1,11 @@
 import { useEffect, useState } from 'react';
-import { money } from '@voxtype/shared/analytics';
+import { money, moneyRange } from '@voxtype/shared/analytics';
 import { CopyIcon, MicrophoneIcon, StopIcon, XIcon } from '../components/icons';
 import { PageHeader } from '../components/layout';
 import { Loader } from '../components/loader';
 import { Button, IconButton } from '../components/ui';
 import { Card } from '../components/ui/card';
-import {
-  api,
-  native,
-  useAnalytics,
-  useAppSession,
-  useCopy,
-  useRecording,
-  useSession,
-} from '../lib/api';
+import { native, useAnalytics, useAppSession, useCopy, useRecording, useSession } from '../lib/api';
 import { duration, isActive } from '../lib/types';
 
 export function HomePage({ visible }: { visible: boolean }) {
@@ -36,13 +28,8 @@ export function HomePage({ visible }: { visible: boolean }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [visible, active, recording.cancel]);
   const start = async () => {
-    await recording.start.mutateAsync(false);
-    // The native command publishes synchronously. Read its exact ID after it starts,
-    // rather than claiming an unrelated session from the shared event stream.
-    const boot = await api.bootstrap();
-    if (!boot.snapshot.external && !boot.snapshot.isTest) {
-      setOwnedId(boot.snapshot.sessionId);
-    }
+    const id = await recording.start.mutateAsync(false);
+    setOwnedId(id);
   };
   const stats = analytics.data;
   return (
@@ -61,7 +48,13 @@ export function HomePage({ visible }: { visible: boolean }) {
               {[
                 ['Words', stats.summary.totalWords.toLocaleString()],
                 ['Minutes', (stats.summary.totalDurationMs / 60000).toFixed(1)],
-                ['Avg. recording', duration(stats.summary.averageDurationMs)],
+                [
+                  'Avg. recording',
+                  duration(
+                    stats.summary.averageDurationMs ??
+                      stats.summary.totalDurationMs / Math.max(1, stats.summary.dictations),
+                  ),
+                ],
                 ['Transcripts', stats.summary.dictations.toLocaleString()],
               ].map(([label, value]) => (
                 <Card key={label} className="border-0 p-6 shadow-none">
@@ -72,11 +65,14 @@ export function HomePage({ visible }: { visible: boolean }) {
             </div>
             <div className="mt-5 mb-10 flex flex-wrap items-center justify-between gap-3 px-1 text-caption text-muted">
               <span>{stats.summary.averageWordsPerMinute} words / min</span>
-              <span title="Deepgram: saved audio duration at Nova-3 list rates, including a range for language and vocabulary. DeepSeek: metered tokens at peak rates. Excludes unsaved audio, credits and discounts.">
-                Estimated cost · Deepgram {money(stats.costs.deepgramMin)}–
-                {money(stats.costs.deepgramMax)} · DeepSeek {money(stats.costs.deepseek)}
-                {stats.costs.unmeteredRequests > 0 ? ' (partial)' : ''}
-              </span>
+              {stats.costs && (
+                <span title="Deepgram: saved audio duration at Nova-3 list rates, including a range for language and vocabulary. DeepSeek: metered tokens at peak rates. Excludes unsaved audio, credits and discounts.">
+                  Estimated cost · Deepgram{' '}
+                  {moneyRange(stats.costs.deepgramMin, stats.costs.deepgramMax)} · DeepSeek{' '}
+                  {money(stats.costs.deepseek)}
+                  {stats.costs.unmeteredRequests > 0 ? ' (partial)' : ''}
+                </span>
+              )}
             </div>
           </>
         )

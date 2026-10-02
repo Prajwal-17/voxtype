@@ -36,3 +36,18 @@ Native behavior remains to be checked on an Android device; these steps are for 
 6. Focus password, PIN, and verification-code fields. Confirm no bubble appears and no transcript can be pasted there. Try a field that rejects insertion and confirm recovery text remains in VoxType.
 7. Dictate with cleanup enabled, then simulate a DeepSeek failure. Confirm the original transcript survives. Save more than 10 recordings and verify only the newest 10 WAV files remain while every transcript stays in local history. Go offline before a finished transcript is uploaded, restart the app, and reconnect. Confirm no upload happens until the next new transcript; then confirm both transcripts reach the server with a mobile tag and no audio. Confirm no server transcripts appear in local history.
 8. Test offline and socket-drop cases, app backgrounding, sign-out during recording, larger system text, reduced motion, landscape, and one tablet or foldable width.
+
+## Interface and native checks
+
+Home has an explicit foreground recorder; it requires microphone permission only.
+The separate voice bubble requires accessibility access and an open, focused, safe text
+field with the keyboard visible. Backgrounding stops an in-app recording. Transcripts
+load from this account's local SQLite database in pages of 12.
+
+The phone web preview is available with `pnpm --filter @voxtype/mobile exec expo start --web`.
+It uses empty preview data and disables Android-only recording and permission actions.
+
+To compile the native module without a device, run Expo prebuild for Android, then
+`./gradlew :voxtype-native:compileDebugKotlin` in the generated `android` folder.
+Set `ANDROID_HOME` to a working SDK path. Generated Android/build directories are ignored;
+app icons and splash configuration live in `app.json` and `assets`.

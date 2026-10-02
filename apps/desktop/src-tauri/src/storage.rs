@@ -277,3 +277,82 @@ fn prune_audio_unlocked(app: &AppHandle) -> Result<(), String> {
     }
     write_history_unlocked(app, items)
 }
+
+/// Stable keyset pages; filtering happens before the page boundary is chosen.
+pub fn history_page(
+    items: Vec<HistoryItem>,
+    user_id: &str,
+    cursor: Option<&str>,
+    query: Option<&str>,
+) -> Result<serde_json::Value, String> {
+    let query = query.unwrap_or_default().to_lowercase();
+    let mut items: Vec<_> = items
+        .into_iter()
+        .filter(|item| {
+            item.user_id.as_deref() == Some(user_id) && item.text.to_lowercase().contains(&query)
+        })
+        .collect();
+    items.sort_by(|a, b| b.created_at.cmp(&a.created_at).then(b.id.cmp(&a.id)));
+    if let Some(cursor) = cursor {
+        let (time, id) = cursor.split_once(':').ok_or("Invalid cursor.")?;
+        let time: u64 = time.parse().map_err(|_| "Invalid cursor.")?;
+        if id.is_empty() {
+            return Err("Invalid cursor.".into());
+        }
+        items.retain(|item| {
+            item.created_at < time || (item.created_at == time && item.id.as_str() < id)
+        });
+    }
+    let more = items.len() > 12;
+    items.truncate(12);
+    let next = if more {
+        items
+            .last()
+            .map(|item| format!("{}:{}", item.created_at, item.id))
+    } else {
+        None
+    };
+    Ok(serde_json::json!({"items":items,"nextCursor":next}))
+}
+
+#[cfg(test)]
+mod paging_tests {
+    use super::*;
+    fn items() -> Vec<HistoryItem> {
+        (0..26)
+            .map(|index| HistoryItem {
+                id: format!("item-{index:02}"),
+                text: format!("Transcript {index}"),
+                original_text: None,
+                created_at: 1000,
+                duration_ms: 1000,
+                words: 2,
+                delivery: "saved".into(),
+                user_id: Some(if index == 25 { "other" } else { "owner" }.into()),
+                audio_file: None,
+                upload_api_url: None,
+            })
+            .collect()
+    }
+    #[test]
+    fn pages_are_bounded_and_account_scoped() {
+        let first = history_page(items(), "owner", None, None).unwrap();
+        assert_eq!(first["items"].as_array().unwrap().len(), 12);
+        assert_eq!(first["items"][0]["id"], "item-24");
+        let second = history_page(items(), "owner", first["nextCursor"].as_str(), None).unwrap();
+        assert_eq!(second["items"][0]["id"], "item-12");
+        let third = history_page(items(), "owner", second["nextCursor"].as_str(), None).unwrap();
+        assert_eq!(third["items"].as_array().unwrap().len(), 1);
+        assert!(third["nextCursor"].is_null());
+    }
+    #[test]
+    fn cursor_survives_deleted_boundary_and_search_is_global() {
+        let mut rows = items();
+        rows.retain(|item| item.id != "item-13");
+        let page = history_page(rows, "owner", Some("1000:item-13"), None).unwrap();
+        assert_eq!(page["items"][0]["id"], "item-12");
+        let found = history_page(items(), "owner", None, Some("TRANSCRIPT 0")).unwrap();
+        assert_eq!(found["items"][0]["id"], "item-00");
+        assert!(history_page(items(), "owner", Some("invalid"), None).is_err());
+    }
+}
