@@ -79,3 +79,38 @@ Verdict: Approve for inspected browser surfaces and asset configuration. Not ver
 native compositor transparency after this patch, real desktop login/reboot, Android
 launcher/notification rendering on hardware. Existing full Android dependency-lint
 limitation still applies.
+
+## Mobile bubble 0.0.5
+
+Mode: full within the native Android bubble. The implementation uses Kotlin Views,
+WindowManager overlays and shared palette values. A browser cannot render or verify
+this OS overlay; the following review covers source, geometry/audio tests and compilation.
+
+| Category    | Evidence inspected                                             | Result                                                             |
+| ----------- | -------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Typography  | Cancel/stop/status glyphs, accessibility descriptions          | Clear labels; no additional visible prose                          |
+| Surfaces    | VoxConstants colors, safe bounds and dock geometry             | Translucent light green surfaces; opaque controls; edge anchoring  |
+| Animations  | Drag/press handlers, placement animator and BubbleWaveformView | Interruptible snap/resize, real PCM waveform, reduced-motion paths |
+| Icons       | Tinted idle mark, cancel and stop controls                     | Dark mark/cancel on light surfaces; distinct primary stop          |
+| Performance | Single canvas waveform, volatile audio level, callback cleanup | No React updates per audio packet; animation stops when hidden     |
+
+| Severity | Location                                                                         | Before                                                   | After                                                                                                                                 | Why                                                                            |
+| -------- | -------------------------------------------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| HIGH     | `VoxTypeAccessibilityService.kt`, `BubbleGeometry.kt`                            | Arbitrary saved coordinates and mid-screen default       | Nearest-edge docking, bottom-edge default above keyboard, relative saved height, inset-aware bounds and anchored expansion            | Keep the overlay out of the center and usable across keyboard/rotation changes |
+| MEDIUM   | `VoxTypeAccessibilityService.kt`, `BubbleWaveformView.kt`, `BubbleAudioLevel.kt` | Five fixed bars disconnected from capture                | Eleven smoothed history bars driven by real signed PCM energy; silence settles                                                        | Recording feedback must reflect speech                                         |
+| MEDIUM   | `VoxConstants.kt`, `VoxTypeAccessibilityService.kt`                              | Saturated opaque bubble with white controls              | Muted light surfaces at 90–94% background opacity; opaque readable controls                                                           | Reduce visual interruption without losing contrast                             |
+| MEDIUM   | `VoxTypeAccessibilityService.kt`                                                 | Drag had no dock feedback; cancel gestures could dismiss | 220ms edge settling, 120ms press response, lift/haptics, explicit performClick, canceled-drag protection; drop-to-close stops capture | Predictable native manipulation and lifecycle behavior                         |
+
+Considered and rejected: perpetual decorative waves (would imply speech during silence),
+fading the entire window (would also fade controls), and free resting positions (would
+preserve the reported center-screen obstruction).
+
+Verification: seven native JVM tests cover edge selection, resizing, keyboard/rotation
+bounds, tiny windows, silence, volume response and signed PCM decoding. Native Kotlin
+compilation and targeted Android lint were run; mobile TypeScript and ESLint were run.
+Generated Gradle test reports are excluded from ESLint. Full dependency lint retains the
+previous upstream worklets exclusion.
+
+Verdict: implementation checks pass. Not verified: Android touch/keyboard behavior,
+waveform rendering, haptics and animation playback at 10% speed on a device. Follow the
+device checks in apps/mobile/README.md before treating native visual QA as complete.

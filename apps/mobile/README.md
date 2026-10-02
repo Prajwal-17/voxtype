@@ -1,6 +1,6 @@
 # VoxType for Android
 
-The app keeps the active keyboard. Its accessibility service shows a small muted bubble near an editable field. The bubble is draggable; dropping it on the ✕ close mark turns it off, and it remembers its position. A tap immediately starts a microphone foreground session and saves a private WAV file. While credentials and the socket connect, a bounded queue holds up to 32 seconds of 16 kHz PCM; the queue is sent in order before live audio. Finish works during connection setup, flushing recorded audio before `Finalize`. Cancel drops the queue and retires its socket. While listening the bubble expands to ✕ cancel and ✓ finish controls with static level bars and a short width transition. Finishing sends Deepgram `Finalize`; the finished transcript is inserted through Android 13's accessibility input connection if the same safe field still has focus. A transcript stays in local SQLite when insertion cannot be verified, with Copy and Paste recovery in the app. Password and sensitive fields are excluded.
+The app keeps the active keyboard. Its accessibility service shows a small muted bubble near an editable field. The muted, translucent bubble docks to the nearest screen edge after dragging. It remembers its edge and relative height, stays above the keyboard, and expands inward while recording. Dropping it on the ✕ close mark stops recording and turns it off. A tap immediately starts a microphone foreground session and saves a private WAV file. While credentials and the socket connect, a bounded queue holds up to 32 seconds of 16 kHz PCM; the queue is sent in order before live audio. Finish works during connection setup, flushing recorded audio before `Finalize`. Cancel drops the queue and retires its socket. While listening the bubble expands to ✕ cancel and ■ stop controls with a rolling waveform driven by microphone PCM, a short width transition, press feedback and gentle docking haptics. System reduced-motion settings disable animated movement. Finishing sends Deepgram `Finalize`; the finished transcript is inserted through Android 13's accessibility input connection if the same safe field still has focus. A transcript stays in local SQLite when insertion cannot be verified, with Copy and Paste recovery in the app. Password and sensitive fields are excluded.
 
 ## Configuration
 
@@ -30,7 +30,7 @@ Native behavior remains to be checked on an Android device; these steps are for 
 
 1. Install a development client or app on Android 13 or newer, with Worker secrets configured. Sign in through Google and confirm the account appears; sign out and sign in again.
 2. Enable **VoxType voice bubble** in Accessibility settings and grant the microphone permission. Keep the normal keyboard selected.
-3. Open a normal text field in another app, place the cursor in the middle of existing text, tap the bubble, immediately speak, then tap ✓ finish. Repeat on a slow connection and finish before the socket opens; confirm the first words and one transcript appear at the cursor and the keyboard did not change. Tap ✕ cancel during connection setup and confirm that take never appears in the next dictation.
+3. Open a normal text field in another app, place the cursor in the middle of existing text, tap the bubble, immediately speak, then tap ■ stop. Repeat on a slow connection and finish before the socket opens; confirm the first words and one transcript appear at the cursor and the keyboard did not change. Tap ✕ cancel during connection setup and confirm that take never appears in the next dictation.
 4. Repeat two short dictations back to back on the same socket. Verify the first text never appears in the second. Wait at least four seconds idle, then repeat. After seven minutes, verify a later dictation reconnects.
 5. Move focus to a different field while recording. Confirm VoxType stops and saves the transcript without inserting into the new target. Tap the bubble's Copy recovery action or open VoxType and use Copy, then paste with the existing keyboard.
 6. Focus password, PIN, and verification-code fields. Confirm no bubble appears and no transcript can be pasted there. Try a field that rejects insertion and confirm recovery text remains in VoxType.
@@ -51,3 +51,24 @@ To compile the native module without a device, run Expo prebuild for Android, th
 `./gradlew :voxtype-native:compileDebugKotlin` in the generated `android` folder.
 Set `ANDROID_HOME` to a working SDK path. Generated Android/build directories are ignored;
 app icons and splash configuration live in `app.json` and `assets`.
+
+## Bubble checks
+
+From the generated Android directory, run:
+
+```sh
+./gradlew :voxtype-native:testDebugUnitTest :voxtype-native:lintDebug \
+  -x :react-native-worklets:lintAnalyzeDebug \
+  -x :expo-modules-core:lintAnalyzeDebug
+```
+
+The exclusions avoid the existing upstream Kotlin lint crash; they do not skip VoxType
+source analysis. Seven JVM tests cover edge selection, expansion anchoring, keyboard
+and rotation bounds, tiny windows, PCM silence, amplitude and signed sample decoding.
+
+On a device, drag from both the idle circle and recording controls; release near either
+edge and in the middle. Check that the bubble docks, remains above the keyboard, and
+keeps its edge during expansion, rotation and reopening. Speak quietly/loudly and pause
+to check waveform response. Check tap vs drag, interrupted drags, drop-to-close, system
+reduced motion and haptic settings. These native interactions cannot be verified in the
+Expo web preview.

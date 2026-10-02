@@ -3,6 +3,8 @@ package com.voxtype.nativebridge
 import android.Manifest
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.InputMethod
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
 import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
 import android.app.Notification
@@ -11,13 +13,15 @@ import android.app.NotificationManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
-import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
+import android.view.ViewConfiguration
+import android.view.WindowInsets
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
@@ -55,7 +59,12 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   private var actionsRow: LinearLayout? = null
   private var cancelBtn: TextView? = null
   private var doneBtn: TextView? = null
-  private var barViews: List<View> = emptyList()
+  private var waveform: BubbleWaveformView? = null
+  @Volatile private var audioLevel = 0f
+  private var placementAnimator: ValueAnimator? = null
+  private var dockRight = true
+  private var verticalPosition = 1f
+  private var lastSafeBounds: BubbleGeometry? = null
   private var bubbleParams: WindowManager.LayoutParams? = null
   private var closeView: FrameLayout? = null
   private var closeHot = false
@@ -105,6 +114,10 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     refreshBubble()
   }
   override fun onInterrupt() { stopRecording() }
+  override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+    super.onConfigurationChanged(newConfig)
+    if (bubble != null && !dragging) placeBubble(animate = false)
+  }
   override fun onUnbind(intent: android.content.Intent?): Boolean {
     stopRecording()
     return super.onUnbind(intent)
@@ -172,6 +185,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     if (bubble == null) createBubble()
     if (bubble == null) return
     updateBubbleContent()
+    if (!dragging && safeBounds() != lastSafeBounds) placeBubble(animate = true)
   }
 
   private val Int.dp: Int get() = (this * resources.displayMetrics.density).toInt()
@@ -188,11 +202,72 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     }
   }
 
+  /** Same coordinate system as overlay LayoutParams (full display, physical left/top). */
+  private fun safeBounds(): BubbleGeometry {
+    val bounds = screenBounds()
+    val insets = try {
+      windows.currentWindowMetrics.windowInsets.getInsetsIgnoringVisibility(
+        WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
+    } catch (_: Exception) { android.graphics.Insets.NONE }
+    val margin = VoxConstants.BUBBLE_EDGE_DP.dp
+    val top = insets.top + margin
+    var bottom = bounds.height() - insets.bottom - margin
+    getWindows().filter { it.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_INPUT_METHOD }
+      .forEach { window ->
+        val keyboard = android.graphics.Rect()
+        window.getBoundsInScreen(keyboard)
+        if (!keyboard.isEmpty) bottom = minOf(bottom, keyboard.top - bounds.top - margin)
+      }
+    return BubbleGeometry(insets.left + margin, top,
+      (bounds.width() - insets.right - margin).coerceAtLeast(insets.left + margin),
+      bottom.coerceAtLeast(top + VoxConstants.BUBBLE_SIZE_DP.dp))
+  }
+
+  private fun updateBubbleLayout() {
+    val root = bubble ?: return
+    val params = bubbleParams ?: return
+    try { windows.updateViewLayout(root, params) }
+    catch (e: Exception) { VoxLog.w("bubble layout failed", e) }
+  }
+
+  private fun placeBubble(width: Int? = null, animate: Boolean = true) {
+    val params = bubbleParams ?: return
+    placementAnimator?.cancel()
+    val area = safeBounds()
+    lastSafeBounds = area
+    val desiredWidth = width ?: if (status == DictationStatus.LISTENING.bridge) VoxConstants.BUBBLE_LISTEN_WIDTH_DP.dp else VoxConstants.BUBBLE_SIZE_DP.dp
+    val targetWidth = desiredWidth.coerceAtMost((area.right - area.left).coerceAtLeast(1))
+    val x = area.dockX(dockRight, targetWidth)
+    val y = area.yAt(verticalPosition, params.height)
+    if (!animate || !ValueAnimator.areAnimatorsEnabled()) {
+      params.x = x; params.y = y; params.width = targetWidth
+      updateBubbleLayout()
+      return
+    }
+    val startX = params.x; val startY = params.y; val startWidth = params.width
+    if (startX == x && startY == y && startWidth == targetWidth) return
+    placementAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+      duration = if (startWidth != targetWidth) VoxConstants.BUBBLE_WIDTH_ANIM_MS else VoxConstants.BUBBLE_SNAP_ANIM_MS
+      interpolator = DecelerateInterpolator(2f)
+      addUpdateListener {
+        val fraction = it.animatedValue as Float
+        params.x = (startX + (x - startX) * fraction).toInt()
+        params.y = (startY + (y - startY) * fraction).toInt()
+        params.width = (startWidth + (targetWidth - startWidth) * fraction).toInt()
+        updateBubbleLayout()
+      }
+      addListener(object : AnimatorListenerAdapter() {
+        override fun onAnimationEnd(animation: Animator) {
+          if (placementAnimator === animation) placementAnimator = null
+        }
+      })
+      start()
+    }
+  }
+
   /**
-   * Compact chat-head: a small muted square at rest that only shows color when
-   * active. While listening it expands to [cancel | level bars | done], mirroring
-   * the desktop overlay. The whole head is draggable; dropping it on the close
-   * zone turns the bubble off.
+   * Muted edge-docked capsule. Expands inwards for recording, with real microphone
+   * history between cancel and stop. Drag release docks to the nearest edge.
    */
   private fun createBubble() {
     val size = VoxConstants.BUBBLE_SIZE_DP.dp
@@ -208,13 +283,14 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     }
     val mark = ImageView(this).apply {
       setImageResource(R.drawable.voxtype_logo)
+      setColorFilter(VoxTheme.accentInk)
       alpha = 1f
       layoutParams = FrameLayout.LayoutParams(
         VoxConstants.BUBBLE_ICON_DP.dp, VoxConstants.BUBBLE_ICON_DP.dp, Gravity.CENTER)
       importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
     }
     val glyph = TextView(this).apply {
-      setTextColor(Color.WHITE)
+      setTextColor(VoxTheme.ink)
       textSize = VoxConstants.BUBBLE_GLYPH_SP
       gravity = Gravity.CENTER
       layoutParams = FrameLayout.LayoutParams(size, size, Gravity.CENTER)
@@ -227,7 +303,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     }
     val actionSize = VoxConstants.BUBBLE_ACTION_DP.dp
     val cancel = TextView(this).apply {
-      text = "✕"; setTextColor(Color.WHITE); textSize = 18f; gravity = Gravity.CENTER
+      text = "✕"; setTextColor(VoxTheme.ink); textSize = 18f; gravity = Gravity.CENTER
       background = GradientDrawable().apply {
         setColor(VoxConstants.BUBBLE_ACTION_COLOR)
         cornerRadius = VoxConstants.BUBBLE_RADIUS_DP.dp.toFloat()
@@ -239,28 +315,11 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       isClickable = true
       isFocusable = false
     }
-    val bars = LinearLayout(this).apply {
-      orientation = LinearLayout.HORIZONTAL
-      gravity = Gravity.CENTER
-      layoutParams = LinearLayout.LayoutParams(0, VoxConstants.BUBBLE_BAR_HEIGHT_DP.dp, 1f)
-      importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-    }
-    val built = mutableListOf<View>()
-    repeat(5) {
-      val bar = View(this).apply {
-        setBackgroundColor(Color.WHITE)
-        alpha = 0.9f
-        layoutParams = LinearLayout.LayoutParams(
-          VoxConstants.BUBBLE_BAR_DP.dp, VoxConstants.BUBBLE_BAR_HEIGHT_DP.dp).apply {
-          marginStart = 2.dp; marginEnd = 2.dp
-        }
-        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-      }
-      bars.addView(bar)
-      built += bar
+    val bars = BubbleWaveformView(this) { audioLevel }.apply {
+      layoutParams = LinearLayout.LayoutParams(0, 26.dp, 1f)
     }
     val done = TextView(this).apply {
-      text = "✓"; setTextColor(VoxConstants.BUBBLE_DONE_ICON); textSize = 20f; gravity = Gravity.CENTER
+      text = "■"; setTextColor(VoxConstants.BUBBLE_DONE_ICON); textSize = 18f; gravity = Gravity.CENTER
       background = GradientDrawable().apply {
         setColor(VoxConstants.BUBBLE_DONE_COLOR)
         cornerRadius = VoxConstants.BUBBLE_RADIUS_DP.dp.toFloat()
@@ -275,11 +334,11 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     row.addView(cancel); row.addView(bars); row.addView(done)
     row.setPadding(8.dp, 0, 8.dp, 0)
     root.addView(mark); root.addView(glyph); root.addView(row)
-    barViews = built
+    waveform = bars
     bubbleMark = mark; bubbleGlyph = glyph; actionsRow = row
     cancelBtn = cancel; doneBtn = done
 
-    val touch = View.OnTouchListener { _, event -> onBubbleTouch(event) }
+    val touch = View.OnTouchListener { view, event -> onBubbleTouch(view, event) }
     root.setOnTouchListener(touch)
     cancel.setOnTouchListener(touch)
     done.setOnTouchListener(touch)
@@ -287,20 +346,22 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     cancel.setOnClickListener { cancelRecording() }
     done.setOnClickListener { stopRecording() }
 
-    val bounds = screenBounds()
+    val area = safeBounds()
     val prefs = bubblePrefs()
+    dockRight = if (prefs.contains("dockRight")) prefs.getBoolean("dockRight", true)
+      else area.nearestRight(prefs.getInt("bx", area.right), size)
+    verticalPosition = if (prefs.contains("verticalPosition")) prefs.getFloat("verticalPosition", 1f).coerceIn(0f, 1f)
+      else if (prefs.contains("by")) area.fractionAt(prefs.getInt("by", area.bottom), size) else 1f
+    lastSafeBounds = area
     val params = WindowManager.LayoutParams(size, size,
       WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
       WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
       PixelFormat.TRANSLUCENT).apply {
-      gravity = Gravity.TOP or Gravity.START
-      if (prefs.contains("bx") && prefs.contains("by")) {
-        x = prefs.getInt("bx", bounds.width() - size - VoxConstants.BUBBLE_EDGE_DP.dp)
-        y = prefs.getInt("by", bounds.height() / 2)
-      } else {
-        x = bounds.width() - size - VoxConstants.BUBBLE_EDGE_DP.dp
-        y = bounds.height() / 2 - size / 2
-      }
+      gravity = Gravity.TOP or Gravity.LEFT
+      flags = flags or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+      setFitInsetsTypes(0)
+      x = area.dockX(dockRight, size)
+      y = area.yAt(verticalPosition, size)
     }
     bubble = root
     bubbleParams = params
@@ -328,7 +389,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
         bubbleMark?.visibility = View.GONE
         bubbleGlyph?.visibility = View.GONE
         actionsRow?.visibility = View.VISIBLE
-        barViews.forEach { it.scaleY = 0.65f }
+        waveform?.setListening(true)
         animateBubbleWidth(VoxConstants.BUBBLE_LISTEN_WIDTH_DP.dp)
       }
       DictationStatus.CONNECTING.bridge, DictationStatus.PROCESSING.bridge -> {
@@ -369,33 +430,15 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   }
 
   private fun bubbleDescription(): String = when (status) {
-    DictationStatus.LISTENING.bridge -> "Dictating. Tap check to finish, cross to cancel, or drag the bubble to move it."
+    DictationStatus.LISTENING.bridge -> "Dictating. Tap stop to finish, cross to cancel, or drag to dock on either edge."
     DictationStatus.PROCESSING.bridge, DictationStatus.CONNECTING.bridge -> "VoxType $status"
     DictationStatus.MICROPHONE_PERMISSION_NEEDED.bridge -> "VoxType needs microphone access"
     DictationStatus.SAVED.bridge -> if (lastDelivered) "VoxType text inserted" else "Copy saved VoxType transcript"
-    else -> "Start VoxType dictation. Drag to move, drop on the close mark to hide."
+    else -> "Start VoxType dictation. Drag to either edge, or drop on the close mark to hide."
   }
 
   private fun animateBubbleWidth(target: Int) {
-    val params = bubbleParams ?: return
-    val root = bubble ?: return
-    params.x = params.x.coerceIn(0, (screenBounds().width() - target).coerceAtLeast(0))
-    if (params.width == target) return
-    if (!ValueAnimator.areAnimatorsEnabled()) {
-      params.width = target
-      try { windows.updateViewLayout(root, params) } catch (e: Exception) { VoxLog.w("bubble resize failed", e) }
-      return
-    }
-    val anim = ValueAnimator.ofInt(params.width, target).apply {
-      duration = VoxConstants.BUBBLE_WIDTH_ANIM_MS
-      interpolator = DecelerateInterpolator()
-      addUpdateListener { value ->
-        params.width = value.animatedValue as Int
-        try { windows.updateViewLayout(root, params) } catch (e: Exception) { VoxLog.w("bubble resize failed", e) }
-      }
-    }
-    motionAnims += anim
-    anim.start()
+    if (!dragging) placeBubble(target)
   }
 
   private fun startSpin() {
@@ -413,47 +456,68 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   private fun stopMotion() {
     motionAnims.forEach { try { it.cancel() } catch (e: Exception) { VoxLog.w("motion cancel failed", e) } }
     motionAnims.clear()
-    barViews.forEach { it.scaleY = 1f }
+    waveform?.setListening(false)
     bubbleGlyph?.rotation = 0f
   }
 
-  private fun onBubbleTouch(event: MotionEvent): Boolean {
+  private fun pressFeedback(view: View, pressed: Boolean) {
+    view.animate().cancel()
+    val scale = if (pressed) 0.96f else 1f
+    if (ValueAnimator.areAnimatorsEnabled()) {
+      view.animate().scaleX(scale).scaleY(scale).setDuration(120L).start()
+    } else { view.scaleX = 1f; view.scaleY = 1f }
+  }
+
+  private fun onBubbleTouch(view: View, event: MotionEvent): Boolean {
     val params = bubbleParams ?: return false
     val root = bubble ?: return false
     when (event.actionMasked) {
       MotionEvent.ACTION_DOWN -> {
+        // Finish a width transition before drag math; interrupt an edge snap in place.
+        if (params.width != VoxConstants.BUBBLE_SIZE_DP.dp && params.width != VoxConstants.BUBBLE_LISTEN_WIDTH_DP.dp) placementAnimator?.end()
+        placementAnimator?.cancel(); placementAnimator = null
         downRawX = event.rawX; downRawY = event.rawY
         dragStartX = params.x; dragStartY = params.y
         dragging = false
-        return false
+        pressFeedback(view, true)
+        return true
       }
       MotionEvent.ACTION_MOVE -> {
-        val slop = VoxConstants.DRAG_SLOP_DP.dp
-        if (!dragging &&
-          (kotlin.math.abs(event.rawX - downRawX) > slop ||
-            kotlin.math.abs(event.rawY - downRawY) > slop)) {
+        val slop = ViewConfiguration.get(this).scaledTouchSlop
+        if (!dragging && (kotlin.math.abs(event.rawX - downRawX) > slop || kotlin.math.abs(event.rawY - downRawY) > slop)) {
           dragging = true
+          pressFeedback(view, false)
+          root.elevation = 6.dp.toFloat()
           showCloseZone()
         }
         if (dragging) {
-          val bounds = screenBounds()
-          params.x = (dragStartX + (event.rawX - downRawX)).toInt()
-            .coerceIn(0, (bounds.width() - root.width).coerceAtLeast(0))
-          params.y = (dragStartY + (event.rawY - downRawY)).toInt()
-            .coerceIn(0, (bounds.height() - root.height).coerceAtLeast(0))
-          try { windows.updateViewLayout(root, params) } catch (e: Exception) { VoxLog.w("bubble drag failed", e) }
+          val area = safeBounds()
+          params.x = area.clampX((dragStartX + event.rawX - downRawX).toInt(), params.width)
+          params.y = area.clampY((dragStartY + event.rawY - downRawY).toInt(), params.height)
+          updateBubbleLayout()
           updateCloseHot()
-          return true
         }
-        return false
+        return true
       }
-      MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+      MotionEvent.ACTION_UP -> {
+        pressFeedback(view, false)
+        root.elevation = VoxConstants.BUBBLE_ELEVATION_DP.dp.toFloat()
         if (dragging) {
           dragging = false
-          finishDrag()
-          return true
+          finishDrag(allowDismiss = true)
+        } else {
+          view.performClick()
+          // A tap can interrupt docking without changing status (e.g. processing).
+          if (placementAnimator == null) placeBubble()
         }
-        return false
+        return true
+      }
+      MotionEvent.ACTION_CANCEL -> {
+        pressFeedback(view, false)
+        root.elevation = VoxConstants.BUBBLE_ELEVATION_DP.dp.toFloat()
+        if (dragging) { dragging = false; finishDrag(allowDismiss = false) }
+        else placeBubble()
+        return true
       }
     }
     return false
@@ -480,7 +544,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
     }
     val cross = TextView(this).apply {
-      text = "✕"; setTextColor(Color.WHITE); textSize = 24f; gravity = Gravity.CENTER
+      text = "✕"; setTextColor(VoxTheme.danger); textSize = 24f; gravity = Gravity.CENTER
       layoutParams = FrameLayout.LayoutParams(size, size, Gravity.CENTER)
       importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
     }
@@ -491,8 +555,12 @@ class VoxTypeAccessibilityService : AccessibilityService() {
         WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
         WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
       PixelFormat.TRANSLUCENT).apply {
-      gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-      y = VoxConstants.CLOSE_BOTTOM_MARGIN_DP.dp
+      gravity = Gravity.TOP or Gravity.LEFT
+      flags = flags or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+      setFitInsetsTypes(0)
+      val area = safeBounds()
+      x = (area.left + area.right - size) / 2
+      y = (area.bottom - size).coerceAtLeast(area.top)
     }
     closeView = zone
     closeHot = false
@@ -504,20 +572,24 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   private fun updateCloseHot() {
     val zone = closeView ?: return
     val root = bubble ?: return
+    val params = bubbleParams ?: return
     val zonePos = IntArray(2).also { zone.getLocationOnScreen(it) }
-    val rootPos = IntArray(2).also { root.getLocationOnScreen(it) }
     val zoneCx = zonePos[0] + zone.width / 2
     val zoneCy = zonePos[1] + zone.height / 2
-    val rootCx = rootPos[0] + root.width / 2
-    val rootCy = rootPos[1] + root.height / 2
+    val screen = screenBounds()
+    val rootCx = screen.left + params.x + params.width / 2
+    val rootCy = screen.top + params.y + params.height / 2
     val hit = VoxConstants.CLOSE_SIZE_DP.dp
     val hot = kotlin.math.abs(zoneCx - rootCx) < hit && kotlin.math.abs(zoneCy - rootCy) < hit
     if (hot != closeHot) {
       closeHot = hot
       (zone.background as? GradientDrawable)?.setColor(
         if (hot) VoxConstants.CLOSE_HOT_COLOR else VoxConstants.CLOSE_COLOR)
-      zone.scaleX = if (hot) 1.12f else 1f
-      zone.scaleY = if (hot) 1.12f else 1f
+      zone.animate().cancel()
+      val scale = if (hot) 1.08f else 1f
+      if (ValueAnimator.areAnimatorsEnabled()) zone.animate().scaleX(scale).scaleY(scale).setDuration(120L).start()
+      else { zone.scaleX = 1f; zone.scaleY = 1f }
+      if (hot) root.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
     }
   }
 
@@ -526,30 +598,39 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     closeView = null; closeHot = false
   }
 
-  private fun finishDrag() {
-    val droppedOnClose = closeHot
+  private fun finishDrag(allowDismiss: Boolean) {
+    val droppedOnClose = allowDismiss && closeHot
     hideCloseZone()
     if (droppedOnClose) {
       // Dropped on the close mark: turn the bubble off entirely.
       store.bubbleEnabled = false
+      if (status == DictationStatus.LISTENING.bridge) stopRecording()
       removeBubble()
       try { VoxTypeNativeModule.changed() } catch (e: Exception) { VoxLog.w("notify change failed", e) }
       return
     }
     val params = bubbleParams ?: return
-    try { bubblePrefs().edit().putInt("bx", params.x).putInt("by", params.y).apply() } catch (e: Exception) {
+    val area = safeBounds()
+    dockRight = area.nearestRight(params.x, params.width)
+    verticalPosition = area.fractionAt(params.y, params.height)
+    if (allowDismiss) bubble?.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+    placeBubble(if (status == DictationStatus.LISTENING.bridge) VoxConstants.BUBBLE_LISTEN_WIDTH_DP.dp else VoxConstants.BUBBLE_SIZE_DP.dp)
+    try { bubblePrefs().edit().putBoolean("dockRight", dockRight).putFloat("verticalPosition", verticalPosition).remove("bx").remove("by").apply() } catch (e: Exception) {
       VoxLog.w("bubble position save failed", e)
     }
   }
 
   private fun removeBubble() {
+    placementAnimator?.cancel(); placementAnimator = null
+    lastSafeBounds = null
+    bubble?.animate()?.cancel()
     stopMotion()
     hideCloseZone()
     bubble?.let { try { windows.removeView(it) } catch (e: Exception) { VoxLog.w("remove bubble failed", e) } }
     lastBubbleRender = null
     bubble = null; bubbleParams = null
     bubbleMark = null; bubbleGlyph = null; actionsRow = null
-    cancelBtn = null; doneBtn = null; barViews = emptyList()
+    cancelBtn = null; doneBtn = null; waveform = null
     dragging = false
   }
 
@@ -558,15 +639,6 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   private fun setStatusBridge(value: String) {
     status = value
     refreshBubble()
-    bubble?.let { view ->
-      view.animate().cancel()
-      if (ValueAnimator.areAnimatorsEnabled()) {
-        view.scaleX = 0.96f; view.scaleY = 0.96f; view.alpha = 0.86f
-        view.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(VoxConstants.BUBBLE_PRESS_ANIM_MS).start()
-      } else {
-        view.scaleX = 1f; view.scaleY = 1f; view.alpha = 1f
-      }
-    }
     try { VoxTypeNativeModule.changed() } catch (e: Exception) { VoxLog.w("notify change failed", e) }
   }
 
@@ -595,13 +667,18 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     try {
       stream.begin()
       showMicrophoneNotification()
-      capture = AudioCapture(this, { stream.audio(it) }, { file, duration ->
+      audioLevel = 0f
+      capture = AudioCapture(this, { bytes ->
+        audioLevel = BubbleAudioLevel.fromPcm(bytes)
+        stream.audio(bytes)
+      }, { file, duration ->
         main.post {
           if (generation != lifecycleGeneration) {
             try { file?.delete() } catch (e: Exception) { VoxLog.w("discarded audio delete failed", e) }
             return@post
           }
           capture = null
+          audioLevel = 0f
           if (discardNext || recordingUserId == null) {
             discardNext = false
             try { file?.delete() } catch (e: Exception) { VoxLog.w("discarded audio delete failed", e) }

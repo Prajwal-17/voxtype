@@ -14,7 +14,6 @@ object VoxConstants {
   const val SAVED_AUTO_DISMISS_DELIVERED_MS = 1_600L
   const val SAVED_AUTO_DISMISS_MS = 5_000L
   const val MIC_PERMISSION_RESET_MS = 2_000L
-  const val BUBBLE_PRESS_ANIM_MS = 150L
   const val RECONNECT_BASE_MS = 1_000L
   const val RECONNECT_MAX_MS = 8_000L
   const val RECONNECT_MAX_SHIFT = 3
@@ -33,34 +32,26 @@ object VoxConstants {
   const val BYTE_RATE = 32_000
   const val WAV_HEADER_BYTES = 44
 
-  val BUBBLE_COLOR = VoxTheme.overlay
-  // Idle bubble stays small and muted; color appears only on interaction.
-  val BUBBLE_MUTED_COLOR = VoxTheme.accent
-  val BUBBLE_ACTIVE_COLOR = VoxTheme.accent
-  val BUBBLE_ACTION_COLOR = VoxTheme.overlayRaised
-  val BUBBLE_DONE_COLOR = VoxTheme.inverse
-  val BUBBLE_DONE_ICON = VoxTheme.ink
-  val BUBBLE_SAVED_COLOR = VoxTheme.success
-  val CLOSE_COLOR = VoxTheme.danger
-  val CLOSE_HOT_COLOR = VoxTheme.danger
-  const val BUBBLE_RADIUS_DP = 16
+  // Translucent light surfaces keep underlying content visible; controls stay opaque.
+  val BUBBLE_MUTED_COLOR = androidx.core.graphics.ColorUtils.setAlphaComponent(VoxTheme.surfaceSubtle, 230)
+  val BUBBLE_ACTIVE_COLOR = androidx.core.graphics.ColorUtils.setAlphaComponent(VoxTheme.accentSoft, 240)
+  val BUBBLE_ACTION_COLOR = VoxTheme.surface
+  val BUBBLE_DONE_COLOR = VoxTheme.accent
+  val BUBBLE_DONE_ICON = VoxTheme.inverse
+  val BUBBLE_SAVED_COLOR = androidx.core.graphics.ColorUtils.setAlphaComponent(VoxTheme.successSoft, 240)
+  val CLOSE_COLOR = androidx.core.graphics.ColorUtils.setAlphaComponent(VoxTheme.dangerSoft, 240)
+  val CLOSE_HOT_COLOR = VoxTheme.dangerSoft
+  const val BUBBLE_RADIUS_DP = 24
   const val BUBBLE_ELEVATION_DP = 3
   const val BUBBLE_ICON_DP = 24
   const val BUBBLE_EDGE_DP = 12
-  const val BUBBLE_PAD_H_DP = 16
-  const val BUBBLE_PAD_V_DP = 10
-  const val BUBBLE_TEXT_DP = 8
-  // Compact chat-head sizing: idle is a small square, listening expands to
+  // Compact capsule sizing: idle is circular, listening expands to
   // [cancel | level bars | done] like the desktop overlay.
   const val BUBBLE_SIZE_DP = 48
-  const val BUBBLE_LISTEN_WIDTH_DP = 176
+  const val BUBBLE_LISTEN_WIDTH_DP = 200
   const val BUBBLE_ACTION_DP = 44
   const val BUBBLE_GLYPH_SP = 22f
-  const val BUBBLE_BAR_DP = 4
-  const val BUBBLE_BAR_HEIGHT_DP = 18
   const val CLOSE_SIZE_DP = 72
-  const val CLOSE_BOTTOM_MARGIN_DP = 96
-  const val DRAG_SLOP_DP = 10
   const val BUBBLE_WIDTH_ANIM_MS = 150L
-  const val BUBBLE_BAR_ANIM_MS = 380L
+  const val BUBBLE_SNAP_ANIM_MS = 220L
 }
