@@ -30,4 +30,18 @@ Mobile icon imports use individual Phosphor modules. This reduced the web bundle
 The broader Android `:voxtype-native:lintDebug` run failed inside the third-party
 `react-native-worklets:lintAnalyzeDebug` task with a Kotlin analysis crash
 (`Cannot find a KaModule for the VirtualFile`). This is not counted as a passing
-Android lint check. Native Kotlin compilation and workspace lint passed.
+full Android lint check. Native Kotlin compilation and workspace lint passed.
+
+The targeted native lint run passed with **0 errors and 14 warnings** after aligning
+the module minimum SDK with the app's Android 13 requirement and enabling
+`abortOnError`. The command excludes dependency analysis affected by the crash:
+
+```sh
+./gradlew :voxtype-native:lintDebug \
+  -x :react-native-worklets:lintAnalyzeDebug \
+  -x :expo-modules-core:lintAnalyzeDebug
+```
+
+Warnings cover dependency updates, redundant SDK guards, static context references,
+KTX suggestions and touch-listener accessibility checks. They remain visible in the
+report; real-device accessibility and lifecycle checks are still required.

@@ -1,6 +1,6 @@
 # VoxType for Android
 
-The app keeps the active keyboard. Its accessibility service shows a small muted bubble near an editable field. The bubble is draggable; dropping it on the ✕ close mark turns it off, and it remembers its position. A tap immediately starts a microphone foreground session and saves a private WAV file. While credentials and the socket connect, a bounded queue holds up to 32 seconds of 16 kHz PCM; the queue is sent in order before live audio. Finish works during connection setup, flushing recorded audio before `Finalize`. Cancel drops the queue and retires its socket. While listening the bubble expands to ✕ cancel and ✓ finish controls with animated level bars, mirroring the desktop overlay. Finishing sends Deepgram `Finalize`; the finished transcript is inserted through Android 13's accessibility input connection if the same safe field still has focus. A transcript stays in local SQLite when insertion cannot be verified, with Copy and Paste recovery in the app. Password and sensitive fields are excluded.
+The app keeps the active keyboard. Its accessibility service shows a small muted bubble near an editable field. The bubble is draggable; dropping it on the ✕ close mark turns it off, and it remembers its position. A tap immediately starts a microphone foreground session and saves a private WAV file. While credentials and the socket connect, a bounded queue holds up to 32 seconds of 16 kHz PCM; the queue is sent in order before live audio. Finish works during connection setup, flushing recorded audio before `Finalize`. Cancel drops the queue and retires its socket. While listening the bubble expands to ✕ cancel and ✓ finish controls with static level bars and a short width transition. Finishing sends Deepgram `Finalize`; the finished transcript is inserted through Android 13's accessibility input connection if the same safe field still has focus. A transcript stays in local SQLite when insertion cannot be verified, with Copy and Paste recovery in the app. Password and sensitive fields are excluded.
 
 ## Configuration
 
@@ -22,7 +22,7 @@ pnpm --filter @voxtype/mobile check-types
 pnpm --filter @voxtype/mobile lint
 ```
 
-Android-only. There is no web preview and no sample data; every transcript shown comes from this phone's local store.
+Recording and system overlays require Android. The web preview checks layout with empty data; installed apps show transcripts from this phone's local store.
 
 ## Android device test steps
 

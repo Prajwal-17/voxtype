@@ -10,12 +10,12 @@ android {
   namespace "com.voxtype.nativebridge"
   compileSdk 35
   defaultConfig {
-    minSdk 24
+    minSdk 33
     versionCode 1
     versionName "0.1.0"
   }
   lint {
-    abortOnError false
+    abortOnError true
   }
 }
 
