@@ -10,7 +10,6 @@ object VoxConstants {
   const val MAINTENANCE_INTERVAL_MS = 4_000L
   const val CONNECT_TIMEOUT_MS = 20_000L
   const val FINALIZE_TIMEOUT_MS = 5_000L
-  const val FINALIZE_RESULT_DELAY_FROM_FINALIZE_MS = 250L
   const val SAVED_AUTO_DISMISS_DELIVERED_MS = 1_600L
   const val SAVED_AUTO_DISMISS_MS = 5_000L
   const val MIC_PERMISSION_RESET_MS = 2_000L
@@ -33,8 +32,8 @@ object VoxConstants {
   const val WAV_HEADER_BYTES = 44
 
   // Translucent light surfaces keep underlying content visible; controls stay opaque.
-  val BUBBLE_MUTED_COLOR = androidx.core.graphics.ColorUtils.setAlphaComponent(VoxTheme.surfaceSubtle, 230)
-  val BUBBLE_ACTIVE_COLOR = androidx.core.graphics.ColorUtils.setAlphaComponent(VoxTheme.accentSoft, 240)
+  val BUBBLE_MUTED_COLOR = androidx.core.graphics.ColorUtils.setAlphaComponent(VoxTheme.surfaceSubtle, 205)
+  val BUBBLE_ACTIVE_COLOR = androidx.core.graphics.ColorUtils.setAlphaComponent(VoxTheme.surfaceRaised, 205)
   val BUBBLE_ACTION_COLOR = VoxTheme.surface
   val BUBBLE_DONE_COLOR = VoxTheme.accent
   val BUBBLE_DONE_ICON = VoxTheme.inverse
@@ -48,7 +47,7 @@ object VoxConstants {
   // Compact capsule sizing: idle is circular, listening expands to
   // [cancel | level bars | done] like the desktop overlay.
   const val BUBBLE_SIZE_DP = 48
-  const val BUBBLE_LISTEN_WIDTH_DP = 200
+  const val BUBBLE_LISTEN_WIDTH_DP = 224
   const val BUBBLE_ACTION_DP = 44
   const val BUBBLE_GLYPH_SP = 22f
   const val CLOSE_SIZE_DP = 72

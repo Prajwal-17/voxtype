@@ -61,3 +61,11 @@ VoxType combines an app-level recording workspace with a system-wide Right Alt s
 ## Accessibility & Inclusion
 
 Preserve keyboard access, semantic controls, visible focus, reduced-motion support, status announcements, sufficient color contrast, and usable compact layouts.
+
+## Cloud history (0.1.4)
+
+Sign-in restores account transcripts into the local cache. New recordings and a two-minute
+background retry synchronize pending uploads. Restores retain local edits/audio paths and do not
+duplicate IDs. Deletion requires a successful cloud deletion before changing the local cache.
+Only a complete cloud listing reconciles deletions; unsent records and other accounts are preserved.
+Audio and device settings remain local. Production API migrations/deployment are a separate step.

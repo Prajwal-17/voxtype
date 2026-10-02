@@ -115,6 +115,9 @@ async fn get_auth_user(app: tauri::AppHandle) -> Result<Option<AuthUser>, String
     app.state::<AppState>()
         .authenticated
         .store(user.is_some(), Ordering::Release);
+    if user.is_some() {
+        uploads::send_pending(app.clone());
+    }
     Ok(user)
 }
 #[tauri::command]
@@ -127,6 +130,7 @@ async fn sign_in_with_google(app: tauri::AppHandle) -> Result<AuthUser, String> 
     app.state::<AppState>()
         .authenticated
         .store(true, Ordering::Release);
+    uploads::send_pending(app.clone());
     Ok(user)
 }
 #[tauri::command]
@@ -203,8 +207,28 @@ async fn get_analytics(app: tauri::AppHandle) -> Result<serde_json::Value, Strin
     Ok(body["data"].clone())
 }
 #[tauri::command]
-fn delete_history(app: tauri::AppHandle, id: Option<String>) -> Result<(), String> {
-    storage::delete_history(&app, id.as_deref())
+async fn delete_history(app: tauri::AppHandle, id: Option<String>) -> Result<(), String> {
+    require_authenticated(&app)?;
+    let state = app.state::<AppState>();
+    let _sync = state.upload_lock.lock().await;
+    let (user, bearer, client) = auth::upload_session().await?.ok_or("Sign in again.")?;
+    if let Some(value) = &id {
+        uuid::Uuid::parse_str(value).map_err(|_| "Invalid transcript ID.")?;
+    }
+    let path = id
+        .as_ref()
+        .map(|id| format!("/v1/dictations/{id}"))
+        .unwrap_or("/v1/dictations".into());
+    let response = client
+        .delete(format!("{}{path}", auth::api_url()))
+        .bearer_auth(bearer)
+        .send()
+        .await
+        .map_err(|_| "Connect to delete this transcript from the cloud.")?;
+    if !response.status().is_success() && response.status().as_u16() != 404 {
+        return Err("Couldn’t delete cloud transcript.".into());
+    }
+    storage::delete_history(&app, &user.id, id.as_deref())
 }
 #[tauri::command]
 async fn get_microphones() -> Result<Vec<Microphone>, String> {
@@ -368,6 +392,14 @@ pub fn run() {
         ])
         .setup(|app| {
             let handle = app.handle();
+            let sync_app = handle.clone();
+            tauri::async_runtime::spawn(async move {
+                let mut interval = tokio::time::interval(std::time::Duration::from_secs(120));
+                loop {
+                    interval.tick().await;
+                    uploads::send_pending(sync_app.clone());
+                }
+            });
             if let Err(error) = storage::settings(handle)
                 .and_then(|settings| startup::configure(handle, settings.launch_at_login))
             {

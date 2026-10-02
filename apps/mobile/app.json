@@ -1,6 +1,6 @@
 {
   "expo": {
-    "version": "0.0.5",
+    "version": "0.0.6",
     "icon": "./assets/icon.png",
     "scheme": "voxtype",
     "userInterfaceStyle": "light",
@@ -8,7 +8,7 @@
     "platforms": ["android", "web"],
     "android": {
       "package": "com.voxtype.dictation.mobile",
-      "versionCode": 5,
+      "versionCode": 6,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "monochromeImage": "./assets/monochrome-icon.png",

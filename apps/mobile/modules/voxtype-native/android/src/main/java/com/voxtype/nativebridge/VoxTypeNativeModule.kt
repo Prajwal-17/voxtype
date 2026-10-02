@@ -16,7 +16,10 @@ class VoxTypeNativeModule : Module() {
   companion object {
     private var active = WeakReference<VoxTypeNativeModule>(null)
     private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
-    fun changed() { mainHandler.post { active.get()?.sendEvent("onChange", mapOf("changed" to true)) } }
+    fun changed() { mainHandler.post {
+      try { active.get()?.sendEvent("onChange", mapOf("changed" to true)) }
+      catch (error: Exception) { VoxLog.w("UI bridge unavailable", error) }
+    } }
     private fun refreshBubble() {
       mainHandler.post { VoxTypeAccessibilityService.instance?.refreshBubble() }
     }
@@ -32,15 +35,17 @@ class VoxTypeNativeModule : Module() {
     AsyncFunction("getSnapshot") {
       val context = requireNotNull(appContext.reactContext)
       VoxTypeStore(context).use { store ->
-        store.pruneAudio()
         val enabled = Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
           ?.contains("${context.packageName}/${VoxTypeAccessibilityService::class.java.name}", true) == true
         mapOf(
           "accessibilityEnabled" to enabled,
+          "accessibilityConnected" to (VoxTypeAccessibilityService.instance?.connected == true),
           "microphoneGranted" to (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED),
           "bubbleEnabled" to store.bubbleEnabled,
           "cleanupEnabled" to store.cleanupEnabled,
           "audioLimit" to VoxTypeStore.AUDIO_LIMIT,
+          "syncing" to TranscriptUploads.syncing,
+          "syncError" to TranscriptUploads.error,
           "status" to (VoxTypeAccessibilityService.instance?.status ?: DictationStatus.IDLE.bridge),
           "inApp" to InAppRecorder.snapshot(),
         )
@@ -60,6 +65,7 @@ class VoxTypeNativeModule : Module() {
     AsyncFunction("setSession") { token: String, userId: String, apiUrl: String ->
       val context = requireNotNull(appContext.reactContext)
       NativeSession(context).save(token, userId, apiUrl)
+      TranscriptUploads.request(context)
       refreshBubble()
     }
 
@@ -77,7 +83,7 @@ class VoxTypeNativeModule : Module() {
 
     AsyncFunction("setPreference") { key: String, value: String ->
       val context = requireNotNull(appContext.reactContext)
-      val store = VoxTypeStore(context)
+      VoxTypeStore(context).use { store ->
       when (key) {
         "bubbleEnabled" -> store.bubbleEnabled =
           value.toBooleanStrictOrNull() ?: throw IllegalArgumentException("bubbleEnabled must be 'true' or 'false'")
@@ -85,25 +91,26 @@ class VoxTypeNativeModule : Module() {
           value.toBooleanStrictOrNull() ?: throw IllegalArgumentException("cleanupEnabled must be 'true' or 'false'")
         else -> throw IllegalArgumentException("Unknown preference: $key")
       }
+      }
       refreshBubble()
       changed()
     }
 
     // Typed alternatives to the generic string-based setPreference. Additive only.
     AsyncFunction("setBubbleEnabled") { enabled: Boolean ->
-      VoxTypeStore(requireNotNull(appContext.reactContext)).bubbleEnabled = enabled
+      VoxTypeStore(requireNotNull(appContext.reactContext)).use { it.bubbleEnabled = enabled }
       refreshBubble()
       changed()
     }
 
     AsyncFunction("setCleanupEnabled") { enabled: Boolean ->
-      VoxTypeStore(requireNotNull(appContext.reactContext)).cleanupEnabled = enabled
+      VoxTypeStore(requireNotNull(appContext.reactContext)).use { it.cleanupEnabled = enabled }
       refreshBubble()
       changed()
     }
 
     AsyncFunction("copyTranscript") { id: String ->
-      VoxTypeStore(requireNotNull(appContext.reactContext)).copyToClipboard(id)
+      VoxTypeStore(requireNotNull(appContext.reactContext)).use { it.copyToClipboard(id) }
     }
 
     AsyncFunction("startRecording") {
@@ -111,11 +118,17 @@ class VoxTypeNativeModule : Module() {
     }.runOnQueue(Queues.MAIN)
     AsyncFunction("stopRecording") { InAppRecorder.stop() }.runOnQueue(Queues.MAIN)
     AsyncFunction("cancelRecording") { InAppRecorder.cancel() }.runOnQueue(Queues.MAIN)
+    AsyncFunction("syncTranscripts") {
+      TranscriptUploads.request(requireNotNull(appContext.reactContext))
+    }
     AsyncFunction("getTranscripts") { cursor: String? ->
       val context = requireNotNull(appContext.reactContext)
       VoxTypeStore(context).use { it.page(requireNotNull(NativeSession(context).userId), cursor) }
     }
     OnActivityEntersBackground { mainHandler.post { InAppRecorder.stop() } }
-    OnDestroy { mainHandler.post { InAppRecorder.cancel() } }
+    OnDestroy {
+      if (active.get() === this@VoxTypeNativeModule) active.clear()
+      mainHandler.post { InAppRecorder.cancel() }
+    }
   }
 }

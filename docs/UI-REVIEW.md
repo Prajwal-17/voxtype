@@ -114,3 +114,44 @@ previous upstream worklets exclusion.
 Verdict: implementation checks pass. Not verified: Android touch/keyboard behavior,
 waveform rendering, haptics and animation playback at 10% speed on a device. Follow the
 device checks in apps/mobile/README.md before treating native visual QA as complete.
+
+## Mobile 0.0.6 and desktop 0.1.4 follow-up
+
+Full review: mobile React Native primitives and Kotlin accessibility overlay, shared Tide colors,
+plus cloud transcript restoration in Kotlin/SQLite and desktop Rust/Tauri. Inspected the user's
+Home, Settings, accessibility, and bubble-comparison screenshots. Android hardware was unavailable.
+
+| Category    | Evidence inspected                                                                  | Result                                                                                                            |
+| ----------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Typography  | Font binary `fvar` axis, `_layout.tsx`, `primitives.tsx`, 390×844 web screenshots   | Default variable weight was 200; static 400/500/600 now render correctly                                          |
+| Surfaces    | `VoxConstants.kt`, native layout test, comparison screenshot                        | 80% opaque surface; control graphics inset within 44dp hit areas                                                  |
+| Animations  | `BubbleWaveformView.kt`, processing state, native layout test                       | 17 opaque bars, 120×34dp space; native spinner at stable width                                                    |
+| Icons       | Bubble action glyphs, progress indicator, existing Phosphor navigation              | Smaller action circles; loading uses a native control rather than a rotating character                            |
+| Performance | Deepgram stream lifecycle and completion tests, HTTP cleanup budget, sync callbacks | Explicit end-of-stream completion, editor-time connection warming without microphone capture, 1.5s cleanup budget |
+
+| Severity | Location                                                                                                     | Before                                                                         | After                                                                                                                | Why                                                   |
+| -------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| HIGH     | `apps/mobile/src/app/_layout.tsx:18`, `src/components/primitives.tsx:16`                                     | Variable font defaults to extra light                                          | Explicit static regular, medium, semibold assets and semantic mapping                                                | Readable typography; stronger hierarchy               |
+| MEDIUM   | `apps/mobile/src/screens/home.tsx`, `src/components/styles.ts`                                               | Tiny tab labels; granted permissions rendered as faded disabled buttons        | 12sp tab labels, 16sp body, readable permission status text                                                          | Contrast and legibility                               |
+| HIGH     | `apps/mobile/modules/voxtype-native/android/src/main/java/com/voxtype/nativebridge/BubbleWaveformView.kt:63` | Faint low-amplitude dots in 76×26dp                                            | Opaque 17-bar waveform in 120×34dp; dB-scaled real PCM                                                               | Meaningful microphone feedback                        |
+| MEDIUM   | `VoxConstants.kt:35`, `VoxTypeAccessibilityService.kt:createBubble`                                          | Nearly opaque capsule and dominant controls                                    | 80% surface opacity; inset circles retain 44dp hit targets                                                           | Lower visual interference without shrinking hit areas |
+| HIGH     | `VoxTypeAccessibilityService.kt:updateBubbleContent`                                                         | Processing shrinks to 48dp and spins a text glyph                              | Stable 224dp capsule and native progress indicator                                                                   | Motion restraint and spatial stability                |
+| HIGH     | `DeepgramSession.kt:finalize`, `HttpClients.kt`                                                              | Optional finalization acknowledgement can incur 5s delay; cleanup can wait 30s | CloseStream terminal metadata, no artificial 250ms delay; bounded cleanup                                            | Response latency and preservation of late final words |
+| HIGH     | `VoxTypeAccessibilityService.kt:finishDrag`, `VoxTypeNativeModule.kt`                                        | Dismissal disables the persistent preference; bridge may outlive UI            | Dismiss until keyboard closes; clear destroyed bridge and guard events; separate connected service status            | Predictable dismissal and lifecycle resilience        |
+| MEDIUM   | `AudioCapture.kt:start`, `res/xml/voxtype_accessibility.xml`                                                 | Silenced capture and missing service description are unexplained               | Detect Android microphone silencing; wire the concise service description                                            | Honest status and error feedback                      |
+| HIGH     | `TranscriptUploads.kt`, `VoxTypeStore.kt`, desktop `uploads.rs`/`storage.rs`                                 | Login only reads local history; retries need another dictation                 | Paginated account restore, persistent Android retries, desktop retries, idempotent cache and deletion reconciliation | Reinstall recovery and offline data preservation      |
+
+Rejected: fabricated waveform activity (hides silenced input); permanent microphone foreground
+service (unnecessary capture/background use); returning before final speech is drained (drops words).
+
+Verification: mobile/desktop TypeScript and ESLint, Rust Clippy/tests, API tests, targeted native
+compilation/lint, and Robolectric tests for stream completion, late finals, connection-time stop,
+cloud restore/idempotency/account boundaries, pending-upload preservation, and actual bubble layout.
+Web Home and Settings visually inspected at 390×844 with static fonts loaded. T3 preview became
+unavailable; a local headless browser was used after the explicit unavailable-host error.
+
+Not verified: real-phone drag/motion at 10% speed, measured production network latency, Android's
+reported recurring accessibility switch-off, OEM background restrictions, or production cloud data.
+The Android shutdown cause remains unconfirmed. Production database migrations and API deployment
+are still required separately. Cloud restore covers transcript text/metadata; audio and settings
+remain local. Verdict: Block for claiming the accessibility shutdown is fixed; it remains unverified on the affected phone. The separately validated UI, protocol, and transcript-sync changes can be released with that limitation.

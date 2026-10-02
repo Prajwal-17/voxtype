@@ -72,3 +72,28 @@ keeps its edge during expansion, rotation and reopening. Speak quietly/loudly an
 to check waveform response. Check tap vs drag, interrupted drags, drop-to-close, system
 reduced motion and haptic settings. These native interactions cannot be verified in the
 Expo web preview.
+
+## Mobile 0.0.6
+
+The recording capsule retains its width while processing and uses a native progress indicator.
+Its waveform has 17 opaque bars in a 120×34dp area; the surrounding surface is 80% opaque.
+Controls retain 44dp touch targets with smaller visual circles. Dropping the bubble on close
+hides it until the keyboard closes, preserving the enabled preference.
+
+Static Mona Sans 400/500/600 assets avoid the variable font's default weight of 200. These
+are derived from the existing OFL-licensed font; the bundled license still applies.
+
+Speech ends with Deepgram CloseStream and completes on final metadata (or normal socket closure),
+without the old additional 250ms wait. Late final results are retained. Optional wording cleanup
+has a 1.5-second total request budget, falling back to the original transcript.
+
+Login and foreground entry request cloud transcript restoration. Android JobScheduler retries
+failed sync with network constraints and exponential backoff, including after process/device
+restart. Transcript IDs deduplicate restores; unsent local records are preserved. A completed
+cloud listing reconciles server deletions. This covers account transcript text and metadata;
+audio recordings, Android permissions, and device preferences remain local. Production must
+have the API migrations and current Worker code before new transcript uploads can succeed.
+
+Accessibility status distinguishes enabled permission from a connected service. Event/bridge
+errors are caught and lifecycle transitions logged. Actual permission revocation on a particular
+phone still needs device logs; a browser cannot verify or fix that OS-level behavior.

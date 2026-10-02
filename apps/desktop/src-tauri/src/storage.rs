@@ -92,7 +92,7 @@ pub fn history(app: &AppHandle) -> Result<Vec<HistoryItem>, String> {
         None => Ok(vec![]),
     }
 }
-pub fn delete_history(app: &AppHandle, id: Option<&str>) -> Result<(), String> {
+pub fn delete_history(app: &AppHandle, user_id: &str, id: Option<&str>) -> Result<(), String> {
     let state = app.state::<AppState>();
     let _lock = state
         .local_data
@@ -101,9 +101,21 @@ pub fn delete_history(app: &AppHandle, id: Option<&str>) -> Result<(), String> {
     let old = history(app)?;
     let items = old
         .iter()
-        .filter(|item| id.is_some_and(|id| item.id != id))
+        .filter(|item| {
+            item.user_id.as_deref() != Some(user_id) || id.is_some_and(|id| item.id != id)
+        })
         .cloned()
         .collect::<Vec<_>>();
+    let mut pending = pending_uploads_unlocked(app)?;
+    pending.retain(|item| {
+        item.user_id.as_deref() != Some(user_id) || id.is_some_and(|id| item.id != id)
+    });
+    app.store(environment::store_file())
+        .map_err(|e| e.to_string())?
+        .set(
+            "uploads",
+            serde_json::to_value(pending).map_err(|e| e.to_string())?,
+        );
     write_history_unlocked(app, items.clone())?;
     for removed in old
         .iter()
@@ -127,6 +139,65 @@ fn write_history_unlocked(app: &AppHandle, items: Vec<HistoryItem>) -> Result<()
     let _ = app.emit("history-changed", ());
     Ok(())
 }
+/// Restore missing cloud records without overwriting pending local recordings or audio paths.
+pub fn restore_history(app: &AppHandle, incoming: Vec<HistoryItem>) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let _lock = state
+        .local_data
+        .lock()
+        .map_err(|_| "Local data unavailable.")?;
+    let mut rows = history(app)?;
+    let previous = rows.len();
+    merge_cloud_rows(&mut rows, incoming);
+    if rows.len() != previous {
+        write_history_unlocked(app, rows)?;
+    }
+    Ok(())
+}
+pub fn reconcile_history(
+    app: &AppHandle,
+    user_id: &str,
+    api_url: &str,
+    cloud_ids: &std::collections::HashSet<String>,
+) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let _lock = state
+        .local_data
+        .lock()
+        .map_err(|_| "Local data unavailable.")?;
+    let pending: std::collections::HashSet<_> = pending_uploads_unlocked(app)?
+        .into_iter()
+        .map(|row| row.id)
+        .collect();
+    let mut rows = history(app)?;
+    let before = rows.len();
+    rows.retain(|row| {
+        row.user_id.as_deref() != Some(user_id)
+            || row.upload_api_url.as_deref() != Some(api_url)
+            || pending.contains(&row.id)
+            || cloud_ids.contains(&row.id)
+    });
+    if before != rows.len() {
+        write_history_unlocked(app, rows)?;
+    }
+    Ok(())
+}
+
+fn merge_cloud_rows(rows: &mut Vec<HistoryItem>, incoming: Vec<HistoryItem>) {
+    let mut ids: std::collections::HashSet<String> =
+        rows.iter().map(|row| row.id.clone()).collect();
+    rows.extend(
+        incoming
+            .into_iter()
+            .filter(|row| ids.insert(row.id.clone())),
+    );
+    rows.sort_by(|a, b| {
+        b.created_at
+            .cmp(&a.created_at)
+            .then_with(|| b.id.cmp(&a.id))
+    });
+}
+
 pub fn append_history(app: &AppHandle, item: HistoryItem) -> Result<(), String> {
     let state = app.state::<AppState>();
     let _lock = state
@@ -333,6 +404,22 @@ mod paging_tests {
                 upload_api_url: None,
             })
             .collect()
+    }
+    #[test]
+    fn cloud_restore_is_idempotent_and_preserves_local_text_and_audio() {
+        let mut local = items();
+        local[0].text = "Pending local text".into();
+        local[0].audio_file = Some("private.wav".into());
+        let mut incoming = items();
+        incoming[1].id = "new-cloud-record".into();
+        incoming[1].created_at = 2000;
+        merge_cloud_rows(&mut local, incoming.clone());
+        merge_cloud_rows(&mut local, incoming);
+        assert_eq!(local.len(), 27);
+        assert_eq!(local[0].id, "new-cloud-record");
+        let preserved = local.iter().find(|row| row.id == "item-00").unwrap();
+        assert_eq!(preserved.text, "Pending local text");
+        assert_eq!(preserved.audio_file.as_deref(), Some("private.wav"));
     }
     #[test]
     fn pages_are_bounded_and_account_scoped() {

@@ -6,6 +6,8 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.media.AudioFormat
 import android.media.AudioRecord
+import android.media.AudioManager
+import android.media.AudioRecordingConfiguration
 import android.media.MediaRecorder
 import androidx.core.content.ContextCompat
 import java.io.File
@@ -15,7 +17,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 /** 16 kHz mono PCM goes straight to the WebSocket and a private WAV file. */
 class AudioCapture(private val context: Context, private val onAudio: (ByteArray) -> Unit,
-                   private val onStopped: (File?, Long) -> Unit) {
+                   private val onStopped: (File?, Long) -> Unit,
+                   private val onSilenced: () -> Unit = {}) {
   private val running = AtomicBoolean(false)
   private var recorder: AudioRecord? = null
   private var thread: Thread? = null
@@ -38,6 +41,15 @@ class AudioCapture(private val context: Context, private val onAudio: (ByteArray
       throw IllegalStateException("Microphone unavailable")
     }
     recorder = audio
+    val recordingCallback = object : AudioManager.AudioRecordingCallback() {
+      override fun onRecordingConfigChanged(configs: MutableList<AudioRecordingConfiguration>) {
+        if (running.get() && configs.any { it.clientAudioSessionId == audio.audioSessionId && it.isClientSilenced }) {
+          VoxLog.w("microphone silenced by Android audio policy")
+          onSilenced()
+        }
+      }
+    }
+    audio.registerAudioRecordingCallback(context.mainExecutor, recordingCallback)
     val dir = File(context.filesDir, "recordings").apply { mkdirs() }
     // Active takes cannot be mistaken for completed recordings during pruning.
     val completedFile = File(dir, "${UUID.randomUUID()}.wav")
@@ -71,6 +83,7 @@ class AudioCapture(private val context: Context, private val onAudio: (ByteArray
       } finally {
         running.set(false)
         try { audio.stop() } catch (e: Exception) { VoxLog.w("AudioRecord.stop failed", e) }
+        audio.unregisterAudioRecordingCallback(recordingCallback)
         audio.release()
         recorder = null
         try { output?.let { writeWavHeader(it, dataSize) } } catch (e: Exception) { VoxLog.w("wav header failed", e) }

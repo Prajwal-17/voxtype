@@ -14,8 +14,14 @@ void SplashScreen.preventAutoHideAsync();
 
 export default function Layout() {
   // Expo's asset bundler requires a static require for local fonts.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment
-  const [loaded, error] = useFonts({ MonaSans: require('../../assets/fonts/MonaSans.ttf') });
+  const [loaded, error] = useFonts({
+    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment
+    MonaSansRegular: require('../../assets/fonts/MonaSans-Regular.ttf'),
+    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment
+    MonaSansMedium: require('../../assets/fonts/MonaSans-Medium.ttf'),
+    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment
+    MonaSansSemiBold: require('../../assets/fonts/MonaSans-SemiBold.ttf'),
+  });
   useEffect(() => {
     if (loaded || error) void SplashScreen.hideAsync();
   }, [loaded, error]);

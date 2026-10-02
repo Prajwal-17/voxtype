@@ -36,9 +36,12 @@ const c = theme.colors;
 const preview = Platform.OS === 'web';
 const previewSnapshot: Snapshot = {
   accessibilityEnabled: false,
+  accessibilityConnected: false,
   microphoneGranted: false,
   bubbleEnabled: false,
   cleanupEnabled: false,
+  syncing: false,
+  syncError: '',
   audioLimit: 10,
   status: 'idle',
   inApp: { status: 'idle', text: '', error: '', durationMs: 0 },
@@ -124,7 +127,10 @@ export default function Home() {
       .then(async (account) => {
         if (!alive) return;
         setUser(account);
-        if (account) await Promise.all([refresh(), loadAnalytics(), loadPage()]);
+        if (account) {
+          await Native.syncTranscripts();
+          await Promise.all([refresh(), loadAnalytics(), loadPage()]);
+        }
       })
       .catch(() => {
         if (alive) setMessage('Couldn’t sign in. Try again.');
@@ -132,15 +138,23 @@ export default function Home() {
       .finally(() => {
         if (alive) setLoading(false);
       });
+    let refreshTimer: ReturnType<typeof setTimeout> | undefined;
     const subscription = Native.addListener('onChange', () => {
       void refresh();
-      void loadAnalytics();
+      clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        void loadPage();
+        void loadAnalytics();
+      }, 300);
     });
     const appState = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
         void currentUser()
           .then((account) => {
-            if (alive) setUser(account);
+            if (alive) {
+              setUser(account);
+              if (account) void Native.syncTranscripts();
+            }
           })
           .catch(() => {});
         void refresh();
@@ -149,6 +163,7 @@ export default function Home() {
     });
     return () => {
       alive = false;
+      clearTimeout(refreshTimer);
       subscription.remove();
       appState.remove();
     };
@@ -250,16 +265,18 @@ export default function Home() {
                 />
               )}
               ListEmptyComponent={
-                paging ? (
+                paging || snapshot?.syncing ? (
                   <Loader />
                 ) : (
                   <Text style={ui.muted}>
-                    {pageError ? 'Couldn’t load transcripts' : 'No transcripts yet'}
+                    {pageError
+                      ? 'Couldn’t load transcripts'
+                      : snapshot?.syncError || 'No transcripts yet'}
                   </Text>
                 )
               }
               ListFooterComponent={
-                paging ? (
+                paging || snapshot?.syncing ? (
                   <Loader />
                 ) : cursor || pageError ? (
                   <Action
@@ -416,7 +433,7 @@ export default function Home() {
                         </Text>
                         <PermissionRow
                           label="Accessibility"
-                          granted={snapshot.accessibilityEnabled}
+                          granted={snapshot.accessibilityEnabled && snapshot.accessibilityConnected}
                           disabled={busy || preview}
                           onPress={() =>
                             void run(async () => {
@@ -424,6 +441,11 @@ export default function Home() {
                             })
                           }
                         />
+                        {snapshot.accessibilityEnabled && !snapshot.accessibilityConnected && (
+                          <Text style={[ui.muted, { color: c.danger }]}>
+                            Service disconnected. Re-enable accessibility.
+                          </Text>
+                        )}
                         <PermissionRow
                           label="Microphone"
                           granted={snapshot.microphoneGranted}
@@ -489,8 +511,8 @@ export default function Home() {
                 />
                 <Text
                   style={{
-                    fontSize: 11,
-                    lineHeight: 16,
+                    fontSize: 12,
+                    lineHeight: 18,
                     fontWeight: tab === id ? '600' : '400',
                     color: tab === id ? c.primary : c.textMuted,
                   }}
@@ -579,12 +601,11 @@ function PermissionRow({
   return (
     <View style={s.row}>
       <Text>{label}</Text>
-      <Action
-        label={granted ? 'Enabled' : 'Allow'}
-        secondary
-        disabled={granted || disabled}
-        onPress={onPress}
-      />
+      {granted ? (
+        <Text style={{ color: c.primary, fontWeight: '500' }}>Enabled</Text>
+      ) : (
+        <Action label="Allow" secondary disabled={disabled} onPress={onPress} />
+      )}
     </View>
   );
 }

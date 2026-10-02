@@ -13,7 +13,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.util.TreeMap
 
-/** Capture starts immediately. One socket survives completed takes, never a canceled take. */
+/** Capture starts immediately; CloseStream drains each take before a fresh socket is warmed. */
 class DeepgramSession(private val token: () -> String?,
                       private val apiUrl: () -> String?,
                       private val onLost: () -> Unit,
@@ -38,6 +38,7 @@ class DeepgramSession(private val token: () -> String?,
   private val segments = TreeMap<Double, String>()
   private var boundary = 0.0
   private var keepUntil = 0L
+  private var finishStartedAt = 0L
   private var finishGeneration = 0
   private var connectGeneration = 0
   private var reconnectAttempt = 0
@@ -54,6 +55,15 @@ class DeepgramSession(private val token: () -> String?,
       if (!ready && !connecting && SystemClock.elapsedRealtime() >= retryAt) connect()
       main.postDelayed(this, VoxConstants.MAINTENANCE_INTERVAL_MS)
     }
+  }
+
+  /** Prepare the connection while a permitted editor is open; never opens the microphone. */
+  fun warm() {
+    if (closed) return
+    keepUntil = SystemClock.elapsedRealtime() + VoxConstants.SOCKET_KEEP_ALIVE_MS
+    connect()
+    main.removeCallbacks(maintenance)
+    main.postDelayed(maintenance, VoxConstants.MAINTENANCE_INTERVAL_MS)
   }
 
   fun begin() {
@@ -107,31 +117,34 @@ class DeepgramSession(private val token: () -> String?,
     synchronized(audioLock) { recording = false }
     check(pendingDone == null) { "already finalizing" }
     pendingDone = onDone
+    finishStartedAt = SystemClock.elapsedRealtime()
     keepUntil = SystemClock.elapsedRealtime() + VoxConstants.SOCKET_KEEP_ALIVE_MS
-    if (takeFailed || closed) { complete(false); return }
-    // If finish was tapped while connecting, onOpen flushes the backlog before Finalize.
-    if (ready) sendFinalize() else connect()
+    if (takeFailed || closed) { complete(); return }
+    // If finish was tapped while connecting, onOpen flushes the backlog before CloseStream.
+    if (ready) closeStream() else connect()
   }
 
-  private fun sendFinalize() {
-    if (socket?.send("{\"type\":\"Finalize\"}") != true) { lost(); return }
+  private fun closeStream() {
+    if (socket?.send("{\"type\":\"CloseStream\"}") != true) { lost(); return }
     val generation = ++finishGeneration
     main.postDelayed({
-      if (pendingDone != null && generation == finishGeneration) complete(false)
+      if (pendingDone != null && generation == finishGeneration) complete()
     }, VoxConstants.FINALIZE_TIMEOUT_MS)
   }
 
-  private fun complete(reusable: Boolean) {
+  private fun complete() {
     val done = pendingDone ?: return
     pendingDone = null
     takeActive = false
     finishGeneration++
     val result = segments.values.filter { it.isNotBlank() }.joinToString(" ").trim()
     segments.clear()
-    // Without a Finalize acknowledgement, abandon the socket to isolate the next take.
-    if (!reusable) disconnect()
+    // Every completed stream is isolated from the next take.
+    disconnect()
     keepUntil = SystemClock.elapsedRealtime() + VoxConstants.SOCKET_KEEP_ALIVE_MS
+    VoxLog.d("speech completion_ms=${SystemClock.elapsedRealtime() - finishStartedAt}")
     done(result)
+    if (!closed) connect()
   }
 
   private fun connect() {
@@ -186,7 +199,7 @@ class DeepgramSession(private val token: () -> String?,
           ready = flushed
         }
         if (!flushed) { lost(); return@post }
-        if (pendingDone != null) sendFinalize()
+        if (pendingDone != null) closeStream()
       }
     }
     override fun onMessage(webSocket: WebSocket, text: String) {
@@ -194,18 +207,14 @@ class DeepgramSession(private val token: () -> String?,
         if (socket !== webSocket || (!recording && pendingDone == null)) return@post
         try {
           val data = JSONObject(text)
+          if (data.optString("type") == "Metadata" && pendingDone != null) { complete(); return@post }
           if (data.optString("type") == "Error") { lost(); return@post }
           if (data.optString("type") != "Results" || !data.optBoolean("is_final")) return@post
           val start = data.optDouble("start", -1.0)
           if (start < boundary - 0.001) return@post
           val words = data.optJSONObject("channel")?.optJSONArray("alternatives")?.optJSONObject(0)?.optString("transcript")?.trim().orEmpty()
           if (words.isNotBlank()) segments[start] = words
-          if (pendingDone != null && data.optBoolean("from_finalize")) {
-            val generation = ++finishGeneration
-            main.postDelayed({
-              if (pendingDone != null && generation == finishGeneration) complete(true)
-            }, VoxConstants.FINALIZE_RESULT_DELAY_FROM_FINALIZE_MS)
-          }
+
         } catch (e: Exception) {
           VoxLog.w("deepgram message parse failed", e)
         }
@@ -213,7 +222,11 @@ class DeepgramSession(private val token: () -> String?,
     }
     override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
       VoxLog.d("deepgram closed $code")
-      main.post { if (socket === webSocket) lost() }
+      main.post {
+        if (socket === webSocket) {
+          if (pendingDone != null && code == 1000) complete() else lost()
+        }
+      }
     }
     override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
       VoxLog.w("deepgram socket failure", t)
@@ -238,7 +251,7 @@ class DeepgramSession(private val token: () -> String?,
     takeFailed = true
     synchronized(audioLock) { recording = false }
     disconnect()
-    if (pendingDone != null) complete(false)
+    if (pendingDone != null) complete()
     else if (active) {
       try { onLost() } catch (e: Exception) { VoxLog.w("onLost failed", e) }
     }

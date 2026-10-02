@@ -2,7 +2,7 @@ import { StyleSheet } from 'react-native';
 import { nativeTheme as theme } from '@voxtype/shared';
 const c = theme.colors;
 export const styles = StyleSheet.create({
-  text: { fontFamily: 'MonaSans', fontSize: 15, lineHeight: 22, color: c.text },
+  text: { fontFamily: 'MonaSansRegular', fontSize: 16, lineHeight: 24, color: c.text },
   card: { backgroundColor: c.surface, borderRadius: 20, padding: 20 },
   action: {
     minHeight: 48,
@@ -31,5 +31,5 @@ export const styles = StyleSheet.create({
   },
   heading: { fontSize: 30, lineHeight: 38, fontWeight: '600', letterSpacing: -0.8 },
   title: { fontSize: 18, lineHeight: 26, fontWeight: '600' },
-  muted: { color: c.textMuted, fontSize: 13, lineHeight: 20 },
+  muted: { color: c.textMuted, fontSize: 14, lineHeight: 21 },
 });

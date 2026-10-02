@@ -66,8 +66,10 @@ Body: `{ id?, text, originalText?, createdAt, durationMs, source }`, where
 fields are rejected.
 
 Both apps save locally first and push using `PUT /v1/dictations/:id`. Stable IDs make retries
-idempotent. They never use the dictation GET endpoints to populate local history, and deleting
-local history or pruning recordings does not delete the server archive. The server stores no audio.
+idempotent. Desktop 0.1.4 and mobile 0.0.6 restore account history through the paginated GET endpoint after sign-in.
+Desktop deletion removes the server record before the local cache; complete sync passes reconcile
+cloud deletions without removing pending uploads. The server stores transcript text and metadata,
+not audio recordings or device preferences.
 
 Apply database migrations through `pnpm db:migrate:local` for development and
 `pnpm db:migrate:remote` before deploying the production Worker.

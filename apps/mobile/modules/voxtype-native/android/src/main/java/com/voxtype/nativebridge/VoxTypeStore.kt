@@ -9,6 +9,7 @@ import android.database.sqlite.SQLiteOpenHelper
 import java.io.File
 import java.util.UUID
 import org.json.JSONObject
+import org.json.JSONArray
 
 /** Transcripts stay local; unsent rows are tried when the next transcript is generated. */
 class VoxTypeStore(
@@ -67,6 +68,43 @@ class VoxTypeStore(
     pruneAudio()
     onChanged()
     return id
+  }
+
+  /** Cloud IDs are idempotent. Never replace pending local edits or local audio paths. */
+  fun restore(userId: String, apiUrl: String, rows: JSONArray) {
+    val db = writableDatabase
+    db.beginTransaction()
+    try {
+      for (i in 0 until rows.length()) {
+        val row = rows.getJSONObject(i)
+        val id = row.getString("id")
+        require(id.isNotBlank() && id.length <= 200)
+        val text = row.getString("text")
+        db.insertWithOnConflict("dictations", null, ContentValues().apply {
+          put("id", id); put("user_id", userId); put("text", text)
+          put("original_text", row.optString("originalText").takeUnless { it == "null" })
+          put("created_at", row.getLong("createdAt")); put("updated_at", row.getLong("updatedAt"))
+          put("duration_ms", row.getLong("durationMs")); put("word_count", row.getInt("words"))
+          put("delivery", "saved"); put("upload_api_url", apiUrl); put("uploaded", 1)
+        }, SQLiteDatabase.CONFLICT_IGNORE)
+      }
+      db.setTransactionSuccessful()
+    } finally { db.endTransaction() }
+  }
+
+  /** A complete successful cloud listing reconciles deletions; pending uploads are never removed. */
+  fun reconcile(userId: String, apiUrl: String, cloudIds: Set<String>) {
+    val db = writableDatabase
+    db.beginTransaction()
+    try {
+      val removed = mutableListOf<Pair<String, String?>>()
+      db.rawQuery("SELECT id,audio_file FROM dictations WHERE user_id = ? AND upload_api_url = ? AND uploaded = 1", arrayOf(userId, apiUrl)).use { cursor ->
+        while (cursor.moveToNext()) if (cursor.getString(0) !in cloudIds) removed += cursor.getString(0) to cursor.getString(1)
+      }
+      removed.forEach { (id, _) -> db.delete("dictations", "id = ? AND user_id = ? AND uploaded = 1", arrayOf(id, userId)) }
+      db.setTransactionSuccessful()
+      // Recordings are pruned separately; never follow paths received from the cloud.
+    } finally { db.endTransaction() }
   }
 
   fun page(userId: String, cursor: String?): Map<String, Any?> {

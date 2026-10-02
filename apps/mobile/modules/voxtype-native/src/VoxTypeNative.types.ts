@@ -13,9 +13,12 @@ export type Dictation = {
 
 export type Snapshot = {
   accessibilityEnabled: boolean;
+  accessibilityConnected: boolean;
   microphoneGranted: boolean;
   bubbleEnabled: boolean;
   cleanupEnabled: boolean;
+  syncing: boolean;
+  syncError: string;
   audioLimit: 10;
   status:
     'idle' | 'connecting' | 'listening' | 'processing' | 'saved' | 'microphone_permission_needed';

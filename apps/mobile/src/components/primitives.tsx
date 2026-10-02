@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import {
   ActivityIndicator,
+  StyleSheet,
   Pressable,
   Switch,
   Text as NativeText,
@@ -12,7 +13,12 @@ import { nativeTheme as theme } from '@voxtype/shared';
 import { styles } from './styles';
 const c = theme.colors;
 export function Text({ style, ...props }: TextProps) {
-  return <NativeText {...props} style={[styles.text, style]} />;
+  const weight = Number(StyleSheet.flatten(style)?.fontWeight ?? 400);
+  const fontFamily =
+    weight >= 600 ? 'MonaSansSemiBold' : weight >= 500 ? 'MonaSansMedium' : 'MonaSansRegular';
+  return (
+    <NativeText {...props} style={[styles.text, style, { fontFamily, fontWeight: 'normal' }]} />
+  );
 }
 export function Card({ style, ...props }: ViewProps) {
   return <View {...props} style={[styles.card, style]} />;

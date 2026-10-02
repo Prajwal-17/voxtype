@@ -11,8 +11,8 @@ import kotlin.math.sin
 /** Rolling microphone history, rendered in one lightweight native view. */
 class BubbleWaveformView(context: Context, private val level: () -> Float) : View(context) {
   private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = VoxTheme.accentInk }
-  private val samples = FloatArray(11)
-  private val display = FloatArray(11)
+  private val samples = FloatArray(17)
+  private val display = FloatArray(17)
   private var listening = false
   private var sampledAt = 0L
   private var frameAt = 0L
@@ -63,13 +63,13 @@ class BubbleWaveformView(context: Context, private val level: () -> Float) : Vie
   override fun onDraw(canvas: Canvas) {
     super.onDraw(canvas)
     val step = width.toFloat() / samples.size
-    val barWidth = minOf(3f * resources.displayMetrics.density, step * 0.6f)
+    val barWidth = minOf(3.5f * resources.displayMetrics.density, step * 0.6f)
     display.forEachIndexed { i, value ->
       val envelope = 0.55f + 0.45f * sin(i.toFloat() / samples.lastIndex * Math.PI).toFloat()
       val amplitude = value * envelope
-      val barHeight = maxOf(2f * resources.displayMetrics.density, height * (0.1f + amplitude * 0.9f))
+      val barHeight = maxOf(2f * resources.displayMetrics.density, height * (0.14f + amplitude * 0.86f))
       val x = step * (i + 0.5f)
-      paint.alpha = (110 + amplitude * 145).toInt()
+      paint.alpha = 255
       canvas.drawRoundRect(x - barWidth / 2, (height - barHeight) / 2,
         x + barWidth / 2, (height + barHeight) / 2, barWidth / 2, barWidth / 2, paint)
     }

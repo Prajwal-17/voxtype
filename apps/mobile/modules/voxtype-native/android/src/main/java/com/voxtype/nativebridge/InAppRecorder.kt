@@ -65,6 +65,8 @@ object InAppRecorder {
             }
           }
         }
+      }, {
+        main.post { cancel(); error = "Microphone is in use by another app"; status = "error"; changed() }
       }).also { it.start() }
       changed()
     } catch (exception: Exception) {
@@ -88,7 +90,7 @@ object InAppRecorder {
       val request = Request.Builder().url("${session.apiUrl}${VoxConstants.CLEANUP_PATH}")
         .header("Authorization", "Bearer ${session.token}")
         .post(JSONObject().put("text", original).toString().toRequestBody("application/json".toMediaType())).build()
-      HttpClients.default.newCall(request).execute().use { response ->
+      HttpClients.cleanup.newCall(request).execute().use { response ->
         if (!response.isSuccessful) original else JSONObject(response.body?.string() ?: "{}").optJSONObject("data")?.optString("text")?.takeIf { it.isNotBlank() } ?: original
       }
     } catch (_: Exception) { original }
