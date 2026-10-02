@@ -7,7 +7,6 @@ import {
   FileText,
   History,
   Keyboard,
-  KeyRound,
   Mic,
   Settings2,
   Square,
@@ -256,9 +255,7 @@ function Dictation({
               : 'Listening'
           : session.phase === 'error'
             ? 'Recording interrupted'
-            : boot.hasKey
-              ? 'Ready to record'
-              : 'Setup needed';
+            : 'Ready to record';
 
   return (
     <>
@@ -271,21 +268,6 @@ function Dictation({
           </Button>
         }
       />
-
-      {!boot.hasKey && (
-        <div className="mb-5 flex items-center gap-3 rounded-panel border border-accent/15 bg-accent-soft px-4 py-3.5 text-accent-ink max-md:flex-wrap">
-          <KeyRound size={18} className="shrink-0" />
-          <div className="min-w-0">
-            <strong className="text-ui font-semibold">Connect Deepgram to start dictating</strong>
-            <p className="mt-0.5 text-caption opacity-80">
-              Your key is stored securely in the desktop keyring.
-            </p>
-          </div>
-          <Button size="sm" variant="primary" onClick={onSettings} className="ml-auto max-md:ml-0">
-            Open settings <ArrowRight size={14} />
-          </Button>
-        </div>
-      )}
 
       <div className="grid grid-cols-[minmax(0,1fr)_19rem] items-stretch gap-5 max-[960px]:grid-cols-1">
         <Card className="flex min-h-[520px] min-w-0 flex-col overflow-hidden max-[960px]:min-h-[420px]">
@@ -365,11 +347,7 @@ function Dictation({
               {duration(session.elapsedMs)}
             </span>
             <span className="mt-2 text-caption text-muted" role="status">
-              {active
-                ? 'Press Escape to cancel'
-                : boot.hasKey
-                  ? 'Ready when you are'
-                  : 'Add a Deepgram key to begin'}
+              {active ? 'Press Escape to cancel' : 'Ready when you are'}
             </span>
           </div>
 
@@ -401,12 +379,11 @@ function Dictation({
                   variant="primary"
                   size="lg"
                   className="w-full"
-                  onClick={() => (boot.hasKey ? recording.start.mutate(false) : onSettings())}
-                  disabled={boot.hasKey && !native}
+                  onClick={() => recording.start.mutate(false)}
+                  disabled={!native}
                   loading={recording.start.isPending}
                 >
-                  {boot.hasKey ? <Mic size={17} /> : <KeyRound size={16} />}
-                  {boot.hasKey ? 'Start dictation' : 'Set up dictation'}
+                  <Mic size={17} /> Start dictation
                 </Button>
                 <div className="flex min-h-9 items-center justify-center gap-2 text-caption text-muted">
                   Or press <Shortcut label={boot.shortcutLabel} />

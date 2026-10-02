@@ -70,7 +70,7 @@ export function HistoryPage({ onRecord }: { onRecord: () => void }) {
             {search
               ? `${filtered.length} of ${history.data?.length ?? 0}`
               : (history.data?.length ?? 0)}{' '}
-            {(search ? filtered.length : history.data?.length) === 1 ? 'dictation' : 'dictations'}
+            {history.data?.length === 1 ? 'dictation' : 'dictations'}
           </span>
         </div>
 

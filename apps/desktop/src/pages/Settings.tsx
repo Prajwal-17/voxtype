@@ -1,18 +1,12 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  ArrowUpRight,
   Check,
   ChevronDown,
-  Eye,
-  EyeOff,
-  KeyRound,
   LoaderCircle,
-  LockKeyhole,
   Mic,
   RefreshCw,
   Square,
-  Trash2,
   TriangleAlert,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -22,7 +16,6 @@ import { cn } from '../lib/utils';
 import { parseVocabulary, settingsSchema, type Bootstrap, type Settings } from '../lib/types';
 import { Button, IconButton, Shortcut, Toggle } from '../components/ui';
 import { FieldRow, PageHeader, SectionHeader } from '../components/layout';
-import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import {
@@ -39,169 +32,24 @@ export function SettingsPage({ boot, active }: { boot: Bootstrap; active: boolea
     <>
       <PageHeader title="Settings" description="Audio, transcription, and desktop integration." />
       <div className="max-w-5xl">
-        <ApiKey boot={boot} active={active} />
+        <SpeechConnection />
         <Preferences key={JSON.stringify(boot.settings)} settings={boot.settings} active={active} />
         <DesktopSetup boot={boot} active={active} />
-        <ApiKey boot={boot} active={active} provider="deepseek" />
       </div>
     </>
   );
 }
 
-function ApiKey({
-  boot,
-  active,
-  provider = 'deepgram',
-}: {
-  boot: Bootstrap;
-  active: boolean;
-  provider?: 'deepgram' | 'deepseek';
-}) {
-  const cleanup = provider === 'deepseek';
-  const name = cleanup ? 'DeepSeek' : 'Deepgram';
-  const hasKey = cleanup ? boot.hasCleanupKey : boot.hasKey;
-  const keyError = cleanup ? boot.cleanupKeyError : boot.keyError;
-  const inputId = `${provider}-api-key`;
-  const [key, setKey] = useState('');
-  const [visible, setVisible] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const client = useQueryClient();
-  const save = useMutation({
-    mutationFn: cleanup ? api.saveCleanupKey : api.saveKey,
-    gcTime: 0,
-    onSuccess: () => {
-      setKey('');
-      setEditing(false);
-      setVisible(false);
-      save.reset();
-      void client.invalidateQueries({ queryKey: ['bootstrap'] });
-      toast.success('API key saved to your desktop keyring');
-    },
-  });
-  const remove = useMutation({
-    mutationFn: cleanup ? api.removeCleanupKey : api.removeKey,
-    onSuccess: () => {
-      void client.invalidateQueries({ queryKey: ['bootstrap'] });
-      toast.success('API key removed');
-    },
-  });
+function SpeechConnection() {
   return (
     <section className="mb-5 rounded-panel border border-line bg-surface p-5 max-md:p-4">
       <SectionHeader
-        title={cleanup ? 'Text cleanup' : 'Deepgram connection'}
-        description={
-          cleanup
-            ? 'DeepSeek V4.1 Flash removes fillers and tidies punctuation after transcription.'
-            : 'Audio streams directly from this device to Deepgram.'
-        }
+        title="Transcription connection"
+        description="Your VoxType account connects transcription automatically."
       />
-      {hasKey && !editing ? (
-        <div className="flex items-center gap-3 rounded-control bg-subtle p-4 max-lg:flex-wrap">
-          <span className="text-success">
-            <KeyRound size={19} />
-          </span>
-          <div className="min-w-0 flex-1">
-            <strong className="text-ui font-medium">API key saved securely</strong>
-            <p className="mt-1 text-caption text-muted">
-              {cleanup
-                ? 'Saved in your desktop keyring. Enable Clean up dictation below to use it.'
-                : 'Stored in your desktop keyring. Ready to try a dictation.'}
-            </p>
-          </div>
-          <Button onClick={() => setEditing(true)} disabled={active}>
-            Replace key
-          </Button>
-          <IconButton
-            label="Remove API key"
-            disabled={active || remove.isPending}
-            onClick={() => remove.mutate()}
-          >
-            <Trash2 size={17} />
-          </IconButton>
-        </div>
-      ) : (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            save.mutate(key.trim());
-          }}
-        >
-          <Label htmlFor={inputId} className="mb-2 block">
-            {name} API key
-          </Label>
-          <div className="flex items-center gap-2 max-md:flex-wrap">
-            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-control border border-line-strong bg-raised py-1 pr-1 pl-3 text-muted focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent max-md:basis-full">
-              <KeyRound size={16} className="shrink-0" />
-              <Input
-                id={inputId}
-                type={visible ? 'text' : 'password'}
-                autoComplete="off"
-                spellCheck={false}
-                value={key}
-                onChange={(e) => setKey(e.target.value)}
-                placeholder={`Paste your ${name} API key`}
-                disabled={active}
-              />
-              <IconButton
-                type="button"
-                label={visible ? 'Hide API key' : 'Show API key'}
-                onClick={() => setVisible(!visible)}
-              >
-                {visible ? <EyeOff size={16} /> : <Eye size={16} />}
-              </IconButton>
-            </div>
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={active || !native || key.trim().length < 10}
-              loading={save.isPending}
-            >
-              Save key
-            </Button>
-            {editing && (
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  setEditing(false);
-                  setKey('');
-                }}
-              >
-                Cancel
-              </Button>
-            )}
-          </div>
-          <p className="mt-2 flex items-center gap-1.5 text-caption text-muted">
-            <LockKeyhole size={12} /> Saved to GNOME Keyring, never to your settings file.
-          </p>
-        </form>
-      )}
-      {keyError && (
-        <p className="mt-2 text-ui text-danger" role="alert">
-          {keyError}
-        </p>
-      )}
-      {cleanup ? (
-        <p className="mt-4 text-caption text-muted">
-          Only the finished transcript is sent to DeepSeek. You can view and copy the original
-          transcript. If cleanup fails, VoxType uses the original.
-        </p>
-      ) : (
-        <p className="mt-4 text-caption text-muted">
-          Use a key with transcription permission and available account credit.{' '}
-          <button
-            className="inline-flex items-center gap-1 border-0 bg-transparent p-0 text-caption text-accent hover:text-accent-hover hover:underline hover:underline-offset-[3px]"
-            type="button"
-            onClick={() =>
-              void api
-                .openDeepgram()
-                .catch(() => toast.error('Couldn’t open the Deepgram console. Try again.'))
-            }
-          >
-            Deepgram console <ArrowUpRight size={12} />
-          </button>
-        </p>
-      )}
+      <p className="text-ui text-muted">
+        Audio streams directly to Deepgram. Start speaking as soon as recording begins.
+      </p>
     </section>
   );
 }
@@ -377,7 +225,7 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
         />
         <Toggle
           label="Clean up dictation"
-          description="Send the finished transcript to DeepSeek before pasting. Connect the optional cleanup service below."
+          description="Send the finished transcript through VoxType for DeepSeek cleanup before pasting. If cleanup fails, the original is kept."
           checked={draft.cleanupEnabled}
           onChange={(v) => set('cleanupEnabled', v)}
           disabled={active}

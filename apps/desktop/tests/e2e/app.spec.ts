@@ -37,11 +37,13 @@ test('first run, navigation, settings and overlay are usable', async ({ page }) 
   expect(await shortcuts.count()).toBeGreaterThanOrEqual(2);
   await expect(shortcuts.first()).toHaveText('Ctrl Shift Space');
   await expect(shortcuts.first()).toHaveCSS('user-select', 'none');
-  await expect(page.getByRole('button', { name: 'Set up dictation' })).toHaveCSS(
+  await expect(page.getByRole('button', { name: 'Start dictation' })).toBeDisabled();
+  await expect(page.getByText('Connect Deepgram to start dictating')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Start dictation' })).toHaveCSS(
     'color',
     'rgb(246, 246, 242)',
   );
-  await expect(page.getByRole('button', { name: 'Set up dictation' })).toHaveCSS(
+  await expect(page.getByRole('button', { name: 'Start dictation' })).toHaveCSS(
     'background-color',
     'rgb(70, 73, 68)',
   );
@@ -57,12 +59,9 @@ test('first run, navigation, settings and overlay are usable', async ({ page }) 
   await page.screenshot({ path: `${captures}/history.png`, fullPage: false });
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
-  const deepgramKey = page.getByLabel('Deepgram API key', { exact: true });
-  await deepgramKey.fill('not-a-real-api-key');
-  await expect(deepgramKey).toHaveAttribute('type', 'password');
-  await deepgramKey.locator('..').getByRole('button', { name: 'Show API key' }).click();
-  await expect(deepgramKey).toHaveAttribute('type', 'text');
-  await deepgramKey.fill('');
+  await expect(page.getByRole('heading', { name: 'Transcription connection' })).toBeVisible();
+  await expect(page.getByLabel('Deepgram API key', { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('DeepSeek API key', { exact: true })).toHaveCount(0);
   await page.getByRole('switch', { name: 'Paste when I finish' }).click();
   await expect(page.getByText('You have unsaved changes.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Save preferences' })).toBeDisabled();

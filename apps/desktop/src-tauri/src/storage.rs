@@ -17,38 +17,11 @@ fn read_key(account: &str) -> Result<Option<String>, String> {
         Err(_) => Err("Unlock your login keyring, then try again.".into()),
     }
 }
-fn write_key(account: &str, value: &str) -> Result<(), String> {
-    let value = value.trim();
-    if value.len() < 10 || value.len() > 512 || value.chars().any(char::is_whitespace) {
-        return Err("Paste a valid API key without spaces.".into());
-    }
-    entry(account)?
-        .set_password(value)
-        .map_err(|_| "Could not save the key. Unlock your login keyring and try again.".into())
-}
 fn remove_key(account: &str) -> Result<(), String> {
     match entry(account)?.delete_credential() {
         Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
         Err(_) => Err("Could not remove the key from your keyring.".into()),
     }
-}
-pub fn key() -> Result<Option<String>, String> {
-    read_key("deepgram")
-}
-pub fn save_key(value: &str) -> Result<(), String> {
-    write_key("deepgram", value)
-}
-pub fn delete_key() -> Result<(), String> {
-    remove_key("deepgram")
-}
-pub fn cleanup_key() -> Result<Option<String>, String> {
-    read_key("deepseek")
-}
-pub fn save_cleanup_key(value: &str) -> Result<(), String> {
-    write_key("deepseek", value)
-}
-pub fn delete_cleanup_key() -> Result<(), String> {
-    remove_key("deepseek")
 }
 
 pub fn auth_token() -> Result<Option<String>, String> {

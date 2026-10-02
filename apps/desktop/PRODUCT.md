@@ -24,14 +24,14 @@ VoxType combines an app-level recording workspace with a system-wide Right Alt s
 - Production and development can run together: development is a separately named and identified app with isolated credentials, settings, history, backend, and shortcut.
 - Users can record from the main Dictation page or through a configurable global shortcut.
 - The compact overlay communicates recording, finishing, success, and failure states while another app has focus.
-- History, diagnostics, API key setup, language, microphone, voice detection, cleanup, and paste behavior are managed inside the app.
+- History, diagnostics, account access, language, microphone, voice detection, cleanup, and paste behavior are managed inside the app.
 
 ## Capabilities and Constraints
 
 - The desktop workspace requires Google sign-in through the system browser; the resulting VoxType session is stored in the operating-system keyring.
 - Microphone audio is streamed to Deepgram for transcription.
 - Finished text can optionally be sent to DeepSeek for cleanup.
-- API keys are stored in the operating-system keyring.
+- Provider API keys stay on the server. Desktop requests a fresh temporary Deepgram token for each connection; optional cleanup uses the authenticated server endpoint.
 - Production defaults to Right Alt and development defaults to Ctrl Shift Space; each can be changed independently.
 - Up to 200 transcripts can be stored locally; there is no cloud sync.
 - The browser build is a preview and cannot record.

@@ -1,6 +1,6 @@
 //! One owner per recording. UI, tray, and shortcuts all send Stop/Cancel to the same task.
 //! Only confirmed complete transcripts can reach automatic paste.
-use crate::{audio, cleanup, desktop, model::*, publish, storage, AppState};
+use crate::{audio, cleanup, desktop, model::*, publish, speech, storage, AppState};
 use futures_util::{FutureExt, SinkExt, StreamExt};
 use std::{
     collections::VecDeque,
@@ -477,25 +477,18 @@ type SpeechSocket =
     tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
 
 async fn connect(settings: &Settings) -> Result<SpeechSocket, String> {
-    let key = tokio::time::timeout(
-        Duration::from_secs(15),
-        tokio::task::spawn_blocking(storage::key),
-    )
-    .await
-    .map_err(|_| "Keyring timed out. Unlock your login keyring and try again.")?
-    .map_err(|_| "Keyring request failed.")??
-    .ok_or("Add your Deepgram API key in Settings before dictating.")?;
+    let token = speech::token().await?;
     let mut request = listen_url(settings)?
         .as_str()
         .into_client_request()
         .map_err(|_| "Could not create a Deepgram request.")?;
     request.headers_mut().insert(
         "Authorization",
-        format!("Token {key}")
+        format!("Bearer {token}")
             .parse()
-            .map_err(|_| "The saved API key is invalid.")?,
+            .map_err(|_| "The server returned invalid transcription credentials.")?,
     );
-    drop(key);
+    drop(token);
     let (socket, _) = tokio::time::timeout(Duration::from_secs(10), connect_async(request))
         .await
         .map_err(|_| "Deepgram connection timed out. No text was inserted; try again.")?
@@ -503,11 +496,9 @@ async fn connect(settings: &Settings) -> Result<SpeechSocket, String> {
             tokio_tungstenite::tungstenite::Error::Http(response)
                 if response.status().as_u16() == 401 || response.status().as_u16() == 403 =>
             {
-                "Deepgram rejected the API key. Replace it in Settings."
+                "Deepgram rejected the temporary credentials. Try dictating again."
             }
-            _ => {
-                "Could not connect to Deepgram. Check your connection, API key, and account credit."
-            }
+            _ => "Could not connect to Deepgram. Check your connection and try again.",
         })?;
     Ok(socket)
 }
@@ -584,7 +575,7 @@ async fn prepare_stream(
     }
 }
 
-// Separate the wire protocol from desktop side effects so finalization is testable without a microphone or API key.
+// Separate the wire protocol from desktop side effects so finalization is testable without a microphone or provider credentials.
 async fn pump(
     snapshot: &mut Snapshot,
     control: &mut mpsc::Receiver<Control>,
@@ -680,7 +671,7 @@ async fn pump(
             incoming = incoming.next() => match incoming {
                 Some(Ok(Message::Text(text))) => {
                     let value: serde_json::Value = serde_json::from_str(&text).map_err(|_| "Deepgram returned an unreadable response.")?;
-                    if value["type"] == "Error" { return Err("Deepgram could not process this recording. Check language, account credit, and API key.".into()); }
+                    if value["type"] == "Error" { return Err("Deepgram could not process this recording. Try again or check your language setting.".into()); }
                     if value["type"] == "Metadata" && close_sent { return Ok(true); }
                     transcript.accept(&value);
                     snapshot.text = transcript.text.clone(); snapshot.interim = transcript.interim.clone();
@@ -1005,12 +996,10 @@ mod tests {
         assert!(buffer.push(vec![1; 2]).is_ok());
     }
     #[tokio::test]
-    #[ignore = "Uses the saved Deepgram key and sends 100ms of synthetic silence"]
+    #[ignore = "Uses the signed-in VoxType session and sends 100ms of synthetic silence"]
     async fn native_deepgram_connection() {
         let _ = rustls::crypto::ring::default_provider().install_default();
-        let key = storage::key()
-            .expect("Unlock the keyring")
-            .expect("Save a key in VoxType first");
+        let token = speech::token().await.expect("Sign in to VoxType first");
         let mut request = listen_url(&Settings::default())
             .unwrap()
             .as_str()
@@ -1018,7 +1007,7 @@ mod tests {
             .unwrap();
         request
             .headers_mut()
-            .insert("Authorization", format!("Token {key}").parse().unwrap());
+            .insert("Authorization", format!("Bearer {token}").parse().unwrap());
         let result = tokio::time::timeout(Duration::from_secs(10), connect_async(request))
             .await
             .expect("Connection timed out");

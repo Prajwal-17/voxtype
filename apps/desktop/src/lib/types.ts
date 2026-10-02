@@ -47,10 +47,6 @@ export const idleSession: Session = {
 };
 export interface Bootstrap {
   settings: Settings;
-  hasKey: boolean;
-  keyError: string | null;
-  hasCleanupKey: boolean;
-  cleanupKeyError: string | null;
   snapshot: Session;
   shortcutRegistered: boolean;
   version: string;

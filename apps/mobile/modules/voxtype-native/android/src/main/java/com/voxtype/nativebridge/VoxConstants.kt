@@ -8,8 +8,8 @@ object VoxConstants {
 
   const val SOCKET_KEEP_ALIVE_MS = 420_000L
   const val MAINTENANCE_INTERVAL_MS = 4_000L
-  const val FINALIZE_TIMEOUT_MS = 2_500L
-  const val FINALIZE_RESULT_DELAY_MS = 700L
+  const val CONNECT_TIMEOUT_MS = 20_000L
+  const val FINALIZE_TIMEOUT_MS = 5_000L
   const val FINALIZE_RESULT_DELAY_FROM_FINALIZE_MS = 250L
   const val SAVED_AUTO_DISMISS_DELIVERED_MS = 1_600L
   const val SAVED_AUTO_DISMISS_MS = 5_000L
@@ -28,6 +28,7 @@ object VoxConstants {
 
   const val SAMPLE_RATE = 16_000
   const val BYTES_PER_SECOND = 32_000
+  const val MAX_BUFFERED_AUDIO_BYTES = 32 * BYTES_PER_SECOND
   const val AUDIO_BUFFER_BYTES = 3_200
   const val BYTE_RATE = 32_000
   const val WAV_HEADER_BYTES = 44

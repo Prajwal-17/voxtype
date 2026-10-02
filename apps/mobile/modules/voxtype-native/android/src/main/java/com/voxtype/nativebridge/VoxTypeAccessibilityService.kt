@@ -599,43 +599,46 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       releaseTarget()
       return
     }
-    setStatus(DictationStatus.CONNECTING)
-    val stream = engine ?: DeepgramSession({ session.token }, { session.apiUrl }) {
+    val stream = engine ?: DeepgramSession({ session.token }, { session.apiUrl }, {
       main.post {
-        if (status == DictationStatus.LISTENING.bridge) { capture?.stop(); setStatus(DictationStatus.PROCESSING) }
-        else if (status == DictationStatus.CONNECTING.bridge) setStatus(DictationStatus.IDLE)
+        if (status == DictationStatus.LISTENING.bridge) stopRecording()
       }
-    }.also { engine = it }
+    }).also { engine = it }
+    val generation = lifecycleGeneration
     try {
-      stream.begin {
-        if (status != DictationStatus.CONNECTING.bridge) return@begin
-        try {
-          showMicrophoneNotification()
-          capture = AudioCapture(this, { stream.audio(it) }, { file, duration ->
-            main.post {
-              if (discardNext || recordingUserId == null) {
-                discardNext = false
-                try { file?.delete() } catch (e: Exception) { VoxLog.w("discarded audio delete failed", e) }
-                try { stream.abort() } catch (e: Exception) { VoxLog.w("stream abort failed", e) }
-                stopForeground(STOP_FOREGROUND_REMOVE)
-                setStatus(DictationStatus.IDLE)
-                return@post
-              }
-              recordingFile = file
-              recordingDuration = duration
-              stopForeground(STOP_FOREGROUND_REMOVE)
-              stream.finalize { finishDictation(it) }
-            }
-          }).also { it.start() }
-          setStatus(DictationStatus.LISTENING)
-        } catch (e: Exception) {
-          VoxLog.e("start capture failed", e)
+      stream.begin()
+      showMicrophoneNotification()
+      capture = AudioCapture(this, { stream.audio(it) }, { file, duration ->
+        main.post {
+          if (generation != lifecycleGeneration) {
+            try { file?.delete() } catch (e: Exception) { VoxLog.w("discarded audio delete failed", e) }
+            return@post
+          }
+          capture = null
+          if (discardNext || recordingUserId == null) {
+            discardNext = false
+            try { file?.delete() } catch (e: Exception) { VoxLog.w("discarded audio delete failed", e) }
+            recordingUserId = null
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            releaseTarget()
+            setStatus(DictationStatus.IDLE)
+            return@post
+          }
+          recordingFile = file
+          recordingDuration = duration
           stopForeground(STOP_FOREGROUND_REMOVE)
-          setStatus(DictationStatus.IDLE)
+          setStatus(DictationStatus.PROCESSING)
+          stream.finalize { finishDictation(it) }
         }
-      }
+      }).also { it.start() }
+      setStatus(DictationStatus.LISTENING)
     } catch (e: Exception) {
-      VoxLog.e("begin stream failed", e)
+      VoxLog.e("start capture failed", e)
+      capture = null
+      recordingUserId = null
+      stream.abort()
+      releaseTarget()
+      stopForeground(STOP_FOREGROUND_REMOVE)
       setStatus(DictationStatus.IDLE)
     }
   }
@@ -651,6 +654,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   private fun cancelRecording() {
     if (status != DictationStatus.LISTENING.bridge) return
     discardNext = true
+    engine?.abort()
     setStatus(DictationStatus.PROCESSING)
     try { capture?.stop() } catch (e: Exception) { VoxLog.w("capture stop failed", e) }
     capture = null

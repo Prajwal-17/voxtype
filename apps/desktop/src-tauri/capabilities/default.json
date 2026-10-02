@@ -3,15 +3,5 @@
   "identifier": "desktop",
   "description": "Local desktop UI only",
   "windows": ["main", "overlay"],
-  "permissions": [
-    "core:default",
-    {
-      "identifier": "opener:allow-open-url",
-      "allow": [
-        {
-          "url": "https://console.deepgram.com/"
-        }
-      ]
-    }
-  ]
+  "permissions": ["core:default"]
 }

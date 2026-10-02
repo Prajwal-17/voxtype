@@ -1,7 +1,6 @@
 import { QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { openUrl } from '@tauri-apps/plugin-opener';
 import { useEffect } from 'react';
 import { toast } from 'sonner';
 import { appEnvironment, isDevelopment, shortcutId, shortcutLabel } from './environment';
@@ -58,10 +57,6 @@ export const api = {
       ? command<Bootstrap>('bootstrap')
       : Promise.resolve<Bootstrap>({
           settings: defaultSettings,
-          hasKey: false,
-          keyError: null,
-          hasCleanupKey: false,
-          cleanupKeyError: null,
           snapshot: idleSession,
           shortcutRegistered: false,
           version: '0.1.2',
@@ -92,10 +87,6 @@ export const api = {
   configureShortcut: (shortcutId: string) => command<void>('configure_shortcut', { shortcutId }),
   settings: (settings: Settings) =>
     command<void>('update_settings', { settings: settingsSchema.parse(settings) }),
-  saveKey: (key: string) => command<void>('save_api_key', { key }),
-  removeKey: () => command<void>('remove_api_key'),
-  saveCleanupKey: (key: string) => command<void>('save_cleanup_key', { key }),
-  removeCleanupKey: () => command<void>('remove_cleanup_key'),
   deleteHistory: (id: string | null) => command<void>('delete_history', { id }),
   start: (test = false) => command<void>('start_dictation', { test }),
   stop: () => command<void>('stop_dictation'),
@@ -104,12 +95,6 @@ export const api = {
     native ? command<void>('copy_text', { text }) : navigator.clipboard.writeText(text),
   openMain: () => command<void>('open_main'),
   dismiss: () => command<void>('dismiss_overlay'),
-  openDeepgram: () =>
-    native
-      ? openUrl('https://console.deepgram.com/')
-      : Promise.resolve(
-          window.open('https://console.deepgram.com/', '_blank', 'noopener,noreferrer'),
-        ),
 };
 export const useAuthUser = () =>
   useQuery({

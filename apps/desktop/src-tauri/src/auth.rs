@@ -33,6 +33,7 @@ fn api_url() -> String {
 
 fn client() -> Result<reqwest::Client, String> {
     reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
         .timeout(Duration::from_secs(20))
         .build()
         .map_err(|_| "VoxType could not prepare a secure connection.".into())
@@ -42,6 +43,17 @@ async fn stored_token() -> Result<Option<String>, String> {
     tokio::task::spawn_blocking(storage::auth_token)
         .await
         .map_err(|_| "The account keyring request failed.".to_string())?
+}
+
+/// Only the account session is persisted. Provider credentials stay on the server.
+pub(crate) async fn speech_request(path: &str) -> Result<reqwest::RequestBuilder, String> {
+    let token = tokio::time::timeout(Duration::from_secs(6), stored_token())
+        .await
+        .map_err(|_| "Unlock your login keyring and try again.")??
+        .ok_or("Sign in with Google to use VoxType dictation.")?;
+    Ok(client()?
+        .post(format!("{}/v1/speech/{path}", api_url()))
+        .bearer_auth(token))
 }
 
 pub async fn current_user() -> Result<Option<AuthUser>, String> {

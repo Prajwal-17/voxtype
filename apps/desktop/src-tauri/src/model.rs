@@ -95,10 +95,6 @@ pub enum Phase {
 #[serde(rename_all = "camelCase")]
 pub struct Bootstrap {
     pub settings: Settings,
-    pub has_key: bool,
-    pub key_error: Option<String>,
-    pub has_cleanup_key: bool,
-    pub cleanup_key_error: Option<String>,
     pub snapshot: Snapshot,
     pub shortcut_registered: bool,
     pub version: String,

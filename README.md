@@ -1,6 +1,6 @@
 # VoxType
 
-Personal dictation app. Streams mic audio to Deepgram and pastes the transcript into the focused app. Keys stay in the OS keyring.
+Personal dictation app. Streams mic audio to Deepgram and pastes the transcript into the focused app. Sign in with Google; VoxType supplies short-lived transcription credentials. Provider API keys stay on the server.
 
 ## Design system
 
@@ -31,7 +31,7 @@ shows the native overlay for 15 seconds without recording or calling transcripti
 It should stay above other apps at the bottom of the monitor under the pointer, clear of the dock,
 without taking keyboard focus or appearing in Alt-Tab. The command is debug-only.
 
-1. Settings → save your Deepgram API key.
+1. Sign in with Google. Configure microphone, language, and optional cleanup in Settings.
 2. Start dictation, Finish to copy/paste.
 
 The installed production app defaults to `Right Alt`. VoxType Dev defaults to
@@ -64,7 +64,9 @@ VOXTYPE_API_URL=https://api.example.com pnpm build:desktop
 ## Cloud backend
 
 The sync/auth API lives in [`apps/api`](apps/api). See its README for D1 creation, Google OAuth,
-migrations, local development, and deployment.
+migrations, local development, and deployment. Set `DEEPGRAM_API_KEY` and `DEEPSEEK_API_KEY` on
+the Worker. Desktop and mobile use authenticated `/v1/speech/token` and `/v1/speech/cleanup`
+endpoints; neither app stores provider keys. The desktop keyring holds only the VoxType account session.
 
 Production builds require an HTTPS API URL and fail during packaging when it is missing. Development
 builds always default to the local Worker:

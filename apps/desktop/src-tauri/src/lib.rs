@@ -6,6 +6,7 @@ mod display;
 mod environment;
 mod model;
 mod session;
+mod speech;
 mod storage;
 
 use model::*;
@@ -69,28 +70,14 @@ async fn bootstrap(app: tauri::AppHandle) -> Result<Bootstrap, String> {
             label: shortcut.label.clone(),
         });
     }
-    let (key, cleanup_key) =
-        tokio::join!(key_status(storage::key), key_status(storage::cleanup_key));
     let state = app.state::<AppState>();
     let snapshot = state
         .snapshot
         .lock()
         .map_err(|_| "Session is unavailable.")?
         .clone();
-    let (has_key, key_error) = match key {
-        Ok(k) => (k.is_some(), None),
-        Err(e) => (false, Some(e)),
-    };
-    let (has_cleanup_key, cleanup_key_error) = match cleanup_key {
-        Ok(k) => (k.is_some(), None),
-        Err(e) => (false, Some(e)),
-    };
     Ok(Bootstrap {
         settings,
-        has_key,
-        key_error,
-        has_cleanup_key,
-        cleanup_key_error,
         snapshot,
         shortcut_registered: state.shortcut_registered.load(Ordering::Relaxed),
         version: env!("CARGO_PKG_VERSION").into(),
@@ -104,41 +91,6 @@ async fn bootstrap(app: tauri::AppHandle) -> Result<Bootstrap, String> {
         shortcut_label: shortcut.label,
         shortcut_options,
     })
-}
-async fn key_status(
-    read: fn() -> Result<Option<String>, String>,
-) -> Result<Option<String>, String> {
-    tokio::time::timeout(
-        std::time::Duration::from_secs(6),
-        tokio::task::spawn_blocking(read),
-    )
-    .await
-    .map_err(|_| "Unlock your login keyring, then reopen Settings.")?
-    .map_err(|_| "Keyring request failed.")?
-}
-#[tauri::command]
-async fn save_cleanup_key(key: String) -> Result<(), String> {
-    tokio::task::spawn_blocking(move || storage::save_cleanup_key(&key))
-        .await
-        .map_err(|_| "Keyring request failed.")?
-}
-#[tauri::command]
-async fn remove_cleanup_key() -> Result<(), String> {
-    tokio::task::spawn_blocking(storage::delete_cleanup_key)
-        .await
-        .map_err(|_| "Keyring request failed.")?
-}
-#[tauri::command]
-async fn save_api_key(key: String) -> Result<(), String> {
-    tokio::task::spawn_blocking(move || storage::save_key(&key))
-        .await
-        .map_err(|_| "Keyring request failed.")?
-}
-#[tauri::command]
-async fn remove_api_key() -> Result<(), String> {
-    tokio::task::spawn_blocking(storage::delete_key)
-        .await
-        .map_err(|_| "Keyring request failed.")?
 }
 #[tauri::command]
 async fn get_auth_user(app: tauri::AppHandle) -> Result<Option<AuthUser>, String> {
@@ -345,13 +297,9 @@ pub fn run() {
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
             bootstrap,
-            save_api_key,
-            remove_api_key,
             get_auth_user,
             sign_in_with_google,
             sign_out,
-            save_cleanup_key,
-            remove_cleanup_key,
             update_settings,
             get_history,
             delete_history,
