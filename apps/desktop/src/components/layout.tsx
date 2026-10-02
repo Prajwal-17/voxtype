@@ -1,56 +1,5 @@
-import { cva, type VariantProps } from 'class-variance-authority';
-import type { LucideIcon } from 'lucide-react';
 import * as React from 'react';
 import { cn } from '../lib/utils';
-import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
-
-// Sidebar nav item — replaces the old
-// aria-[current=page]:... hover:not-aria-[current=page]:... [&>svg]:... [&>span]:hidden soup
-// with a clean `active` variant.
-const sidebarNavItemVariants = cva(
-  'flex h-10 w-full items-center gap-3 rounded-control border-0 bg-transparent px-3 text-left text-ui font-medium transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent max-lg:justify-center max-lg:px-0',
-  {
-    variants: {
-      active: {
-        true: 'bg-navigation-raised text-inverse',
-        false: 'text-inverse-muted hover:bg-navigation-raised hover:text-inverse',
-      },
-    },
-    defaultVariants: { active: false },
-  },
-);
-
-export function SidebarNavItem({
-  icon: Icon,
-  label,
-  active,
-  onClick,
-}: {
-  icon: LucideIcon;
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          aria-label={label}
-          aria-current={active ? 'page' : undefined}
-          onClick={onClick}
-          className={cn(sidebarNavItemVariants({ active }))}
-        >
-          <Icon size={17} strokeWidth={1.8} className={cn(active && 'text-white')} />
-          <span className="max-lg:hidden">{label}</span>
-        </button>
-      </TooltipTrigger>
-      <TooltipContent side="right" className="hidden max-lg:block">
-        {label}
-      </TooltipContent>
-    </Tooltip>
-  );
-}
 
 // Page header — replaces [&_h1]: / [&_p]: selector soup with explicit elements.
 export function PageHeader({
@@ -137,5 +86,3 @@ export function FieldRow({
     </div>
   );
 }
-
-export type SidebarNavItemVariants = VariantProps<typeof sidebarNavItemVariants>;

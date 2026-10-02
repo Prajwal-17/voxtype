@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import '@voxtype/design-system/web.css';
+@import './design-trial.css';
 
 @layer base {
   * {
@@ -44,4 +45,33 @@
     background: var(--palette-faint);
     background-clip: padding-box;
   }
+}
+
+/* Standard shadcn color names map to the existing desktop design tokens. */
+@theme inline {
+  --color-background: var(--palette-canvas);
+  --color-foreground: var(--palette-ink);
+  --color-card: var(--palette-surface);
+  --color-card-foreground: var(--palette-ink);
+  --color-popover: var(--palette-surface);
+  --color-popover-foreground: var(--palette-ink);
+  --color-primary: var(--palette-accent);
+  --color-primary-foreground: var(--trial-on-accent, var(--palette-inverse));
+  --color-secondary: var(--palette-surface-subtle);
+  --color-secondary-foreground: var(--palette-ink);
+  --color-muted-foreground: var(--palette-muted);
+  --color-accent-foreground: var(--palette-accent-ink);
+  --color-destructive: var(--palette-danger);
+  --color-destructive-foreground: #fff;
+  --color-border: var(--palette-line);
+  --color-input: var(--palette-line-strong);
+  --color-ring: var(--palette-accent);
+  --color-sidebar: var(--palette-navigation);
+  --color-sidebar-foreground: var(--palette-inverse);
+  --color-sidebar-primary: var(--palette-accent);
+  --color-sidebar-primary-foreground: var(--trial-on-accent, var(--palette-inverse));
+  --color-sidebar-accent: var(--palette-navigation-raised);
+  --color-sidebar-accent-foreground: var(--palette-inverse);
+  --color-sidebar-border: var(--palette-navigation-line);
+  --color-sidebar-ring: var(--palette-accent);
 }

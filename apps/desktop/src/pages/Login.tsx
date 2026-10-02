@@ -1,4 +1,4 @@
-import { CircleAlert } from 'lucide-react';
+import { WarningCircleIcon } from '../components/icons';
 import { useEffect, useRef } from 'react';
 import { Button, Logo } from '../components/ui';
 import { Card } from '../components/ui/card';
@@ -73,7 +73,7 @@ export function LoginPage({
                 className="mt-5 flex items-start gap-2.5 rounded-control bg-danger-soft px-3.5 py-3 text-left text-ui text-danger"
                 role="alert"
               >
-                <CircleAlert size={16} className="mt-0.5 shrink-0" />
+                <WarningCircleIcon size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
                 <span>{error}</span>
               </div>
             )}

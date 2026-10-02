@@ -1,24 +1,40 @@
 import {
-  ArrowRight,
-  AudioLines,
-  Check,
-  CircleAlert,
-  Copy,
-  FileText,
-  History,
-  Keyboard,
-  Mic,
-  Settings2,
-  Square,
-  UserRound,
-  X,
-} from 'lucide-react';
+  ArrowRightIcon,
+  WaveformIcon,
+  CheckIcon,
+  WarningCircleIcon,
+  CopyIcon,
+  FileTextIcon,
+  ClockCounterClockwiseIcon,
+  KeyboardIcon,
+  MicrophoneIcon,
+  SlidersHorizontalIcon,
+  StopIcon,
+  UserCircleIcon,
+  XIcon,
+} from './components/icons';
 import { useEffect, useState } from 'react';
+import { DesignSwitcher } from './components/design-switcher';
+import { useDesignTrial, type Design } from './lib/design-trial';
 import { VoiceOverlay } from './components/overlay';
-import { PageHeader, SidebarNavItem, StatusDot } from './components/layout';
+import { PageHeader, StatusDot } from './components/layout';
 import { Button, IconButton, Logo, Shortcut } from './components/ui';
 import { Card } from './components/ui/card';
 import { Skeleton } from './components/ui/skeleton';
+import {
+  SidebarProvider,
+  Sidebar,
+  SidebarHeader,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarInset,
+  SidebarTrigger,
+} from './components/ui/sidebar';
 import { Waveform } from './components/waveform';
 import {
   native,
@@ -47,13 +63,23 @@ import { SettingsPage } from './pages/Settings';
 type Page = 'dictation' | 'history' | 'settings' | 'profile';
 
 const navigation = [
-  { id: 'dictation', icon: AudioLines, label: 'Dictation' },
-  { id: 'history', icon: History, label: 'History' },
-  { id: 'settings', icon: Settings2, label: 'Settings' },
-  { id: 'profile', icon: UserRound, label: 'Profile' },
+  { id: 'dictation', icon: WaveformIcon, label: 'Dictation' },
+  { id: 'history', icon: ClockCounterClockwiseIcon, label: 'History' },
+  { id: 'settings', icon: SlidersHorizontalIcon, label: 'Settings' },
+  { id: 'profile', icon: UserCircleIcon, label: 'Profile' },
 ] as const;
 
 export function App() {
+  const { design, setDesign } = useDesignTrial();
+  return (
+    <>
+      <Application design={design} />
+      <DesignSwitcher design={design} onChange={setDesign} />
+    </>
+  );
+}
+
+function Application({ design }: { design: Design }) {
   const auth = useAuthUser();
   const { signIn, signOut } = useAuthActions();
 
@@ -70,15 +96,22 @@ export function App() {
   }
 
   return (
-    <Workspace user={auth.data} signingOut={signOut.isPending} onSignOut={() => signOut.mutate()} />
+    <Workspace
+      design={design}
+      user={auth.data}
+      signingOut={signOut.isPending}
+      onSignOut={() => signOut.mutate()}
+    />
   );
 }
 
 function Workspace({
+  design,
   user,
   signingOut,
   onSignOut,
 }: {
+  design: Design;
   user: AuthUser;
   signingOut: boolean;
   onSignOut: () => void;
@@ -107,62 +140,95 @@ function Workspace({
   }, [active, preview, cancel]);
 
   return (
-    <div className="min-h-screen bg-canvas text-ink selection:bg-accent-soft selection:text-accent-ink">
-      <aside className="sidebar group fixed inset-y-0 left-0 z-30 flex w-60 flex-col border-r border-navigation-line bg-navigation p-4 text-inverse max-lg:w-20 max-lg:px-3">
-        <div className="flex h-12 items-center px-2 max-lg:justify-center max-lg:px-0">
-          <Logo />
-        </div>
-
-        <nav className="mt-7 flex flex-col gap-1" aria-label="Main navigation">
-          {navigation.map(({ id, icon, label }) => (
-            <SidebarNavItem
-              key={id}
-              icon={icon}
-              label={label}
-              active={page === id}
-              onClick={() => setPage(id)}
+    <SidebarProvider className="desktop-workspace bg-canvas text-ink selection:bg-accent-soft selection:text-accent-ink">
+      <Sidebar>
+        <SidebarHeader className="pt-7 pb-8">
+          <div className="flex h-10 items-center px-3 group-data-[collapsible=icon]/sidebar:justify-center group-data-[collapsible=icon]/sidebar:px-0">
+            <Logo
+              collapse={false}
+              className="group-data-[collapsible=icon]/sidebar:[&>span]:hidden"
             />
-          ))}
-        </nav>
-
-        <div className="mt-auto space-y-3 max-lg:hidden">
+          </div>
+        </SidebarHeader>
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupLabel>WORKSPACE</SidebarGroupLabel>
+            <nav aria-label="Main navigation">
+              <SidebarMenu>
+                {navigation.map(({ id, icon: Icon, label }) => (
+                  <SidebarMenuItem key={id}>
+                    <SidebarMenuButton
+                      isActive={page === id}
+                      tooltip={label}
+                      aria-label={label}
+                      onClick={() => setPage(id)}
+                    >
+                      <Icon
+                        size={20}
+                        weight={page === id ? 'fill' : 'regular'}
+                        aria-hidden="true"
+                      />
+                      <span className="group-data-[collapsible=icon]/sidebar:hidden">{label}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </nav>
+          </SidebarGroup>
+        </SidebarContent>
+        <SidebarFooter>
           <button
             type="button"
-            className="w-full rounded-panel bg-navigation-raised p-3.5 text-left transition-colors hover:bg-navigation-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className="rounded-panel bg-navigation-raised p-4 text-left text-inverse hover:bg-navigation-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent group-data-[collapsible=icon]/sidebar:hidden"
             onClick={() => setPage('settings')}
           >
-            <span className="flex items-center gap-2 text-ui font-medium text-inverse">
-              <Keyboard size={16} /> Dictate anywhere
+            <KeyboardIcon size={24} weight="duotone" aria-hidden="true" className="mb-3" />
+            <span className="block text-ui font-semibold">Your voice, anywhere.</span>
+            <span className="mt-1.5 block text-caption leading-relaxed text-inverse-muted">
+              One shortcut. Any desktop app.
             </span>
-            <span className="mt-2.5 block">
+            <span className="mt-4 block">
               <Shortcut label={boot.data?.shortcutLabel} />
             </span>
           </button>
-        </div>
-        <div className="mt-auto hidden justify-center max-lg:flex">
-          <IconButton
-            label={`${boot.data?.shortcutLabel ?? 'Recording'} shortcut settings`}
-            onClick={() => setPage('settings')}
-            className="text-inverse-muted hover:bg-navigation-raised hover:text-inverse"
+          <SidebarMenuButton
+            tooltip="Profile"
+            aria-label="Open profile"
+            onClick={() => setPage('profile')}
+            className="mt-1"
           >
-            <Keyboard size={17} />
-          </IconButton>
-        </div>
-      </aside>
-
-      <main className="ml-60 min-h-screen min-w-0 max-lg:ml-20">
-        {!native && (
-          <div className="border-b border-warning/15 bg-warning-soft px-5 py-2 text-center text-caption font-medium text-warning">
-            Browser preview · Open the desktop app to record.
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-accent-soft text-sm font-semibold text-accent-ink">
+              {user.name.slice(0, 1)}
+            </span>
+            <span className="min-w-0 group-data-[collapsible=icon]/sidebar:hidden">
+              <span className="block text-ui font-medium text-inverse">
+                {user.name.split(' ')[0]}
+              </span>
+              <span className="block text-[11px] text-inverse-muted">Personal workspace</span>
+            </span>
+          </SidebarMenuButton>
+        </SidebarFooter>
+      </Sidebar>
+      <SidebarInset className="desktop-main min-h-screen">
+        <header className="workspace-topbar flex h-16 items-center justify-between gap-4 border-b border-line px-8 text-caption text-muted">
+          <div className="flex min-w-0 items-center gap-3">
+            <SidebarTrigger />
+            <span className="h-4 w-px bg-line" aria-hidden="true" />
+            <span className="text-ui font-medium text-ink">
+              {navigation.find((item) => item.id === page)?.label}
+            </span>
           </div>
-        )}
-        {native && isDevelopment && (
-          <div className="border-b border-warning/15 bg-warning-soft px-5 py-2 text-center text-caption font-medium text-warning">
-            Development environment · Local backend and isolated app data
-          </div>
-        )}
+          <span className="flex items-center gap-2 text-right">
+            <span className="size-1.5 shrink-0 rounded-full bg-accent" />
+            {native
+              ? isDevelopment
+                ? 'Development workspace'
+                : 'Personal workspace'
+              : 'Desktop preview · Recording available in the app'}
+          </span>
+        </header>
 
-        <div className="mx-auto w-full max-w-[1240px] px-8 py-9 max-md:px-5 max-md:py-7">
+        <div className="workspace-content mx-auto w-full max-w-[1240px] px-8 pt-9 pb-48 max-md:px-5 max-md:py-7">
           {boot.isPending ? (
             <div className="flex flex-col gap-4 py-4" aria-label="Loading VoxType">
               <Skeleton className="h-8 w-48" />
@@ -189,6 +255,7 @@ function Workspace({
             <>
               {page === 'dictation' && (
                 <Dictation
+                  design={design}
                   boot={boot.data}
                   session={session}
                   onSettings={() => setPage('settings')}
@@ -205,11 +272,11 @@ function Workspace({
         </div>
 
         {preview && page === 'dictation' && (
-          <div className="fixed right-6 bottom-6 z-40 w-[328px] max-w-[calc(100vw-2rem)] rounded-panel border border-line bg-surface p-3 shadow-floating max-md:right-4 max-md:bottom-4">
+          <div className="fixed right-6 bottom-48 z-40 w-[328px] max-w-[calc(100vw-2rem)] rounded-panel border border-line bg-surface p-3 shadow-floating max-md:right-4 max-md:bottom-4">
             <div className="flex items-center justify-between pl-1 text-caption text-muted">
               <span>Overlay preview · {active ? 'Live' : 'Idle'}</span>
               <IconButton label="Close preview" onClick={() => setPreview(false)}>
-                <X size={15} />
+                <XIcon size={16} aria-hidden="true" />
               </IconButton>
             </div>
             <VoiceOverlay
@@ -217,17 +284,19 @@ function Workspace({
             />
           </div>
         )}
-      </main>
-    </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }
 
 function Dictation({
+  design,
   boot,
   session,
   onSettings,
   onPreview,
 }: {
+  design: Design;
   boot: Bootstrap;
   session: Session;
   onSettings: () => void;
@@ -259,26 +328,30 @@ function Dictation({
 
   return (
     <>
-      <PageHeader
-        title="Dictation"
-        description="Speak here or use your shortcut from any desktop app."
-        actions={
-          <Button variant="outline" size="sm" onClick={onPreview}>
-            <AudioLines size={15} /> Preview overlay
-          </Button>
-        }
-      />
-
-      <div className="grid grid-cols-[minmax(0,1fr)_19rem] items-stretch gap-5 max-[960px]:grid-cols-1">
-        <Card className="flex min-h-[520px] min-w-0 flex-col overflow-hidden max-[960px]:min-h-[420px]">
-          <div className="flex min-h-14 items-center justify-between gap-4 border-b border-line px-5">
+      <div className="dictation-heading">
+        <p className="design-eyebrow mb-4 text-[10px] font-semibold tracking-[.18em] text-accent">
+          {design.eyebrow}
+        </p>
+        <PageHeader
+          title={design.title}
+          description="Speak naturally. We’ll take it from here."
+          actions={
+            <Button variant="outline" size="sm" onClick={onPreview}>
+              <WaveformIcon size={16} aria-hidden="true" /> Preview overlay
+            </Button>
+          }
+        />
+      </div>
+      <div className="dictation-grid grid grid-cols-[minmax(0,1fr)_19rem] items-stretch gap-5 max-[960px]:grid-cols-1">
+        <Card className="transcript-panel flex min-h-[420px] min-w-0 flex-col overflow-hidden max-[960px]:min-h-[420px]">
+          <div className="transcript-topline flex min-h-14 items-center justify-between gap-4 border-b border-line px-5">
             <span className="flex items-center gap-2 text-ui font-semibold">
-              <FileText size={15} className="text-muted" /> Transcript
+              <FileTextIcon size={16} className="text-muted" aria-hidden="true" /> Transcript
             </span>
             <span className="text-caption text-muted">{language}</span>
           </div>
 
-          <div className="min-w-0 flex-1 px-7 py-7 max-md:px-5 max-md:py-6">
+          <div className="transcript-body min-w-0 flex-1 px-7 py-7 max-md:px-5 max-md:py-6">
             {text && !session.isTest ? (
               <p className="max-h-[390px] overflow-auto whitespace-pre-wrap [overflow-wrap:anywhere] text-transcript font-transcript tracking-[-.01em]">
                 <span>{session.text}</span>
@@ -291,27 +364,32 @@ function Dictation({
                 )}
               </p>
             ) : (
-              <div className="flex h-full min-h-[260px] flex-col justify-center">
-                <span className="mb-5 block h-1 w-10 rounded-full bg-accent" aria-hidden="true" />
+              <div className="transcript-empty flex h-full min-h-[220px] flex-col justify-center">
+                <span
+                  className="empty-mark mb-6 flex size-12 items-center justify-center rounded-2xl bg-accent-soft text-accent-ink"
+                  aria-hidden="true"
+                >
+                  <WaveformIcon weight="duotone" size={24} aria-hidden="true" />
+                </span>
                 <h2 className="max-w-md text-subheading font-semibold tracking-[-.018em]">
                   {active
                     ? session.isTest
                       ? 'Test your microphone'
                       : 'Listening for your words…'
-                    : 'Your transcript will appear here'}
+                    : 'A blank page. Endless possibilities.'}
                 </h2>
                 <p className="mt-2 max-w-md text-body text-muted">
                   {active
                     ? session.isTest
                       ? 'Speak naturally to see the live microphone level.'
                       : 'Start speaking when you’re ready. Natural pauses are fine.'
-                    : 'Start a dictation, then speak naturally. VoxType will keep the text ready to copy or paste.'}
+                    : 'An idea, a message, a first draft. Just say it out loud — your words will land right here.'}
                 </p>
               </div>
             )}
           </div>
 
-          <div className="flex min-h-14 items-center justify-between gap-3 border-t border-line bg-raised px-5 text-caption text-muted">
+          <div className="transcript-footer flex min-h-14 items-center justify-between gap-3 border-t border-line bg-raised px-5 text-caption text-muted">
             <span>{text ? `${text.trim().split(/\s+/).length} words` : 'No audio is stored'}</span>
             <Button
               variant="ghost"
@@ -320,15 +398,15 @@ function Dictation({
               disabled={!text}
               loading={copy.isPending}
             >
-              <Copy size={14} /> Copy transcript
+              <CopyIcon size={16} aria-hidden="true" /> Copy transcript
             </Button>
           </div>
         </Card>
 
-        <Card className="flex min-h-[520px] flex-col p-5 max-[960px]:min-h-0">
-          <div className="flex items-center justify-between">
+        <Card className="recorder-panel flex min-h-[420px] flex-col p-5 max-[960px]:min-h-0">
+          <div className="recorder-heading flex flex-wrap items-center justify-between gap-2">
             <span className="flex items-center gap-2 text-ui font-semibold">
-              <Mic size={15} className="text-muted" /> Recorder
+              <MicrophoneIcon size={16} className="text-muted" aria-hidden="true" /> Recorder
             </span>
             <span
               className={cn(
@@ -341,8 +419,19 @@ function Dictation({
             </span>
           </div>
 
-          <div className="flex flex-1 flex-col items-center justify-center py-10 max-[960px]:py-8">
-            <Waveform level={session.level} active={session.phase === 'listening'} large />
+          <div className="recorder-visual flex flex-1 flex-col items-center justify-center py-6 max-[960px]:py-8">
+            <div className="recorder-orbit flex items-center justify-center">
+              {active ? (
+                <Waveform level={session.level} active={session.phase === 'listening'} large />
+              ) : (
+                <MicrophoneIcon
+                  weight="duotone"
+                  size={40}
+                  className="text-accent"
+                  aria-hidden="true"
+                />
+              )}
+            </div>
             <span className="mt-7 text-timer font-medium tracking-[-.025em] tabular-nums">
               {duration(session.elapsedMs)}
             </span>
@@ -351,7 +440,7 @@ function Dictation({
             </span>
           </div>
 
-          <div className="space-y-2">
+          <div className="recorder-actions space-y-2">
             {active ? (
               <>
                 <Button
@@ -361,7 +450,7 @@ function Dictation({
                   onClick={() => recording.stop.mutate()}
                   loading={finishing || recording.stop.isPending}
                 >
-                  <Square size={12} fill="currentColor" /> Finish{' '}
+                  <StopIcon size={12} weight="fill" aria-hidden="true" /> Finish{' '}
                   {session.isTest ? 'test' : 'dictation'}
                 </Button>
                 <Button
@@ -370,7 +459,7 @@ function Dictation({
                   onClick={() => recording.cancel.mutate()}
                   disabled={recording.cancel.isPending}
                 >
-                  <X size={15} /> Cancel
+                  <XIcon size={16} aria-hidden="true" /> Cancel
                 </Button>
               </>
             ) : (
@@ -383,7 +472,7 @@ function Dictation({
                   disabled={!native}
                   loading={recording.start.isPending}
                 >
-                  <Mic size={17} /> Start dictation
+                  <MicrophoneIcon size={18} aria-hidden="true" /> Start dictation
                 </Button>
                 <div className="flex min-h-9 items-center justify-center gap-2 text-caption text-muted">
                   Or press <Shortcut label={boot.shortcutLabel} />
@@ -392,13 +481,37 @@ function Dictation({
             )}
           </div>
 
-          <div className="mt-5 flex items-center justify-between border-t border-line pt-4 text-caption text-muted">
+          <div className="recorder-detail mt-5 flex items-center justify-between border-t border-line pt-4 text-caption text-muted">
             <span>{boot.settings.voiceDetection ? 'Silence detection' : 'Continuous audio'}</span>
             <span className="font-medium text-ink">
               {boot.settings.voiceDetection ? 'On' : 'Off'}
             </span>
           </div>
         </Card>
+      </div>
+
+      <div className="workspace-notes mt-6 grid grid-cols-3 gap-6 border-t border-line pt-5 text-caption text-muted">
+        <div className="flex gap-3">
+          <span className="font-mono text-accent">01</span>
+          <div>
+            <span className="block font-medium text-ink">Speak your mind</span>
+            <p className="mt-1">Use your shortcut from any app.</p>
+          </div>
+        </div>
+        <div className="flex gap-3">
+          <span className="font-mono text-accent">02</span>
+          <div>
+            <span className="block font-medium text-ink">Find your flow</span>
+            <p className="mt-1">Natural pauses are always welcome.</p>
+          </div>
+        </div>
+        <div className="flex gap-3">
+          <span className="font-mono text-accent">03</span>
+          <div>
+            <span className="block font-medium text-ink">Make it yours</span>
+            <p className="mt-1">Copy your words into whatever’s next.</p>
+          </div>
+        </div>
       </div>
 
       {session.originalText && !active && (
@@ -415,7 +528,7 @@ function Dictation({
             onClick={() => copy.mutate(session.originalText!)}
             loading={copy.isPending}
           >
-            <Copy size={14} /> Copy original
+            <CopyIcon size={16} aria-hidden="true" /> Copy original
           </Button>
         </details>
       )}
@@ -429,9 +542,9 @@ function Dictation({
           role={session.phase === 'error' ? 'alert' : 'status'}
         >
           {session.phase === 'error' ? (
-            <CircleAlert size={17} className="mt-0.5 shrink-0" />
+            <WarningCircleIcon size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
           ) : (
-            <Check size={17} className="mt-0.5 shrink-0" />
+            <CheckIcon size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
           )}
           <span className="min-w-0 [overflow-wrap:anywhere]">{session.message}</span>
           {session.phase === 'error' && (
@@ -441,7 +554,7 @@ function Dictation({
               onClick={onSettings}
               className="ml-auto -my-1 text-current"
             >
-              Settings <ArrowRight size={13} />
+              Settings <ArrowRightIcon size={13} aria-hidden="true" />
             </Button>
           )}
         </div>

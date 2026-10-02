@@ -134,7 +134,20 @@ export function Logo({
       aria-label={appName}
       className={cn('relative flex items-center gap-2.5', className)}
     >
-      <img src="/voxtype.svg" alt="" width={32} height={32} className="size-8 shrink-0" />
+      <img
+        src="/voxtype.svg"
+        alt=""
+        width={32}
+        height={32}
+        className="brand-mark-original size-8 shrink-0"
+      />
+      <img
+        src="/voxtype-tide.svg"
+        alt=""
+        width={32}
+        height={32}
+        className="brand-mark-tide hidden size-8 shrink-0"
+      />
       <span
         aria-hidden="true"
         className={cn(

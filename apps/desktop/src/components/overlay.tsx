@@ -1,4 +1,11 @@
-import { ArrowUpRight, CircleAlert, FileText, LoaderCircle, Square, X } from 'lucide-react';
+import {
+  ArrowUpRightIcon,
+  WarningCircleIcon,
+  FileTextIcon,
+  CircleNotchIcon,
+  StopIcon,
+  XIcon,
+} from './icons';
 import { cn } from '../lib/utils';
 import { toast } from 'sonner';
 import { api, useRecording, useSession } from '../lib/api';
@@ -75,7 +82,7 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
                 )
         }
       >
-        <X size={15} strokeWidth={1.8} />
+        <XIcon size={16} aria-hidden="true" />
       </button>
       <div
         className={cn(
@@ -84,17 +91,16 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
         )}
       >
         {finishing ? (
-          <LoaderCircle
+          <CircleNotchIcon
             size={20}
-            strokeWidth={1.8}
             className="animate-spin motion-reduce:animate-none"
             data-signal="loading"
             aria-hidden="true"
           />
         ) : failed ? (
-          <CircleAlert size={16} />
+          <WarningCircleIcon size={16} aria-hidden="true" />
         ) : done ? (
-          <FileText size={16} strokeWidth={1.8} />
+          <FileTextIcon size={16} aria-hidden="true" />
         ) : (
           <Waveform level={session.level} active={session.phase === 'listening'} overlay />
         )}
@@ -107,9 +113,9 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
         onClick={() => (failed || done ? recover() : stop.mutate())}
       >
         {failed || done ? (
-          <ArrowUpRight size={15} strokeWidth={1.9} />
+          <ArrowUpRightIcon size={16} aria-hidden="true" />
         ) : (
-          <Square size={11} fill="currentColor" strokeWidth={1.5} />
+          <StopIcon size={11} weight="fill" aria-hidden="true" />
         )}
       </button>
 

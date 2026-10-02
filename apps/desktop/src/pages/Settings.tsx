@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Check,
-  ChevronDown,
-  LoaderCircle,
-  Mic,
-  RefreshCw,
-  Square,
-  TriangleAlert,
-} from 'lucide-react';
+  CheckIcon,
+  CaretDownIcon,
+  CircleNotchIcon,
+  MicrophoneIcon,
+  ArrowsClockwiseIcon,
+  StopIcon,
+  WarningIcon,
+} from '../components/icons';
 import { toast } from 'sonner';
 import { api, native, useRecording, useSession } from '../lib/api';
 import { captureShortcut } from '../lib/shortcuts';
@@ -135,7 +135,11 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
               onClick={() => void microphones.refetch()}
               disabled={microphones.isFetching}
             >
-              <RefreshCw size={15} className={microphones.isFetching ? 'animate-spin' : ''} />
+              <ArrowsClockwiseIcon
+                size={16}
+                className={microphones.isFetching ? 'animate-spin' : ''}
+                aria-hidden="true"
+              />
             </IconButton>
           </div>
         </FieldRow>
@@ -146,7 +150,7 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
         )}
         <div className="mt-4 flex flex-wrap items-center gap-3 rounded-control bg-subtle px-3 py-2.5">
           <div className="mr-auto flex items-center gap-2 text-caption text-muted">
-            <Mic size={16} />
+            <MicrophoneIcon size={16} aria-hidden="true" />
             <span>
               {session.isTest && active
                 ? 'Listening to your microphone…'
@@ -165,7 +169,7 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
               session.isTest && active ? recording.stop.mutate() : recording.start.mutate(true)
             }
           >
-            {session.isTest && active ? <Square size={12} /> : null}
+            {session.isTest && active ? <StopIcon size={12} aria-hidden="true" /> : null}
             {session.isTest && active ? 'Stop test' : 'Test mic'}
           </Button>
         </div>
@@ -257,7 +261,7 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
           <span>{value.vocabulary.length} / 100 terms</span>
         </div>
       </section>
-      <div className="sticky bottom-4 z-10 mb-5 flex items-center justify-between gap-3 rounded-panel border border-line bg-surface px-4 py-3 text-caption text-muted shadow-panel">
+      <div className="settings-save-bar sticky bottom-4 z-10 mb-5 flex items-center justify-between gap-3 rounded-panel border border-line bg-surface px-4 py-3 text-caption text-muted shadow-panel">
         <span>
           {active
             ? 'Finish recording to change preferences.'
@@ -308,7 +312,7 @@ function DesktopSetup({ boot, active }: { boot: Bootstrap; active: boolean }) {
         <div className="flex items-center justify-between gap-4">
           <h2 className="text-title font-semibold tracking-[-.02em]">Ubuntu desktop setup</h2>
           <Button variant="ghost" onClick={() => void checks.refetch()} loading={checks.isFetching}>
-            <RefreshCw size={14} /> Check again
+            <ArrowsClockwiseIcon size={16} aria-hidden="true" /> Check again
           </Button>
         </div>
         <p className="mt-1 text-ui text-muted">
@@ -395,7 +399,8 @@ function DesktopSetup({ boot, active }: { boot: Bootstrap; active: boolean }) {
       <div className="grid grid-cols-2 gap-x-6 gap-y-5 max-md:grid-cols-1">
         {checks.isPending ? (
           <p className="flex items-center gap-2 text-ui text-muted">
-            <LoaderCircle size={16} className="animate-spin" /> Checking your desktop…
+            <CircleNotchIcon size={16} className="animate-spin" aria-hidden="true" /> Checking your
+            desktop…
           </p>
         ) : checks.isError ? (
           <p className="mt-2 text-ui text-danger">
@@ -405,9 +410,9 @@ function DesktopSetup({ boot, active }: { boot: Bootstrap; active: boolean }) {
           checks.data?.map((check) => (
             <div className="flex items-start gap-2" key={check.name}>
               {check.status === 'ok' ? (
-                <Check className="mt-0.5 text-success" size={16} />
+                <CheckIcon className="mt-0.5 text-success" size={16} aria-hidden="true" />
               ) : (
-                <TriangleAlert className="mt-0.5 text-warning" size={16} />
+                <WarningIcon className="mt-0.5 text-warning" size={16} aria-hidden="true" />
               )}
               <div>
                 <strong className="text-ui font-medium">{check.name}</strong>
@@ -423,10 +428,11 @@ function DesktopSetup({ boot, active }: { boot: Bootstrap; active: boolean }) {
         aria-expanded={expanded}
       >
         Shortcut & paste setup{' '}
-        <ChevronDown
+        <CaretDownIcon
           size={16}
           className="transition-transform duration-150"
           style={{ transform: expanded ? 'rotate(180deg)' : undefined }}
+          aria-hidden="true"
         />
       </button>
       {expanded && (

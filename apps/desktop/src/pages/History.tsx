@@ -1,5 +1,12 @@
 import { useMemo, useState } from 'react';
-import { ArrowRight, AudioLines, Copy, History, Search, Trash2 } from 'lucide-react';
+import {
+  ArrowRightIcon,
+  WaveformIcon,
+  CopyIcon,
+  ClockCounterClockwiseIcon,
+  MagnifyingGlassIcon,
+  TrashSimpleIcon,
+} from '../components/icons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { api, useCopy, useHistory } from '../lib/api';
@@ -44,7 +51,7 @@ export function HistoryPage({ onRecord }: { onRecord: () => void }) {
               pending={remove.isPending}
               trigger={
                 <Button variant="outline" size="sm">
-                  <Trash2 size={14} /> Clear history
+                  <TrashSimpleIcon size={16} aria-hidden="true" /> Clear history
                 </Button>
               }
             />
@@ -55,7 +62,7 @@ export function HistoryPage({ onRecord }: { onRecord: () => void }) {
       <Card className="overflow-hidden">
         <div className="flex min-h-16 items-center justify-between gap-5 border-b border-line bg-raised px-5 max-md:flex-wrap max-md:gap-3 max-md:py-3">
           <label className="flex w-80 max-w-full items-center gap-2 rounded-control border border-line-strong bg-surface px-3 text-muted focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent max-md:w-full">
-            <Search size={16} className="shrink-0" />
+            <MagnifyingGlassIcon size={16} className="shrink-0" aria-hidden="true" />
             <Input
               type="search"
               placeholder="Search transcripts"
@@ -90,7 +97,12 @@ export function HistoryPage({ onRecord }: { onRecord: () => void }) {
           </div>
         ) : !filtered.length ? (
           <div className="flex min-h-[390px] flex-col items-center justify-center px-6 py-16 text-center">
-            <History size={26} strokeWidth={1.6} className="mb-5 text-faint" />
+            <ClockCounterClockwiseIcon
+              weight="duotone"
+              size={32}
+              className="mb-5 text-faint"
+              aria-hidden="true"
+            />
             <h2 className="text-title font-semibold">
               {search ? 'No matching transcripts' : 'No dictations yet'}
             </h2>
@@ -105,7 +117,8 @@ export function HistoryPage({ onRecord }: { onRecord: () => void }) {
               </Button>
             ) : (
               <Button variant="primary" onClick={onRecord}>
-                <AudioLines size={16} /> Start a dictation <ArrowRight size={14} />
+                <WaveformIcon size={16} aria-hidden="true" /> Start a dictation{' '}
+                <ArrowRightIcon size={16} aria-hidden="true" />
               </Button>
             )}
           </div>
@@ -148,7 +161,7 @@ export function HistoryPage({ onRecord }: { onRecord: () => void }) {
                       size="sm"
                       onClick={() => copy.mutate(item.originalText!)}
                     >
-                      <Copy size={14} /> Copy original
+                      <CopyIcon size={16} aria-hidden="true" /> Copy original
                     </Button>
                   </details>
                 )}
@@ -162,14 +175,14 @@ export function HistoryPage({ onRecord }: { onRecord: () => void }) {
                   </span>
                   <div className="flex gap-1 text-muted">
                     <IconButton label="Copy transcript" onClick={() => copy.mutate(item.text)}>
-                      <Copy size={15} />
+                      <CopyIcon size={16} aria-hidden="true" />
                     </IconButton>
                     <IconButton
                       label="Delete transcript"
                       onClick={() => remove.mutate(item.id)}
                       disabled={remove.isPending}
                     >
-                      <Trash2 size={15} />
+                      <TrashSimpleIcon size={16} aria-hidden="true" />
                     </IconButton>
                   </div>
                 </div>

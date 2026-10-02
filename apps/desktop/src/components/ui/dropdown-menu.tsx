@@ -1,5 +1,5 @@
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
-import { Check, ChevronRight, Circle } from 'lucide-react';
+import { CheckIcon, CaretRightIcon, CircleIcon } from '../icons';
 import * as React from 'react';
 import { cn } from '../../lib/utils';
 import { Kbd } from './kbd';
@@ -25,7 +25,7 @@ const DropdownMenuSubTrigger = React.forwardRef<
     {...props}
   >
     {children}
-    <ChevronRight size={14} className="ml-auto text-muted" />
+    <CaretRightIcon size={16} className="ml-auto text-muted" aria-hidden="true" />
   </DropdownMenuPrimitive.SubTrigger>
 ));
 DropdownMenuSubTrigger.displayName = DropdownMenuPrimitive.SubTrigger.displayName;
@@ -94,7 +94,7 @@ const DropdownMenuCheckboxItem = React.forwardRef<
   >
     <span className="absolute left-2 flex size-4 items-center justify-center">
       <DropdownMenuPrimitive.ItemIndicator>
-        <Check size={14} className="text-accent" />
+        <CheckIcon size={16} className="text-accent" aria-hidden="true" />
       </DropdownMenuPrimitive.ItemIndicator>
     </span>
     {children}
@@ -116,7 +116,7 @@ const DropdownMenuRadioItem = React.forwardRef<
   >
     <span className="absolute left-2 flex size-4 items-center justify-center">
       <DropdownMenuPrimitive.ItemIndicator>
-        <Circle size={8} className="fill-accent text-accent" />
+        <CircleIcon size={8} weight="fill" className="text-accent" aria-hidden="true" />
       </DropdownMenuPrimitive.ItemIndicator>
     </span>
     {children}
