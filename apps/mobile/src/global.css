@@ -1,6 +1,6 @@
 @import 'tailwindcss';
 @import 'uniwind';
-@import '@voxtype/design-system/web.css';
+@import '@voxtype/shared/web.css';
 
 @theme inline {
   --color-background: var(--palette-canvas);
@@ -28,6 +28,6 @@
 }
 
 ::selection {
-  background: #c8cbc3;
-  color: #22231f;
+  background: var(--palette-accent-soft);
+  color: var(--palette-ink);
 }

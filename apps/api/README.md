@@ -11,12 +11,14 @@ pnpm db:migrate:local
 pnpm dev
 ```
 
-Local: `http://localhost:8787`, reports `environment: development`, uses
-Wrangler's local D1 state.
+Local: `http://localhost:8788`, reports `environment: development`, uses
+Wrangler's local D1 state. The API and inspector ports are configured in
+`wrangler.jsonc` as `8788` and `9230` to coexist with other local Workers.
 
 `.dev.vars`: `BETTER_AUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `DEEPGRAM_API_KEY`, `DEEPSEEK_API_KEY`
 
-Redirect URI: `http://localhost:8787/api/auth/callback/google`
+Add `http://localhost:8788/api/auth/callback/google` to the Google OAuth client's
+authorized redirect URIs for local sign-in.
 
 ## Deploy
 
@@ -43,7 +45,7 @@ Android sign-in opens `/api/mobile-auth/start?state=<uuid>` in the system browse
 callback returns a single-use grant to `voxtype://auth/callback`; the app checks the state,
 exchanges the grant, and stores the bearer session in Android secure storage.
 
-`POST /v1/speech/token` grants a 60-second Deepgram JWT for a direct Android WebSocket.
+`POST /v1/speech/token` grants a 60-second Deepgram JWT for a direct desktop or Android WebSocket.
 `POST /v1/speech/cleanup` optionally cleans text with DeepSeek and returns the original on
 provider failure. Neither endpoint stores audio or transcripts. Set provider keys as Worker
 secrets with `wrangler secret put ...`; never place them in Expo configuration.
@@ -59,4 +61,13 @@ All `/v1/*` require auth, except `GET /health`.
 | `PUT`    | `/v1/dictations/:id`                                                                                              |
 | `DELETE` | `/v1/dictations/:id`, `/v1/dictations`                                                                            |
 
-Body: `{ id?, text, originalText?, createdAt?, durationMs?, delivery? }`. Server computes word count.
+Body: `{ id?, text, originalText?, createdAt, durationMs, source }`, where
+`source` is `desktop` or `mobile`. Server computes word count. Audio, recording paths, and unknown
+fields are rejected.
+
+Both apps save locally first and push using `PUT /v1/dictations/:id`. Stable IDs make retries
+idempotent. They never use the dictation GET endpoints to populate local history, and deleting
+local history or pruning recordings does not delete the server archive. The server stores no audio.
+
+Apply database migrations through `pnpm db:migrate:local` for development and
+`pnpm db:migrate:remote` before deploying the production Worker.

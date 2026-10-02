@@ -1,3 +1,4 @@
+import { parseUsage, type TokenUsage } from '../analytics/analytics.costs';
 import { ApiError } from '../../shared/errors/api-error';
 
 const TRANSCRIPTION_UNAVAILABLE = 'Could not start transcription. Try again.';
@@ -59,7 +60,7 @@ export async function cleanTranscript(
   originalText: string,
   apiKey: string,
   fetcher: typeof fetch = fetch,
-): Promise<{ text: string; cleaned: boolean }> {
+): Promise<{ text: string; cleaned: boolean; usage?: TokenUsage | null; metered?: boolean }> {
   if (!originalText.trim()) return { text: originalText, cleaned: false };
   try {
     const response = await fetcher('https://api.deepseek.com/chat/completions', {
@@ -69,6 +70,7 @@ export async function cleanTranscript(
         model: 'deepseek-flash',
         stream: false,
         temperature: 0,
+        thinking: { type: 'disabled' },
         max_tokens: 1024,
         messages: [
           {
@@ -82,11 +84,12 @@ export async function cleanTranscript(
     });
     if (!response.ok) return { text: originalText, cleaned: false };
     const body: unknown = await response.json();
+    const usage = parseUsage((body as { usage?: unknown })?.usage);
     const content = (body as { choices?: { message?: { content?: unknown } }[] })?.choices?.[0]
       ?.message?.content;
     if (typeof content !== 'string' || !content.trim())
-      return { text: originalText, cleaned: false };
-    return { text: content.trim(), cleaned: true };
+      return { text: originalText, cleaned: false, usage, metered: true };
+    return { text: content.trim(), cleaned: true, usage, metered: true };
   } catch {
     return { text: originalText, cleaned: false };
   }

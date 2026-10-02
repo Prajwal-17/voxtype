@@ -12,6 +12,16 @@ export function createAnalyticsRepository(database: D1Database) {
   const db = createDb(database);
 
   return {
+    async getCleanupUsage(userId: string, since: Date | null) {
+      return database
+        .prepare(
+          `SELECT COALESCE(SUM(cost_usd),0) AS cost, COUNT(*) AS requests,
+        COALESCE(SUM(CASE WHEN cost_usd IS NULL THEN 1 ELSE 0 END),0) AS unmetered
+        FROM speech_usage WHERE user_id = ? AND created_at >= ?`,
+        )
+        .bind(userId, since?.getTime() ?? 0)
+        .first<{ cost: number; requests: number; unmetered: number }>();
+    },
     async getSummary(userId: string, since: Date | null) {
       const [summary] = await db
         .select({

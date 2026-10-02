@@ -37,7 +37,7 @@ export function IconButton({
           variant="ghost"
           size="icon"
           aria-label={label}
-          className={cn('shrink-0 text-current hover:bg-line', className)}
+          className={cn('shrink-0 text-current', className)}
           {...props}
         >
           {children}
@@ -56,7 +56,7 @@ export function Toggle({
   disabled,
 }: {
   label: string;
-  description: string;
+  description?: string;
   checked: boolean;
   onChange: (value: boolean) => void;
   disabled?: boolean;
@@ -66,9 +66,11 @@ export function Toggle({
     <div className="flex items-center justify-between gap-6 border-b border-line py-4 last:border-b-0 last:pb-0 max-lg:gap-4 max-md:flex-wrap">
       <div className="min-w-0">
         <Label htmlFor={id}>{label}</Label>
-        <p id={`${id}-description`} className="mt-1 max-w-lg text-ui text-muted">
-          {description}
-        </p>
+        {description && (
+          <p id={`${id}-description`} className="mt-1 max-w-lg text-ui text-muted">
+            {description}
+          </p>
+        )}
       </div>
       <Switch
         id={id}
@@ -92,7 +94,7 @@ export function Confirm({
 }: {
   trigger: ReactNode;
   title: string;
-  description: string;
+  description?: string;
   onConfirm: () => void;
   pending?: boolean;
   cancelLabel?: string;

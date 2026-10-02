@@ -1,3 +1,4 @@
+import { cleanupCost } from '../analytics/analytics.costs';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import type { ApiEnv } from '../../shared/http/api.types';
@@ -17,6 +18,25 @@ speechController.post('/cleanup', async (context) => {
   if (!parsed.success)
     return context.json({ error: { code: 'invalid_input', message: 'Invalid transcript.' } }, 400);
   const result = await cleanTranscript(parsed.data.text, context.env.DEEPSEEK_API_KEY);
+  if (result.metered) {
+    const userId = context.get('session').user.id;
+    await context.env.DB.prepare(
+      'INSERT INTO speech_usage (id,user_id,created_at,input_tokens,cached_tokens,output_tokens,cost_usd) VALUES (?,?,?,?,?,?,?)',
+    )
+      .bind(
+        crypto.randomUUID(),
+        userId,
+        Date.now(),
+        result.usage?.prompt_tokens ?? null,
+        result.usage?.prompt_cache_hit_tokens ?? null,
+        result.usage?.completion_tokens ?? null,
+        result.usage ? cleanupCost(result.usage) : null,
+      )
+      .run()
+      .catch(() => {
+        console.error(JSON.stringify({ scope: 'speech.usage', reason: 'write_failed' }));
+      });
+  }
   context.header('Cache-Control', 'no-store');
   return context.json({ data: result });
 });

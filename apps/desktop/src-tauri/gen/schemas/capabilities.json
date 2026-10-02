@@ -1,1 +1,1 @@
-{"desktop":{"identifier":"desktop","description":"Local desktop UI only","local":true,"windows":["main","overlay"],"permissions":["core:default",{"identifier":"opener:allow-open-url","allow":[{"url":"https://console.deepgram.com/"}]}]}}
+{"desktop":{"identifier":"desktop","description":"Local desktop UI only","local":true,"windows":["main","overlay"],"permissions":["core:default"]}}

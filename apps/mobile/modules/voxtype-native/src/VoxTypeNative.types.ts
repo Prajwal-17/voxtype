@@ -16,10 +16,17 @@ export type Snapshot = {
   microphoneGranted: boolean;
   bubbleEnabled: boolean;
   cleanupEnabled: boolean;
-  audioLimit: 5 | 10 | 15;
+  audioLimit: 10;
   status:
     'idle' | 'connecting' | 'listening' | 'processing' | 'saved' | 'microphone_permission_needed';
-  dictations: Dictation[];
+  inApp: {
+    status: 'idle' | 'listening' | 'processing' | 'saved' | 'error';
+    text: string;
+    error: string;
+    durationMs: number;
+  };
 };
 
 export type VoxTypeNativeModuleEvents = { onChange: (params: { changed: boolean }) => void };
+
+export type TranscriptPage = { items: Dictation[]; nextCursor: string | null };

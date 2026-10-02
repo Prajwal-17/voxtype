@@ -1,646 +1,590 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AppState,
+  FlatList,
   Image,
+  Linking,
+  Platform,
   Pressable,
   ScrollView,
-  Switch,
+  StyleSheet,
   View,
-  useWindowDimensions,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { requestRecordingPermissionsAsync } from 'expo-audio';
-import Animated, {
-  useAnimatedStyle,
-  useReducedMotion,
-  useSharedValue,
-  withRepeat,
-  withSequence,
-  withTiming,
-} from 'react-native-reanimated';
+import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { nativeTheme as theme } from '@voxtype/design-system/native';
-import { Button } from '@/components/ui/button';
-import { Text } from '@/components/ui/text';
-import VoxTypeNative, {
+import { WaveformIcon } from 'phosphor-react-native/src/icons/Waveform';
+import { FileTextIcon } from 'phosphor-react-native/src/icons/FileText';
+import { SlidersHorizontalIcon } from 'phosphor-react-native/src/icons/SlidersHorizontal';
+import { MicrophoneIcon } from 'phosphor-react-native/src/icons/Microphone';
+import { StopIcon } from 'phosphor-react-native/src/icons/Stop';
+import { CopyIcon } from 'phosphor-react-native/src/icons/Copy';
+import { nativeTheme as theme } from '@voxtype/shared';
+import { emptyAnalytics, money, moneyRange, type Analytics } from '@voxtype/shared/analytics';
+import { Action, Card, Loader, Setting, Text } from '../components/primitives';
+import { currentUser, getAnalytics, signIn, signOut, type User } from '../lib/mobile-api';
+import Native, {
   isVoxTypeNativeAvailable,
 } from '../../modules/voxtype-native/src/VoxTypeNativeModule';
 import type { Dictation, Snapshot } from '../../modules/voxtype-native/src/VoxTypeNative.types';
-import { currentUser, signIn, signOut, type User } from '@/lib/mobile-api';
-import logo from '../../assets/icon.png';
-
+import { styles as ui } from '../components/styles';
+// Metro resolves static bundled assets through require.
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment
+const logo = require('../../assets/icon.png');
 const c = theme.colors;
-
-function Action({
-  title,
-  onPress,
-  secondary = false,
-  disabled = false,
-}: {
-  title: string;
-  onPress: () => void;
-  secondary?: boolean;
-  disabled?: boolean;
-}) {
-  return (
-    <Button
-      accessibilityLabel={title}
-      onPress={onPress}
-      disabled={disabled}
-      variant={secondary ? 'outline' : 'default'}
-      className="min-h-12 rounded-[10px] px-5"
-      style={{
-        backgroundColor: secondary ? c.surface : c.primary,
-        borderColor: c.borderStrong,
-        borderWidth: secondary ? 1 : 0,
-      }}
-    >
-      <Text style={{ color: secondary ? c.text : c.onPrimary, fontSize: 14, fontWeight: '600' }}>
-        {title}
-      </Text>
-    </Button>
-  );
-}
-
-function WaveBar({
-  height,
-  index,
-  motion,
-}: {
-  height: number;
-  index: number;
-  motion: ReturnType<typeof useSharedValue<number>>;
-}) {
-  const style = useAnimatedStyle(() => ({
-    transform: [{ scaleY: 0.4 + motion.value * (index % 2 ? 0.55 : 0.85) }],
-  }));
-  return (
-    <Animated.View
-      style={[{ width: 4, height, borderRadius: 4, backgroundColor: c.onChrome }, style]}
-    />
-  );
-}
-
-function RecordingPanel({
-  status,
-  onStop,
-}: {
-  status: Snapshot['status'];
-  onStop: () => void;
-}) {
-  const reduced = useReducedMotion();
-  const motion = useSharedValue(0);
-  const scale = useSharedValue(1);
-  const bubbleWidth = useSharedValue(112);
-  useEffect(() => {
-    motion.value =
-      status === 'listening' && !reduced
-        ? withRepeat(
-            withSequence(withTiming(1, { duration: 330 }), withTiming(0, { duration: 420 })),
-            -1,
-            true,
-          )
-        : 0;
-    if (!reduced)
-      scale.value = withSequence(
-        withTiming(status === 'saved' ? 1.025 : 1.01, { duration: 130 }),
-        withTiming(1, { duration: 220 }),
-      );
-    const nextWidth = status === 'listening' ? 132 : status === 'processing' ? 116 : 112;
-    bubbleWidth.value = reduced ? nextWidth : withTiming(nextWidth, { duration: 180 });
-  }, [status, reduced, motion, scale, bubbleWidth]);
-  const animated = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-  const bubble = useAnimatedStyle(() => ({ width: bubbleWidth.value }));
-  const listening = status === 'listening';
-  const processing = status === 'processing' || status === 'connecting';
-  const heading = listening
-    ? 'Listening now'
-    : status === 'processing'
-      ? 'Finishing your words'
-      : status === 'connecting'
-        ? 'Connecting to transcription'
-        : status === 'saved'
-          ? 'Dictation saved'
-          : 'Ready when you are';
-  const badge = listening
-    ? 'Recording'
-    : processing
-      ? 'Working'
-      : status === 'saved'
-        ? 'Saved'
-        : 'Ready';
-  return (
-    <Animated.View
-      style={[
-        { backgroundColor: c.chrome, borderRadius: 16, padding: 24, minHeight: 210 },
-        animated,
-      ]}
-    >
-      <View className="flex-row items-center justify-between">
-        <Animated.View
-          className="flex-row items-center gap-2"
-          style={[{ backgroundColor: c.chromeRaised, borderRadius: 999, padding: 8 }, bubble]}
-        >
-          <View
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: 4,
-              backgroundColor: listening ? '#c5d8cb' : c.onChromeMuted,
-            }}
-          />
-          <Text style={{ color: c.onChromeMuted, fontSize: 13, fontWeight: '600' }}>
-            {badge}
-          </Text>
-        </Animated.View>
-        <View
-          className="flex-row items-center gap-1"
-          accessibilityLabel={listening ? 'Listening waveform' : 'Recording status'}
-        >
-          {[12, 22, 34, 20, 12].map((height, index) => (
-            <WaveBar key={index} height={height} index={index} motion={motion} />
-          ))}
-        </View>
-      </View>
-      <Text
-        style={{
-          color: c.onChrome,
-          fontSize: 25,
-          fontWeight: '600',
-          letterSpacing: -0.5,
-          marginTop: 24,
-        }}
-      >
-        {heading}
-      </Text>
-      <Text
-        style={{
-          color: c.onChromeMuted,
-          fontSize: 14,
-          lineHeight: 21,
-          marginTop: 8,
-          maxWidth: 320,
-        }}
-      >
-        {listening
-          ? 'Tap Stop when you finish. Text appears at the cursor.'
-          : processing
-            ? 'Your microphone is off. Final text is on its way.'
-            : status === 'saved'
-              ? 'Open a transcript below if you need to copy or paste it.'
-              : 'Focus a text field in another app, then tap the VoxType bubble.'}
-      </Text>
-      {listening && (
-        <View style={{ marginTop: 20, alignSelf: 'flex-start' }}>
-          <Action
-            title="Stop recording"
-            onPress={onStop}
-            disabled={processing}
-            secondary
-          />
-        </View>
-      )}
-    </Animated.View>
-  );
-}
-
-function SetupRow({
-  title,
-  detail,
-  ready,
-  action,
-  onPress,
-}: {
-  title: string;
-  detail: string;
-  ready: boolean;
-  action: string;
-  onPress: () => void;
-}) {
-  return (
-    <View
-      className="flex-row items-center justify-between gap-4 py-4"
-      style={{ borderBottomWidth: 1, borderBottomColor: c.border }}
-    >
-      <View className="flex-1">
-        <View className="flex-row items-center gap-2">
-          <View
-            style={{
-              width: 7,
-              height: 7,
-              borderRadius: 4,
-              backgroundColor: ready ? c.success : c.warning,
-            }}
-          />
-          <Text style={{ color: c.text, fontSize: 15, fontWeight: '600' }}>{title}</Text>
-        </View>
-        <Text style={{ color: c.textMuted, fontSize: 13, lineHeight: 19, marginTop: 4 }}>
-          {detail}
-        </Text>
-      </View>
-      {ready ? (
-        <Text style={{ color: c.success, fontSize: 13, fontWeight: '600' }}>On</Text>
-      ) : (
-        <Pressable
-          onPress={onPress}
-          accessibilityRole="button"
-          accessibilityLabel={action}
-          className="min-h-12 justify-center px-2"
-        >
-          <Text style={{ color: c.primary, fontSize: 13, fontWeight: '600' }}>{action}</Text>
-        </Pressable>
-      )}
-    </View>
-  );
-}
-
-function TranscriptRow({ item, onCopy }: { item: Dictation; onCopy: () => void }) {
-  return (
-    <View style={{ paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: c.border }}>
-      <Text selectable style={{ color: c.text, fontSize: 16, lineHeight: 25 }} numberOfLines={3}>
-        {item.text || 'No transcript. The audio was saved on this phone.'}
-      </Text>
-      <View className="flex-row items-center justify-between gap-3" style={{ marginTop: 12 }}>
-        <Text style={{ color: c.textMuted, fontSize: 12, flexShrink: 1 }}>
-          {new Date(item.createdAt).toLocaleString()} ·{' '}
-          {item.delivery === 'pasted'
-            ? 'Inserted'
-            : item.delivery === 'copied'
-              ? 'Copied'
-              : 'Saved'}
-        </Text>
-        <Pressable
-          onPress={onCopy}
-          disabled={!item.text}
-          accessibilityRole="button"
-          accessibilityLabel="Copy transcript"
-          className="min-h-12 justify-center px-2"
-        >
-          <Text style={{ color: c.primary, fontSize: 13, fontWeight: '600' }}>Copy</Text>
-        </Pressable>
-      </View>
-    </View>
-  );
-}
-
+const preview = Platform.OS === 'web';
+const previewSnapshot: Snapshot = {
+  accessibilityEnabled: false,
+  microphoneGranted: false,
+  bubbleEnabled: false,
+  cleanupEnabled: false,
+  audioLimit: 10,
+  status: 'idle',
+  inApp: { status: 'idle', text: '', error: '', durationMs: 0 },
+};
+const tabs = [
+  { id: 'home', label: 'Home', icon: WaveformIcon },
+  { id: 'transcripts', label: 'Transcripts', icon: FileTextIcon },
+  { id: 'settings', label: 'Settings', icon: SlidersHorizontalIcon },
+] as const;
+type Tab = (typeof tabs)[number]['id'];
+const seconds = (ms: number) =>
+  `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`;
 export default function Home() {
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
-  const [user, setUser] = useState<User | null>(null);
-  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
-  const nativeAvailable = isVoxTypeNativeAvailable();
-  const [loading, setLoading] = useState(nativeAvailable);
+  const [tab, setTab] = useState<Tab>('home');
+  const [user, setUser] = useState<User | null>(
+    preview ? { id: 'preview', name: 'Preview', email: '', image: null } : null,
+  );
+  const [snapshot, setSnapshot] = useState<Snapshot | null>(preview ? previewSnapshot : null);
+  const [analytics, setAnalytics] = useState<Analytics | null>(preview ? emptyAnalytics : null);
+  const [analyticsError, setAnalyticsError] = useState(false);
+  const [loading, setLoading] = useState(isVoxTypeNativeAvailable());
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
-
+  const [items, setItems] = useState<Dictation[]>([]);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [paging, setPaging] = useState(false);
+  const [pageError, setPageError] = useState(false);
+  const requestGeneration = useRef(0);
+  const pageBusy = useRef(false);
+  const available = isVoxTypeNativeAvailable();
   const refresh = useCallback(async () => {
-    if (!nativeAvailable) return;
+    if (!available) return;
+    const generation = requestGeneration.current;
+    const next = await Native.getSnapshot();
+    if (generation === requestGeneration.current) setSnapshot(next);
+  }, [available]);
+  const loadAnalytics = useCallback(async () => {
+    if (!available) return;
+    const generation = requestGeneration.current;
     try {
-      setSnapshot(await VoxTypeNative.getSnapshot());
-    } catch {
-      setMessage('Could not read this phone’s VoxType data. Reopen the app.');
-    }
-  }, [nativeAvailable]);
-  useEffect(() => {
-    if (!nativeAvailable) {
-      return;
-    }
-    let mounted = true;
-    void (async () => {
-      try {
-        const account = await currentUser();
-        if (mounted) setUser(account);
-        if (account) await refresh();
-      } catch {
-        if (mounted)
-          setMessage('Could not verify your account. Check your connection and reopen VoxType.');
-      } finally {
-        if (mounted) setLoading(false);
+      const data = await getAnalytics();
+      if (generation === requestGeneration.current) {
+        setAnalytics(data);
+        setAnalyticsError(false);
       }
-    })();
-    const event = VoxTypeNative.addListener('onChange', () => {
+    } catch {
+      if (generation === requestGeneration.current) setAnalyticsError(true);
+    }
+  }, [available]);
+  const loadPage = useCallback(
+    async (next: string | null = null) => {
+      if (!available || pageBusy.current) return;
+      pageBusy.current = true;
+      setPaging(true);
+      setPageError(false);
+      const generation = requestGeneration.current;
+      try {
+        const page = await Native.getTranscripts(next);
+        if (generation !== requestGeneration.current) return;
+        setItems((old) =>
+          next
+            ? [
+                ...old,
+                ...page.items.filter((item) => !old.some((previous) => previous.id === item.id)),
+              ]
+            : page.items,
+        );
+        setCursor(page.nextCursor);
+      } catch {
+        if (generation === requestGeneration.current) setPageError(true);
+      } finally {
+        pageBusy.current = false;
+        setPaging(false);
+      }
+    },
+    [available],
+  );
+  useEffect(() => {
+    if (!available) return;
+    let alive = true;
+    void currentUser()
+      .then(async (account) => {
+        if (!alive) return;
+        setUser(account);
+        if (account) await Promise.all([refresh(), loadAnalytics(), loadPage()]);
+      })
+      .catch(() => {
+        if (alive) setMessage('Couldn’t sign in. Try again.');
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    const subscription = Native.addListener('onChange', () => {
       void refresh();
+      void loadAnalytics();
     });
     const appState = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
-        // Picks up a session stored by the auth-callback route on cold-start redirects.
         void currentUser()
           .then((account) => {
-            if (mounted) setUser(account);
+            if (alive) setUser(account);
           })
           .catch(() => {});
         void refresh();
+        void loadAnalytics();
       }
     });
     return () => {
-      mounted = false;
-      event.remove();
+      alive = false;
+      subscription.remove();
       appState.remove();
     };
-  }, [refresh, nativeAvailable]);
-
+  }, [available, refresh, loadAnalytics, loadPage]);
   const run = async (task: () => Promise<void>) => {
     setBusy(true);
     setMessage('');
     try {
       await task();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Something went wrong. Try again.');
+      setMessage(error instanceof Error ? error.message : 'Try again');
     } finally {
       setBusy(false);
     }
   };
-  const updatePreference = (
-    key: 'bubbleEnabled' | 'cleanupEnabled' | 'audioLimit',
-    value: boolean | number,
-  ) => {
+  const microphone = async () => {
+    const permission = await requestRecordingPermissionsAsync();
+    await refresh();
+    if (!permission.granted) {
+      if (!permission.canAskAgain) await Linking.openSettings();
+      return false;
+    }
+    return true;
+  };
+  const record = () =>
     void run(async () => {
-      await VoxTypeNative.setPreference(key, String(value));
-      await refresh();
+      if (await microphone()) {
+        await Native.startRecording();
+        await refresh();
+      }
     });
+  const inApp = snapshot?.inApp;
+  const recording = inApp?.status === 'listening';
+  const processing = inApp?.status === 'processing';
+  const changeTab = (next: Tab) => {
+    setTab(next);
+    setMessage('');
+    if (next === 'transcripts') void loadPage();
   };
-  const stopRecording = () => {
-    void VoxTypeNative.stopRecording();
-  };
-  const status = snapshot?.status || 'idle';
 
   return (
-    <View className="flex-1" style={{ backgroundColor: c.background }}>
+    <View style={[s.root, { paddingTop: insets.top }]}>
       <StatusBar style="dark" />
-      <ScrollView
-        contentContainerStyle={{
-          paddingTop: insets.top + 20,
-          paddingBottom: insets.bottom + 40,
-          paddingHorizontal: 24,
-          alignItems: 'center',
-        }}
-      >
-        <View style={{ width: '100%', maxWidth: width >= 700 ? 760 : 480 }}>
-          <View className="flex-row items-center justify-between">
-            <View className="flex-row items-center gap-3">
-              <Image
-                source={logo}
-                style={{ width: 35, height: 35, borderRadius: 10 }}
-                accessibilityLabel="VoxType logo"
-              />
-              <Text style={{ color: c.text, fontSize: 20, fontWeight: '700', letterSpacing: -0.4 }}>
-                VoxType
-              </Text>
-            </View>
-            {user && (
-              <Pressable
-                onPress={() =>
-                  void run(async () => {
-                    await signOut();
-                    setUser(null);
-                    setSnapshot(null);
-                  })
-                }
-                accessibilityRole="button"
-                accessibilityLabel="Sign out"
-                className="min-h-12 justify-center px-2"
-              >
-                <Text style={{ color: c.textMuted, fontSize: 13, fontWeight: '600' }}>
-                  Sign out
-                </Text>
-              </Pressable>
-            )}
-          </View>
-          {message ? (
-            <View
-              style={{
-                backgroundColor: c.dangerContainer,
-                borderRadius: 10,
-                padding: 14,
-                marginTop: 18,
-              }}
-            >
-              <Text selectable style={{ color: c.danger, fontSize: 13, lineHeight: 19 }}>
-                {message}
-              </Text>
-            </View>
-          ) : null}
-          {loading ? (
-            <Text style={{ color: c.textMuted, marginTop: 40 }}>Opening VoxType…</Text>
-          ) : !user ? (
-            <View style={{ paddingTop: 76, maxWidth: 460 }}>
-              <Text
-                style={{
-                  color: c.text,
-                  fontSize: 32,
-                  lineHeight: 38,
-                  fontWeight: '600',
-                  letterSpacing: -0.7,
-                }}
-              >
-                Your words, wherever you type.
-              </Text>
-              <Text
-                style={{
-                  color: c.textMuted,
-                  fontSize: 16,
-                  lineHeight: 25,
-                  marginTop: 18,
-                  marginBottom: 32,
-                }}
-              >
-                Use your usual keyboard. VoxType adds a small voice bubble to text fields in other
-                apps.
-              </Text>
-              <Action
-                title="Sign in with Google"
-                disabled={busy}
-                onPress={() =>
-                  void run(async () => {
-                    setUser(await signIn());
-                    await refresh();
-                  })
-                }
-              />
-              <Text style={{ color: c.textMuted, fontSize: 12, lineHeight: 18, marginTop: 18 }}>
-                Transcripts and recordings stay on this phone.
-              </Text>
-            </View>
-          ) : (
-            <>
-              <View style={{ paddingTop: 42, paddingBottom: 28 }}>
-                <Text
-                  style={{
-                    color: c.text,
-                    fontSize: 30,
-                    lineHeight: 36,
-                    fontWeight: '600',
-                    letterSpacing: -0.8,
-                    maxWidth: 470,
-                  }}
-                >
-                  Speak into any text field.
-                </Text>
-                <Text
-                  style={{
-                    color: c.textMuted,
-                    fontSize: 15,
-                    lineHeight: 23,
-                    marginTop: 10,
-                    maxWidth: 500,
-                  }}
-                >
-                  Tap the bubble while your cursor is in another app. Stop speaking to insert the
-                  finished text.
-                </Text>
-              </View>
-              <RecordingPanel
-                status={status}
-                onStop={stopRecording}
-              />
-              <View style={{ marginTop: 34 }}>
-                <Text style={{ color: c.text, fontSize: 19, fontWeight: '600' }}>
-                  Set up your bubble
-                </Text>
-                <Text style={{ color: c.textMuted, fontSize: 13, lineHeight: 19, marginTop: 5 }}>
-                  Both permissions are needed for cross-app dictation.
-                </Text>
-                <SetupRow
-                  title="Accessibility access"
-                  detail="Shows the bubble beside editable fields."
-                  ready={!!snapshot?.accessibilityEnabled}
-                  action="Open settings"
-                  onPress={() =>
-                    void run(async () => {
-                      await VoxTypeNative.openAccessibilitySettings();
-                    })
+      <View style={s.brand}>
+        <Image
+          source={logo as import('react-native').ImageSourcePropType}
+          style={{ width: 28, height: 28, borderRadius: 8 }}
+          accessibilityLabel="VoxType"
+        />
+        <Text style={{ fontSize: 18, fontWeight: '600' }}>VoxType</Text>
+        {preview && <Text style={[ui.muted, { marginLeft: 'auto' }]}>Preview</Text>}
+      </View>
+      {message ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss message"
+          onPress={() => setMessage('')}
+          style={s.message}
+        >
+          <Text accessibilityLiveRegion="polite" style={{ color: c.danger }}>
+            {message}
+          </Text>
+        </Pressable>
+      ) : null}
+      {loading ? (
+        <Loader />
+      ) : !user ? (
+        <View style={{ padding: 24, gap: 24, flex: 1, justifyContent: 'center' }}>
+          <Text style={ui.heading}>Sign in</Text>
+          <Action
+            label={busy ? 'Signing in' : 'Continue with Google'}
+            disabled={busy || !available}
+            onPress={() =>
+              void run(async () => {
+                setUser(await signIn());
+                await Promise.all([refresh(), loadAnalytics(), loadPage()]);
+              })
+            }
+          />
+          {!available && <Text style={ui.muted}>Open the installed Android app to sign in.</Text>}
+        </View>
+      ) : (
+        <>
+          {tab === 'transcripts' ? (
+            <FlatList
+              data={items}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={s.content}
+              ListHeaderComponent={
+                <Text style={[ui.heading, { marginBottom: 24 }]}>Transcripts</Text>
+              }
+              ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+              renderItem={({ item }) => (
+                <Transcript
+                  item={item}
+                  onCopy={() =>
+                    void Clipboard.setStringAsync(item.text).then(() => setMessage('Copied'))
                   }
                 />
-                <SetupRow
-                  title="Microphone"
-                  detail="Records only while you are dictating."
-                  ready={!!snapshot?.microphoneGranted}
-                  action="Allow"
-                  onPress={() =>
-                    void run(async () => {
-                      const result = await requestRecordingPermissionsAsync();
-                      if (!result.granted)
-                        setMessage(
-                          'Microphone access is off. Allow it in Android settings to dictate.',
-                        );
-                      await refresh();
-                    })
-                  }
-                />
-              </View>
-              <View style={{ marginTop: 30 }}>
-                <View className="flex-row items-end justify-between">
-                  <Text style={{ color: c.text, fontSize: 19, fontWeight: '600' }}>
-                    Recent transcripts
-                  </Text>
-                  <Text style={{ color: c.textMuted, fontSize: 12 }}>Stored on this phone</Text>
-                </View>
-                {!snapshot?.dictations.length ? (
-                  <View
-                    style={{
-                      backgroundColor: c.surface,
-                      borderRadius: 14,
-                      padding: 20,
-                      marginTop: 14,
-                    }}
-                  >
-                    <Text style={{ color: c.textMuted, fontSize: 14, lineHeight: 22 }}>
-                      No dictations yet. Focus a text field in another app and tap the bubble.
-                    </Text>
-                  </View>
+              )}
+              ListEmptyComponent={
+                paging ? (
+                  <Loader />
                 ) : (
-                  snapshot.dictations.slice(0, 5).map((item) => (
-                    <TranscriptRow
-                      key={item.id}
-                      item={item}
-                      onCopy={() =>
+                  <Text style={ui.muted}>
+                    {pageError ? 'Couldn’t load transcripts' : 'No transcripts yet'}
+                  </Text>
+                )
+              }
+              ListFooterComponent={
+                paging ? (
+                  <Loader />
+                ) : cursor || pageError ? (
+                  <Action
+                    label={pageError ? 'Retry' : 'Load more'}
+                    secondary
+                    onPress={() => void loadPage(cursor)}
+                  />
+                ) : null
+              }
+            />
+          ) : (
+            <ScrollView contentContainerStyle={s.content}>
+              <Text style={[ui.heading, { marginBottom: 24 }]}>
+                {tab === 'home' ? 'Home' : 'Settings'}
+              </Text>
+              {tab === 'home' ? (
+                <>
+                  <Text style={[ui.muted, { marginBottom: 12 }]}>Last 30 days</Text>
+                  {analyticsError ? (
+                    <Action
+                      label="Retry analytics"
+                      secondary
+                      onPress={() => void loadAnalytics()}
+                    />
+                  ) : !analytics ? (
+                    <Loader />
+                  ) : (
+                    <>
+                      <View style={s.stats}>
+                        {[
+                          ['Words', analytics.summary.totalWords.toLocaleString()],
+                          ['Minutes', (analytics.summary.totalDurationMs / 60000).toFixed(1)],
+                          [
+                            'Avg. recording',
+                            seconds(
+                              analytics.summary.averageDurationMs ??
+                                analytics.summary.totalDurationMs /
+                                  Math.max(1, analytics.summary.dictations),
+                            ),
+                          ],
+                          ['Transcripts', analytics.summary.dictations.toLocaleString()],
+                        ].map(([label, value]) => (
+                          <Card key={label} style={s.stat}>
+                            <Text style={ui.muted}>{label}</Text>
+                            <Text style={s.value}>{value}</Text>
+                          </Card>
+                        ))}
+                      </View>
+                      <Text style={[ui.muted, { marginTop: 16 }]}>
+                        {analytics.summary.averageWordsPerMinute} words / min
+                      </Text>
+                      {analytics.costs && (
+                        <Text style={[ui.muted, { marginTop: 8 }]}>
+                          Estimated cost · Deepgram{' '}
+                          {moneyRange(analytics.costs.deepgramMin, analytics.costs.deepgramMax)} ·
+                          DeepSeek {money(analytics.costs.deepseek)}
+                          {analytics.costs.unmeteredRequests ? ' (partial)' : ''}
+                        </Text>
+                      )}
+                    </>
+                  )}
+                  <Card style={{ marginTop: 28, gap: 16 }}>
+                    <View style={s.row}>
+                      <Text style={ui.title}>Quick recording</Text>
+                      {recording && (
+                        <Text accessibilityLiveRegion="polite" style={ui.muted}>
+                          Recording
+                        </Text>
+                      )}
+                    </View>
+                    {processing ? (
+                      <Loader label="Processing" />
+                    ) : (
+                      <Action
+                        label={recording ? 'Stop' : 'Record'}
+                        disabled={
+                          busy ||
+                          preview ||
+                          (!recording &&
+                            ['listening', 'processing', 'connecting'].includes(
+                              snapshot?.status ?? '',
+                            ))
+                        }
+                        onPress={
+                          recording
+                            ? () =>
+                                void run(async () => {
+                                  await Native.stopRecording();
+                                  await refresh();
+                                })
+                            : record
+                        }
+                        icon={
+                          recording ? (
+                            <StopIcon size={20} color={c.onPrimary} />
+                          ) : (
+                            <MicrophoneIcon size={20} color={c.onPrimary} weight="duotone" />
+                          )
+                        }
+                      />
+                    )}
+                    {(recording || processing) && (
+                      <Action
+                        label="Cancel"
+                        secondary
+                        onPress={() =>
+                          void run(async () => {
+                            await Native.cancelRecording();
+                            await refresh();
+                          })
+                        }
+                      />
+                    )}
+                    {inApp?.text ? (
+                      <>
+                        <Text selectable>{inApp.text}</Text>
+                        <Action
+                          label="Copy text"
+                          secondary
+                          icon={<CopyIcon size={18} color={c.primary} />}
+                          onPress={() =>
+                            void Clipboard.setStringAsync(inApp.text).then(() =>
+                              setMessage('Copied'),
+                            )
+                          }
+                        />
+                      </>
+                    ) : null}
+                    {inApp?.error ? (
+                      <Text accessibilityLiveRegion="polite" style={{ color: c.danger }}>
+                        {inApp.error}
+                      </Text>
+                    ) : null}
+                  </Card>
+                </>
+              ) : (
+                <>
+                  <Card>
+                    <Setting
+                      label="Voice bubble"
+                      value={!!snapshot?.bubbleEnabled}
+                      disabled={preview || busy}
+                      onChange={(value) =>
                         void run(async () => {
-                          await VoxTypeNative.copyTranscript(item.id);
-                          setMessage('Transcript copied. Paste it where you need it.');
+                          await Native.setBubbleEnabled(value);
                           await refresh();
                         })
                       }
                     />
-                  ))
-                )}
-              </View>
-              <View style={{ marginTop: 34 }}>
-                <Text style={{ color: c.text, fontSize: 19, fontWeight: '600' }}>Preferences</Text>
-                <View
-                  className="flex-row items-center justify-between gap-4"
-                  style={{ paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: c.border }}
-                >
-                  <View className="flex-1">
-                    <Text style={{ color: c.text, fontSize: 14 }}>Show voice bubble</Text>
-                    <Text style={{ color: c.textMuted, fontSize: 13 }}>
-                      Only near editable fields.
-                    </Text>
-                  </View>
-                  <Switch
-                    value={!!snapshot?.bubbleEnabled}
-                    onValueChange={(value) => updatePreference('bubbleEnabled', value)}
-                    accessibilityLabel="Show voice bubble"
-                    trackColor={{ true: c.primary }}
-                  />
-                </View>
-                <View
-                  className="flex-row items-center justify-between gap-4"
-                  style={{ paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: c.border }}
-                >
-                  <View className="flex-1">
-                    <Text style={{ color: c.text, fontSize: 14 }}>Clean up wording</Text>
-                    <Text style={{ color: c.textMuted, fontSize: 13 }}>
-                      Optional; original text is kept.
-                    </Text>
-                  </View>
-                  <Switch
-                    value={!!snapshot?.cleanupEnabled}
-                    onValueChange={(value) => updatePreference('cleanupEnabled', value)}
-                    accessibilityLabel="Clean up wording"
-                    trackColor={{ true: c.primary }}
-                  />
-                </View>
-                <View style={{ paddingTop: 18 }}>
-                  <Text style={{ color: c.text, fontSize: 14 }}>Keep newest recording files</Text>
-                  <View className="flex-row gap-2" style={{ marginTop: 12 }}>
-                    {([5, 10, 15] as const).map((count) => (
-                      <Pressable
-                        key={count}
-                        onPress={() => updatePreference('audioLimit', count)}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Keep ${count} recording files`}
-                        accessibilityState={{ selected: snapshot?.audioLimit === count }}
-                        className="min-h-12 flex-1 items-center justify-center"
-                        style={{
-                          borderRadius: 10,
-                          backgroundColor: snapshot?.audioLimit === count ? c.primary : c.surface,
-                          borderWidth: 1,
-                          borderColor: snapshot?.audioLimit === count ? c.primary : c.border,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color: snapshot?.audioLimit === count ? c.onPrimary : c.text,
-                            fontWeight: '600',
-                          }}
-                        >
-                          {count}
+                    {snapshot?.bubbleEnabled && (
+                      <>
+                        <Text style={[ui.muted, { marginBottom: 12 }]}>
+                          Appears beside an active text field.
                         </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                  <Text style={{ color: c.textMuted, fontSize: 12, lineHeight: 18, marginTop: 10 }}>
-                    Older audio files are deleted automatically. Transcripts remain available.
-                  </Text>
-                </View>
-              </View>
-              <Text style={{ color: c.textMuted, fontSize: 12, lineHeight: 18, marginTop: 42 }}>
-                {user.email}
-              </Text>
-            </>
+                        <PermissionRow
+                          label="Accessibility"
+                          granted={snapshot.accessibilityEnabled}
+                          disabled={busy || preview}
+                          onPress={() =>
+                            void run(async () => {
+                              await Native.openAccessibilitySettings();
+                            })
+                          }
+                        />
+                        <PermissionRow
+                          label="Microphone"
+                          granted={snapshot.microphoneGranted}
+                          disabled={busy || preview}
+                          onPress={() =>
+                            void run(async () => {
+                              await microphone();
+                            })
+                          }
+                        />
+                      </>
+                    )}
+                    <Setting
+                      label="Clean up wording"
+                      value={!!snapshot?.cleanupEnabled}
+                      disabled={preview || busy || recording || processing}
+                      onChange={(value) =>
+                        void run(async () => {
+                          await Native.setCleanupEnabled(value);
+                          await refresh();
+                        })
+                      }
+                    />
+                  </Card>
+                  <Card style={{ marginTop: 20, gap: 16 }}>
+                    {user.email ? <Text style={ui.muted}>{user.email}</Text> : null}
+                    <Action
+                      label="Sign out"
+                      secondary
+                      disabled={preview || busy}
+                      onPress={() =>
+                        void run(async () => {
+                          requestGeneration.current++;
+                          await signOut();
+                          setUser(null);
+                          setSnapshot(null);
+                          setAnalytics(null);
+                          setItems([]);
+                          setCursor(null);
+                        })
+                      }
+                    />
+                  </Card>
+                </>
+              )}
+            </ScrollView>
           )}
-        </View>
-      </ScrollView>
+          <View style={[s.tabs, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+            {tabs.map(({ id, label, icon: Icon }) => (
+              <Pressable
+                key={id}
+                accessibilityRole="tab"
+                accessibilityLabel={label}
+                accessibilityState={{ selected: tab === id }}
+                aria-selected={tab === id}
+                onPress={() => changeTab(id)}
+                style={s.tab}
+              >
+                <Icon
+                  size={24}
+                  weight={tab === id ? 'fill' : 'regular'}
+                  color={tab === id ? c.primary : c.textMuted}
+                />
+                <Text
+                  style={{
+                    fontSize: 11,
+                    lineHeight: 16,
+                    fontWeight: tab === id ? '600' : '400',
+                    color: tab === id ? c.primary : c.textMuted,
+                  }}
+                >
+                  {label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </>
+      )}
+    </View>
+  );
+}
+function Transcript({ item, onCopy }: { item: Dictation; onCopy: () => void }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <Card>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={expanded ? 'Collapse transcript' : 'Expand transcript'}
+        accessibilityState={{ expanded }}
+        aria-expanded={expanded}
+        onPress={() => setExpanded(!expanded)}
+      >
+        <Text numberOfLines={expanded ? undefined : 3}>{item.text || 'Empty transcript'}</Text>
+      </Pressable>
+      <View style={[s.row, { marginTop: 12 }]}>
+        <Text style={ui.muted}>
+          {new Date(item.createdAt).toLocaleDateString()} · {item.wordCount} words
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Copy transcript"
+          onPress={onCopy}
+          style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
+        >
+          <CopyIcon size={20} color={c.primary} />
+        </Pressable>
+      </View>
+    </Card>
+  );
+}
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: c.background },
+  brand: { height: 64, paddingHorizontal: 24, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  content: { padding: 24, paddingTop: 18, paddingBottom: 36 },
+  stats: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  stat: { flexBasis: '46%', flexGrow: 1, padding: 18 },
+  value: {
+    fontSize: 28,
+    lineHeight: 36,
+    fontWeight: '500',
+    marginTop: 14,
+    fontVariant: ['tabular-nums'],
+    letterSpacing: -0.7,
+  },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  tabs: {
+    flexDirection: 'row',
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.surface,
+  },
+  tab: { flex: 1, minHeight: 52, alignItems: 'center', justifyContent: 'center', gap: 4 },
+  message: {
+    padding: 14,
+    marginHorizontal: 24,
+    borderRadius: 14,
+    backgroundColor: c.dangerContainer,
+  },
+});
+
+function PermissionRow({
+  label,
+  granted,
+  disabled,
+  onPress,
+}: {
+  label: string;
+  granted: boolean;
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <View style={s.row}>
+      <Text>{label}</Text>
+      <Action
+        label={granted ? 'Enabled' : 'Allow'}
+        secondary
+        disabled={granted || disabled}
+        onPress={onPress}
+      />
     </View>
   );
 }

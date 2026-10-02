@@ -1,5 +1,5 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { X } from 'lucide-react';
+import { XIcon } from '../icons';
 import * as React from 'react';
 import { cn } from '../../lib/utils';
 
@@ -15,7 +15,7 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      'fixed inset-0 z-30 bg-navigation/45 data-[state=open]:animate-in data-[state=open]:fade-in-0',
+      'fixed inset-0 z-30 bg-ink/45 data-[state=open]:animate-in data-[state=open]:fade-in-0',
       className,
     )}
     {...props}
@@ -38,8 +38,8 @@ const DialogContent = React.forwardRef<
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="absolute top-4 right-4 inline-flex size-8 items-center justify-center rounded-control text-muted hover:bg-subtle hover:text-ink focus-visible:outline-2 focus-visible:outline-accent disabled:pointer-events-none">
-        <X size={18} />
+      <DialogPrimitive.Close className="absolute top-4 right-4 inline-flex size-8 items-center justify-center rounded-control text-muted hover:bg-accent-soft hover:text-accent-ink focus-visible:outline-2 focus-visible:outline-accent disabled:pointer-events-none">
+        <XIcon size={18} aria-hidden="true" />
         <span className="sr-only">Close</span>
       </DialogPrimitive.Close>
     </DialogPrimitive.Content>

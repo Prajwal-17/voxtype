@@ -1,4 +1,11 @@
-import { ArrowUpRight, CircleAlert, FileText, LoaderCircle, Square, X } from 'lucide-react';
+import {
+  ArrowUpRightIcon,
+  WarningCircleIcon,
+  FileTextIcon,
+  CircleNotchIcon,
+  StopIcon,
+  XIcon,
+} from './icons';
 import { cn } from '../lib/utils';
 import { toast } from 'sonner';
 import { api, useRecording, useSession } from '../lib/api';
@@ -61,7 +68,7 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
         </span>
       )}
       <button
-        className="inline-flex size-8 items-center justify-center rounded-full border-0 bg-overlay-raised p-0 text-overlay-text transition-[transform,background-color] duration-150 ease-out enabled:active:scale-[.97] enabled:hover:bg-navigation-line enabled:hover:text-white focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-overlay-text disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100"
+        className="inline-flex size-8 items-center justify-center rounded-full border-0 bg-overlay-raised p-0 text-overlay-text transition-[transform,background-color] duration-150 ease-out enabled:active:scale-[.97] enabled:hover:bg-overlay-line enabled:hover:text-white focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-overlay-text disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100"
         title={active ? 'Cancel dictation' : 'Dismiss overlay'}
         aria-label={active ? 'Cancel dictation' : 'Dismiss overlay'}
         disabled={!!preview || cancel.isPending}
@@ -75,7 +82,7 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
                 )
         }
       >
-        <X size={15} strokeWidth={1.8} />
+        <XIcon size={16} aria-hidden="true" />
       </button>
       <div
         className={cn(
@@ -84,32 +91,31 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
         )}
       >
         {finishing ? (
-          <LoaderCircle
+          <CircleNotchIcon
             size={20}
-            strokeWidth={1.8}
             className="animate-spin motion-reduce:animate-none"
             data-signal="loading"
             aria-hidden="true"
           />
         ) : failed ? (
-          <CircleAlert size={16} />
+          <WarningCircleIcon size={16} aria-hidden="true" />
         ) : done ? (
-          <FileText size={16} strokeWidth={1.8} />
+          <FileTextIcon size={16} aria-hidden="true" />
         ) : (
           <Waveform level={session.level} active={session.phase === 'listening'} overlay />
         )}
       </div>
       <button
-        className="inline-flex size-8 items-center justify-center rounded-full border-0 bg-overlay-text p-0 text-navigation transition-[transform,background-color] duration-150 ease-out enabled:active:scale-[.97] enabled:hover:bg-inverse-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-overlay-text disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100"
+        className="inline-flex size-8 items-center justify-center rounded-full border-0 bg-overlay-text p-0 text-overlay transition-[transform,background-color] duration-150 ease-out enabled:active:scale-[.97] enabled:hover:bg-inverse-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-overlay-text disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100"
         title={failed || done ? 'Open transcript' : 'Finish dictation'}
         aria-label={failed || done ? 'Open VoxType to recover transcript' : 'Finish dictation'}
         disabled={!!preview || finishing || stop.isPending || (!active && !failed && !done)}
         onClick={() => (failed || done ? recover() : stop.mutate())}
       >
         {failed || done ? (
-          <ArrowUpRight size={15} strokeWidth={1.9} />
+          <ArrowUpRightIcon size={16} aria-hidden="true" />
         ) : (
-          <Square size={11} fill="currentColor" strokeWidth={1.5} />
+          <StopIcon size={14} weight="fill" aria-hidden="true" />
         )}
       </button>
 

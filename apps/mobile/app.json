@@ -1,18 +1,18 @@
 {
   "expo": {
-    "version": "0.0.3",
+    "version": "0.0.4",
     "icon": "./assets/icon.png",
     "scheme": "voxtype",
     "userInterfaceStyle": "light",
     "orientation": "default",
-    "platforms": ["android"],
+    "platforms": ["android", "web"],
     "android": {
       "package": "com.voxtype.dictation.mobile",
-      "versionCode": 3,
+      "versionCode": 4,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "monochromeImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#F6F6F2"
+        "monochromeImage": "./assets/monochrome-icon.png",
+        "backgroundColor": "#155E63"
       },
       "permissions": ["RECORD_AUDIO", "FOREGROUND_SERVICE", "FOREGROUND_SERVICE_MICROPHONE"]
     },
@@ -29,9 +29,20 @@
           }
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#dce6e5",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 96
+        }
+      ]
     ],
     "name": "VoxType",
-    "slug": "voxtype-mobile"
+    "slug": "voxtype-mobile",
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
   }
 }

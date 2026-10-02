@@ -1,28 +1,13 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  ArrowUpRight,
-  Check,
-  ChevronDown,
-  Eye,
-  EyeOff,
-  KeyRound,
-  LoaderCircle,
-  LockKeyhole,
-  Mic,
-  RefreshCw,
-  Square,
-  Trash2,
-  TriangleAlert,
-} from 'lucide-react';
+import { MicrophoneIcon, ArrowsClockwiseIcon, StopIcon } from '../components/icons';
 import { toast } from 'sonner';
 import { api, native, useRecording, useSession } from '../lib/api';
 import { captureShortcut } from '../lib/shortcuts';
 import { cn } from '../lib/utils';
 import { parseVocabulary, settingsSchema, type Bootstrap, type Settings } from '../lib/types';
-import { Button, IconButton, Shortcut, Toggle } from '../components/ui';
+import { Button, IconButton, Toggle } from '../components/ui';
 import { FieldRow, PageHeader, SectionHeader } from '../components/layout';
-import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import {
@@ -37,172 +22,17 @@ import { Waveform } from '../components/waveform';
 export function SettingsPage({ boot, active }: { boot: Bootstrap; active: boolean }) {
   return (
     <>
-      <PageHeader title="Settings" description="Audio, transcription, and desktop integration." />
-      <div className="max-w-5xl">
-        <ApiKey boot={boot} active={active} />
-        <Preferences key={JSON.stringify(boot.settings)} settings={boot.settings} active={active} />
+      <PageHeader title="Settings" />
+      <div className="max-w-3xl">
+        <Preferences
+          key={JSON.stringify(boot.settings)}
+          settings={boot.settings}
+          active={active}
+          startupAvailable={boot.startupAvailable}
+        />
         <DesktopSetup boot={boot} active={active} />
-        <ApiKey boot={boot} active={active} provider="deepseek" />
       </div>
     </>
-  );
-}
-
-function ApiKey({
-  boot,
-  active,
-  provider = 'deepgram',
-}: {
-  boot: Bootstrap;
-  active: boolean;
-  provider?: 'deepgram' | 'deepseek';
-}) {
-  const cleanup = provider === 'deepseek';
-  const name = cleanup ? 'DeepSeek' : 'Deepgram';
-  const hasKey = cleanup ? boot.hasCleanupKey : boot.hasKey;
-  const keyError = cleanup ? boot.cleanupKeyError : boot.keyError;
-  const inputId = `${provider}-api-key`;
-  const [key, setKey] = useState('');
-  const [visible, setVisible] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const client = useQueryClient();
-  const save = useMutation({
-    mutationFn: cleanup ? api.saveCleanupKey : api.saveKey,
-    gcTime: 0,
-    onSuccess: () => {
-      setKey('');
-      setEditing(false);
-      setVisible(false);
-      save.reset();
-      void client.invalidateQueries({ queryKey: ['bootstrap'] });
-      toast.success('API key saved to your desktop keyring');
-    },
-  });
-  const remove = useMutation({
-    mutationFn: cleanup ? api.removeCleanupKey : api.removeKey,
-    onSuccess: () => {
-      void client.invalidateQueries({ queryKey: ['bootstrap'] });
-      toast.success('API key removed');
-    },
-  });
-  return (
-    <section className="mb-5 rounded-panel border border-line bg-surface p-5 max-md:p-4">
-      <SectionHeader
-        title={cleanup ? 'Text cleanup' : 'Deepgram connection'}
-        description={
-          cleanup
-            ? 'DeepSeek V4.1 Flash removes fillers and tidies punctuation after transcription.'
-            : 'Audio streams directly from this device to Deepgram.'
-        }
-      />
-      {hasKey && !editing ? (
-        <div className="flex items-center gap-3 rounded-control bg-subtle p-4 max-lg:flex-wrap">
-          <span className="text-success">
-            <KeyRound size={19} />
-          </span>
-          <div className="min-w-0 flex-1">
-            <strong className="text-ui font-medium">API key saved securely</strong>
-            <p className="mt-1 text-caption text-muted">
-              {cleanup
-                ? 'Saved in your desktop keyring. Enable Clean up dictation below to use it.'
-                : 'Stored in your desktop keyring. Ready to try a dictation.'}
-            </p>
-          </div>
-          <Button onClick={() => setEditing(true)} disabled={active}>
-            Replace key
-          </Button>
-          <IconButton
-            label="Remove API key"
-            disabled={active || remove.isPending}
-            onClick={() => remove.mutate()}
-          >
-            <Trash2 size={17} />
-          </IconButton>
-        </div>
-      ) : (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            save.mutate(key.trim());
-          }}
-        >
-          <Label htmlFor={inputId} className="mb-2 block">
-            {name} API key
-          </Label>
-          <div className="flex items-center gap-2 max-md:flex-wrap">
-            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-control border border-line-strong bg-raised py-1 pr-1 pl-3 text-muted focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent max-md:basis-full">
-              <KeyRound size={16} className="shrink-0" />
-              <Input
-                id={inputId}
-                type={visible ? 'text' : 'password'}
-                autoComplete="off"
-                spellCheck={false}
-                value={key}
-                onChange={(e) => setKey(e.target.value)}
-                placeholder={`Paste your ${name} API key`}
-                disabled={active}
-              />
-              <IconButton
-                type="button"
-                label={visible ? 'Hide API key' : 'Show API key'}
-                onClick={() => setVisible(!visible)}
-              >
-                {visible ? <EyeOff size={16} /> : <Eye size={16} />}
-              </IconButton>
-            </div>
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={active || !native || key.trim().length < 10}
-              loading={save.isPending}
-            >
-              Save key
-            </Button>
-            {editing && (
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  setEditing(false);
-                  setKey('');
-                }}
-              >
-                Cancel
-              </Button>
-            )}
-          </div>
-          <p className="mt-2 flex items-center gap-1.5 text-caption text-muted">
-            <LockKeyhole size={12} /> Saved to GNOME Keyring, never to your settings file.
-          </p>
-        </form>
-      )}
-      {keyError && (
-        <p className="mt-2 text-ui text-danger" role="alert">
-          {keyError}
-        </p>
-      )}
-      {cleanup ? (
-        <p className="mt-4 text-caption text-muted">
-          Only the finished transcript is sent to DeepSeek. You can view and copy the original
-          transcript. If cleanup fails, VoxType uses the original.
-        </p>
-      ) : (
-        <p className="mt-4 text-caption text-muted">
-          Use a key with transcription permission and available account credit.{' '}
-          <button
-            className="inline-flex items-center gap-1 border-0 bg-transparent p-0 text-caption text-accent hover:text-accent-hover hover:underline hover:underline-offset-[3px]"
-            type="button"
-            onClick={() =>
-              void api
-                .openDeepgram()
-                .catch(() => toast.error('Couldn’t open the Deepgram console. Try again.'))
-            }
-          >
-            Deepgram console <ArrowUpRight size={12} />
-          </button>
-        </p>
-      )}
-    </section>
   );
 }
 
@@ -219,7 +49,15 @@ const LANGUAGES = [
   ['ja', 'Japanese'],
 ] as const;
 
-function Preferences({ settings, active }: { settings: Settings; active: boolean }) {
+function Preferences({
+  settings,
+  active,
+  startupAvailable,
+}: {
+  settings: Settings;
+  active: boolean;
+  startupAvailable: boolean;
+}) {
   const [draft, setDraft] = useState(settings);
   const [vocabulary, setVocabulary] = useState(settings.vocabulary.join('\n'));
   const client = useQueryClient();
@@ -251,15 +89,8 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
       }}
     >
       <section className="mb-5 rounded-panel border border-line bg-surface p-5 max-md:p-4">
-        <SectionHeader
-          title="Voice & language"
-          description="Choose your input device and transcription language."
-        />
-        <FieldRow
-          label="Microphone"
-          htmlFor="microphone"
-          description="Choose the input you use for dictation."
-        >
+        <SectionHeader title="Voice & language" />
+        <FieldRow label="Microphone" htmlFor="microphone">
           <div className="flex shrink-0 items-center gap-1.5 max-md:w-full max-md:max-w-full">
             <Select
               value={draft.microphone || '__default'}
@@ -287,7 +118,11 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
               onClick={() => void microphones.refetch()}
               disabled={microphones.isFetching}
             >
-              <RefreshCw size={15} className={microphones.isFetching ? 'animate-spin' : ''} />
+              <ArrowsClockwiseIcon
+                size={16}
+                className={microphones.isFetching ? 'animate-spin' : ''}
+                aria-hidden="true"
+              />
             </IconButton>
           </div>
         </FieldRow>
@@ -298,13 +133,13 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
         )}
         <div className="mt-4 flex flex-wrap items-center gap-3 rounded-control bg-subtle px-3 py-2.5">
           <div className="mr-auto flex items-center gap-2 text-caption text-muted">
-            <Mic size={16} />
+            <MicrophoneIcon size={16} aria-hidden="true" />
             <span>
               {session.isTest && active
                 ? 'Listening to your microphone…'
                 : dirty
-                  ? 'Save your microphone selection before testing.'
-                  : 'Test the selected microphone.'}
+                  ? 'Save before testing'
+                  : 'Microphone test'}
             </span>
           </div>
           <Waveform level={session.isTest ? session.level : 0} active={session.isTest && active} />
@@ -317,7 +152,7 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
               session.isTest && active ? recording.stop.mutate() : recording.start.mutate(true)
             }
           >
-            {session.isTest && active ? <Square size={12} /> : null}
+            {session.isTest && active ? <StopIcon size={12} aria-hidden="true" /> : null}
             {session.isTest && active ? 'Stop test' : 'Test mic'}
           </Button>
         </div>
@@ -333,11 +168,7 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
             {session.message}
           </p>
         )}
-        <FieldRow
-          label="Language"
-          htmlFor="language"
-          description="Use multilingual for supported mixed-language speech."
-        >
+        <FieldRow label="Language" htmlFor="language">
           <Select
             value={draft.language}
             onValueChange={(v) => set('language', v as Settings['language'])}
@@ -357,67 +188,54 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
         </FieldRow>
       </section>
       <section className="mb-5 rounded-panel border border-line bg-surface p-5 max-md:p-4">
-        <SectionHeader
-          title="Recording preferences"
-          description="Control text insertion and local storage."
-        />
+        <SectionHeader title="Preferences" />
+        {startupAvailable && (
+          <Toggle
+            label="Launch at login"
+            checked={draft.launchAtLogin}
+            onChange={(v) => set('launchAtLogin', v)}
+            disabled={active}
+          />
+        )}
         <Toggle
-          label="Detect speech locally"
-          description="Use on-device voice detection to skip long pauses. A short lead-in and tail protect word boundaries. Turn off if quiet speech is missed."
+          label="Skip long pauses"
           checked={draft.voiceDetection}
           onChange={(v) => set('voiceDetection', v)}
           disabled={active}
         />
         <Toggle
           label="Paste when I finish"
-          description="For shortcut recordings, send Ctrl+V to the focused app. Otherwise, copy the text."
           checked={draft.autoPaste}
           onChange={(v) => set('autoPaste', v)}
           disabled={active}
         />
         <Toggle
-          label="Clean up dictation"
-          description="Send the finished transcript to DeepSeek before pasting. Connect the optional cleanup service below."
+          label="Clean up wording"
           checked={draft.cleanupEnabled}
           onChange={(v) => set('cleanupEnabled', v)}
           disabled={active}
         />
-        <Toggle
-          label="Keep local history"
-          description="Save up to 200 dictations on this device. Existing history stays until you delete it."
-          checked={draft.keepHistory}
-          onChange={(v) => set('keepHistory', v)}
-          disabled={active}
-        />
       </section>
       <section className="mb-5 rounded-panel border border-line bg-surface p-5 max-md:p-4">
-        <SectionHeader
-          title="Personal vocabulary"
-          description="Help Deepgram recognize names, projects, and technical terms."
-        />
+        <SectionHeader title="Personal vocabulary" />
         <Label className="sr-only" htmlFor="vocabulary">
           Personal vocabulary
         </Label>
         <Textarea
           id="vocabulary"
           rows={4}
-          placeholder={'One word or phrase per line\nFor example: Cloudflare Workers'}
+          placeholder={'One word or phrase per line'}
           value={vocabulary}
           onChange={(e) => setVocabulary(e.target.value)}
           disabled={active}
         />
         <div className="mt-2 flex justify-between gap-3 text-caption text-muted max-md:flex-col max-md:gap-1">
-          <span>Recognition hints, not automatic replacements.</span>
           <span>{value.vocabulary.length} / 100 terms</span>
         </div>
       </section>
-      <div className="sticky bottom-4 z-10 mb-5 flex items-center justify-between gap-3 rounded-panel border border-line bg-surface px-4 py-3 text-caption text-muted shadow-panel">
+      <div className="settings-save-bar sticky bottom-4 z-10 mb-5 flex items-center justify-between gap-3 rounded-panel border border-line bg-surface px-4 py-3 text-caption text-muted shadow-panel">
         <span>
-          {active
-            ? 'Finish recording to change preferences.'
-            : dirty
-              ? 'You have unsaved changes.'
-              : 'All preferences saved.'}
+          {active ? 'Finish recording to change preferences.' : dirty ? 'Unsaved changes' : ''}
         </span>
         <Button
           variant="primary"
@@ -425,7 +243,7 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
           loading={save.isPending}
           disabled={!dirty || active || !native}
         >
-          Save preferences
+          Save changes
         </Button>
       </div>
     </form>
@@ -433,7 +251,6 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
 }
 
 function DesktopSetup({ boot, active }: { boot: Bootstrap; active: boolean }) {
-  const [expanded, setExpanded] = useState(false);
   const [shortcutId, setShortcutId] = useState(boot.shortcutId);
   const [recordingShortcut, setRecordingShortcut] = useState(false);
   const [customLabel, setCustomLabel] = useState<string | null>(null);
@@ -460,23 +277,15 @@ function DesktopSetup({ boot, active }: { boot: Bootstrap; active: boolean }) {
     <section className="mb-7 rounded-panel border border-line bg-surface p-5 max-md:p-4">
       <div className="mb-5">
         <div className="flex items-center justify-between gap-4">
-          <h2 className="text-title font-semibold tracking-[-.02em]">Ubuntu desktop setup</h2>
+          <h2 className="text-title font-semibold tracking-[-.02em]">Shortcut</h2>
           <Button variant="ghost" onClick={() => void checks.refetch()} loading={checks.isFetching}>
-            <RefreshCw size={14} /> Check again
+            <ArrowsClockwiseIcon size={16} aria-hidden="true" /> Check again
           </Button>
         </div>
-        <p className="mt-1 text-ui text-muted">
-          Check the services used for shortcuts and text insertion.
-        </p>
       </div>
       <div className="mb-5 flex items-center justify-between gap-6 rounded-control bg-subtle p-4 max-lg:gap-4 max-md:flex-wrap">
         <div className="min-w-0">
           <Label>Recording shortcut</Label>
-          <p className="mt-1 max-w-lg text-ui text-muted">
-            {boot.shortcutRegistered
-              ? 'Press once to record. Press again to finish.'
-              : 'Choose a key combination to start and stop dictation from any app.'}
-          </p>
           <div className="mt-3 flex items-center gap-3 max-md:flex-wrap">
             <Select
               value={shortcutId}
@@ -546,58 +355,13 @@ function DesktopSetup({ boot, active }: { boot: Bootstrap; active: boolean }) {
           Save shortcut
         </Button>
       </div>
-      <div className="grid grid-cols-2 gap-x-6 gap-y-5 max-md:grid-cols-1">
-        {checks.isPending ? (
-          <p className="flex items-center gap-2 text-ui text-muted">
-            <LoaderCircle size={16} className="animate-spin" /> Checking your desktop…
+      {checks.data
+        ?.filter((check) => check.status !== 'ok')
+        .map((check) => (
+          <p key={check.name} className="mt-3 text-ui text-warning">
+            {check.detail}
           </p>
-        ) : checks.isError ? (
-          <p className="mt-2 text-ui text-danger">
-            VoxType couldn’t check desktop services. Nothing was changed. Select Check again.
-          </p>
-        ) : (
-          checks.data?.map((check) => (
-            <div className="flex items-start gap-2" key={check.name}>
-              {check.status === 'ok' ? (
-                <Check className="mt-0.5 text-success" size={16} />
-              ) : (
-                <TriangleAlert className="mt-0.5 text-warning" size={16} />
-              )}
-              <div>
-                <strong className="text-ui font-medium">{check.name}</strong>
-                <p className="mt-1 text-caption text-muted">{check.detail}</p>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-      <button
-        className="mt-6 flex w-full items-center justify-between border-0 border-t border-line bg-transparent pt-5 text-ui font-medium"
-        onClick={() => setExpanded(!expanded)}
-        aria-expanded={expanded}
-      >
-        Shortcut & paste setup{' '}
-        <ChevronDown
-          size={16}
-          className="transition-transform duration-150"
-          style={{ transform: expanded ? 'rotate(180deg)' : undefined }}
-        />
-      </button>
-      {expanded && (
-        <div className="pt-4">
-          <p className="mb-3 text-ui text-muted">
-            <Shortcut label={boot.shortcutLabel} /> toggles recording. Use the cancel button in the
-            voice overlay to discard a recording. Keep your cursor in the destination field while
-            recording.
-          </p>
-          <p className="mb-3 text-ui text-muted">
-            Wayland paste needs <code className="text-caption text-accent-ink">ydotoold</code>{' '}
-            running with access to <code className="text-caption text-accent-ink">/dev/uinput</code>
-            . The app checks the service; it does not change system permissions. The README includes
-            installation steps.
-          </p>
-        </div>
-      )}
+        ))}
     </section>
   );
 }

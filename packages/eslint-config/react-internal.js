@@ -13,15 +13,7 @@ import { baseConfig } from './base.js';
 export function createReactConfig({ tsconfigRootDir }) {
   return tseslint.config(
     {
-      ignores: [
-        '**/node_modules/**',
-        '**/dist/**',
-        '**/target/**',
-        '**/coverage/**',
-        '**/test-results/**',
-        '**/playwright-report/**',
-        'src-tauri/gen/**',
-      ],
+      ignores: ['**/node_modules/**', '**/dist/**', '**/target/**', 'src-tauri/gen/**'],
     },
     ...baseConfig,
     ...tseslint.configs.recommendedTypeChecked.map((config) => ({
@@ -47,7 +39,7 @@ export function createReactConfig({ tsconfigRootDir }) {
       },
     },
     {
-      files: ['**/*.config.ts', '**/tests/**/*.{ts,tsx}'],
+      files: ['**/*.config.ts'],
       languageOptions: {
         globals: { ...globals.node, ...globals.browser },
       },

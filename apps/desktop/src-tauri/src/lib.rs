@@ -5,8 +5,12 @@ mod desktop;
 mod display;
 mod environment;
 mod model;
+mod recordings;
 mod session;
+mod speech;
+mod startup;
 mod storage;
+mod uploads;
 
 use model::*;
 use std::sync::{
@@ -19,6 +23,9 @@ pub struct AppState {
     pub snapshot: Mutex<Snapshot>,
     pub control: Mutex<Option<tokio::sync::mpsc::Sender<session::Control>>>,
     pub authenticated: AtomicBool,
+    pub user: Mutex<Option<AuthUser>>,
+    pub local_data: Mutex<()>,
+    pub upload_lock: tokio::sync::Mutex<()>,
     pub shortcut_registered: AtomicBool,
 }
 impl Default for AppState {
@@ -27,6 +34,9 @@ impl Default for AppState {
             snapshot: Mutex::new(Snapshot::default()),
             control: Mutex::new(None),
             authenticated: AtomicBool::new(false),
+            user: Mutex::new(None),
+            local_data: Mutex::new(()),
+            upload_lock: tokio::sync::Mutex::new(()),
             shortcut_registered: AtomicBool::new(false),
         }
     }
@@ -69,28 +79,14 @@ async fn bootstrap(app: tauri::AppHandle) -> Result<Bootstrap, String> {
             label: shortcut.label.clone(),
         });
     }
-    let (key, cleanup_key) =
-        tokio::join!(key_status(storage::key), key_status(storage::cleanup_key));
     let state = app.state::<AppState>();
     let snapshot = state
         .snapshot
         .lock()
         .map_err(|_| "Session is unavailable.")?
         .clone();
-    let (has_key, key_error) = match key {
-        Ok(k) => (k.is_some(), None),
-        Err(e) => (false, Some(e)),
-    };
-    let (has_cleanup_key, cleanup_key_error) = match cleanup_key {
-        Ok(k) => (k.is_some(), None),
-        Err(e) => (false, Some(e)),
-    };
     Ok(Bootstrap {
         settings,
-        has_key,
-        key_error,
-        has_cleanup_key,
-        cleanup_key_error,
         snapshot,
         shortcut_registered: state.shortcut_registered.load(Ordering::Relaxed),
         version: env!("CARGO_PKG_VERSION").into(),
@@ -103,42 +99,8 @@ async fn bootstrap(app: tauri::AppHandle) -> Result<Bootstrap, String> {
         shortcut_id: shortcut.id,
         shortcut_label: shortcut.label,
         shortcut_options,
+        startup_available: startup::available(),
     })
-}
-async fn key_status(
-    read: fn() -> Result<Option<String>, String>,
-) -> Result<Option<String>, String> {
-    tokio::time::timeout(
-        std::time::Duration::from_secs(6),
-        tokio::task::spawn_blocking(read),
-    )
-    .await
-    .map_err(|_| "Unlock your login keyring, then reopen Settings.")?
-    .map_err(|_| "Keyring request failed.")?
-}
-#[tauri::command]
-async fn save_cleanup_key(key: String) -> Result<(), String> {
-    tokio::task::spawn_blocking(move || storage::save_cleanup_key(&key))
-        .await
-        .map_err(|_| "Keyring request failed.")?
-}
-#[tauri::command]
-async fn remove_cleanup_key() -> Result<(), String> {
-    tokio::task::spawn_blocking(storage::delete_cleanup_key)
-        .await
-        .map_err(|_| "Keyring request failed.")?
-}
-#[tauri::command]
-async fn save_api_key(key: String) -> Result<(), String> {
-    tokio::task::spawn_blocking(move || storage::save_key(&key))
-        .await
-        .map_err(|_| "Keyring request failed.")?
-}
-#[tauri::command]
-async fn remove_api_key() -> Result<(), String> {
-    tokio::task::spawn_blocking(storage::delete_key)
-        .await
-        .map_err(|_| "Keyring request failed.")?
 }
 #[tauri::command]
 async fn get_auth_user(app: tauri::AppHandle) -> Result<Option<AuthUser>, String> {
@@ -146,6 +108,10 @@ async fn get_auth_user(app: tauri::AppHandle) -> Result<Option<AuthUser>, String
         .authenticated
         .store(false, Ordering::Release);
     let user = auth::current_user().await?;
+    *app.state::<AppState>()
+        .user
+        .lock()
+        .map_err(|_| "Account unavailable.")? = user.clone();
     app.state::<AppState>()
         .authenticated
         .store(user.is_some(), Ordering::Release);
@@ -154,6 +120,10 @@ async fn get_auth_user(app: tauri::AppHandle) -> Result<Option<AuthUser>, String
 #[tauri::command]
 async fn sign_in_with_google(app: tauri::AppHandle) -> Result<AuthUser, String> {
     let user = auth::sign_in(app.clone()).await?;
+    *app.state::<AppState>()
+        .user
+        .lock()
+        .map_err(|_| "Account unavailable.")? = Some(user.clone());
     app.state::<AppState>()
         .authenticated
         .store(true, Ordering::Release);
@@ -171,6 +141,10 @@ async fn sign_out(app: tauri::AppHandle) -> Result<(), String> {
             .store(true, Ordering::Release);
         return Err(error);
     }
+    *app.state::<AppState>()
+        .user
+        .lock()
+        .map_err(|_| "Account unavailable.")? = None;
     Ok(())
 }
 #[tauri::command]
@@ -186,22 +160,51 @@ fn update_settings(app: tauri::AppHandle, settings: Settings) -> Result<(), Stri
     {
         return Err("Finish your dictation before changing settings.".into());
     }
+    startup::configure(&app, settings.launch_at_login)?;
     storage::save_settings(&app, &settings)
 }
 #[tauri::command]
-fn get_history(app: tauri::AppHandle) -> Result<Vec<HistoryItem>, String> {
-    storage::history(&app)
+fn get_history(
+    app: tauri::AppHandle,
+    cursor: Option<String>,
+    query: Option<String>,
+) -> Result<serde_json::Value, String> {
+    require_authenticated(&app)?;
+    let user_id = app
+        .state::<AppState>()
+        .user
+        .lock()
+        .map_err(|_| "Account unavailable.")?
+        .as_ref()
+        .map(|u| u.id.clone())
+        .ok_or("Sign in again.")?;
+    storage::claim_legacy_history(&app, &user_id)?;
+    storage::history_page(
+        storage::history(&app)?,
+        &user_id,
+        cursor.as_deref(),
+        query.as_deref(),
+    )
+}
+#[tauri::command]
+async fn get_analytics(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    require_authenticated(&app)?;
+    let (_, bearer, client) = auth::upload_session().await?.ok_or("Sign in again.")?;
+    let response = client
+        .get(format!("{}/v1/analytics?range=30d", auth::api_url()))
+        .bearer_auth(bearer)
+        .send()
+        .await
+        .map_err(|_| "Couldn’t load analytics.")?;
+    if !response.status().is_success() {
+        return Err("Couldn’t load analytics.".into());
+    }
+    let body: serde_json::Value = speech::read_json(response, 256_000).await?;
+    Ok(body["data"].clone())
 }
 #[tauri::command]
 fn delete_history(app: tauri::AppHandle, id: Option<String>) -> Result<(), String> {
-    let items = match id {
-        Some(id) => storage::history(&app)?
-            .into_iter()
-            .filter(|item| item.id != id)
-            .collect(),
-        None => vec![],
-    };
-    storage::write_history(&app, items)
+    storage::delete_history(&app, id.as_deref())
 }
 #[tauri::command]
 async fn get_microphones() -> Result<Vec<Microphone>, String> {
@@ -246,9 +249,17 @@ async fn copy_text(text: String) -> Result<(), String> {
     desktop::copy(&text).await
 }
 #[tauri::command]
-async fn start_dictation(app: tauri::AppHandle, test: bool) -> Result<(), String> {
+async fn start_dictation(app: tauri::AppHandle, test: bool) -> Result<String, String> {
     require_authenticated(&app)?;
-    session::start(app, test, false).await
+    session::start(app.clone(), test, false).await?;
+    let id = app
+        .state::<AppState>()
+        .snapshot
+        .lock()
+        .map_err(|_| "Session unavailable.")?
+        .session_id
+        .clone();
+    Ok(id)
 }
 #[tauri::command]
 async fn stop_dictation(app: tauri::AppHandle) -> Result<(), String> {
@@ -270,31 +281,24 @@ fn dismiss_overlay(app: tauri::AppHandle) {
 }
 
 fn dispatch(app: &tauri::AppHandle, action: &str) {
-    if action == "toggle" {
-        if let Err(error) = require_authenticated(app) {
-            let _ = app.emit("app-error", error);
-            show_main(app);
-            return;
-        }
-    }
     let app = app.clone();
-    match action {
+    match startup::action(action) {
+        startup::Action::Background => {}
         #[cfg(debug_assertions)]
-        "preview-overlay" => session::preview_overlay(&app),
-        "toggle" => {
+        startup::Action::PreviewOverlay => session::preview_overlay(&app),
+        startup::Action::Toggle => {
             tauri::async_runtime::spawn(async move {
                 if let Err(error) = session::toggle(app.clone()).await {
-                    let _ = app.emit("app-error", &error);
-                    show_main(&app);
+                    session::show_error(&app, error);
                 }
             });
         }
-        "cancel" => {
+        startup::Action::Cancel => {
             tauri::async_runtime::spawn(async move {
                 let _ = session::signal(&app, session::Control::Cancel).await;
             });
         }
-        _ => show_main(&app),
+        startup::Action::Open => show_main(&app),
     }
 }
 
@@ -330,30 +334,27 @@ pub fn run() {
     display::configure();
     // WebSocket TLS has multiple optional crypto backends; select one explicitly.
     let _ = rustls::crypto::ring::default_provider().install_default();
-    let mut builder = tauri::Builder::default();
-    // Debug-only WebDriver sessions can run independently of the user's open app.
-    // Release builds always enforce a single instance.
-    if !cfg!(debug_assertions) || std::env::var("TAURI_WEBVIEW_AUTOMATION").as_deref() != Ok("true")
-    {
-        builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _| {
+    tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, args, _| {
             dispatch(app, args.get(1).map(String::as_str).unwrap_or("settings"));
-        }));
-    }
-    builder
+        }))
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_opener::init())
+        .plugin(
+            tauri_plugin_autostart::Builder::new()
+                .app_name(environment::app_name())
+                .arg("--background")
+                .build(),
+        )
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
             bootstrap,
-            save_api_key,
-            remove_api_key,
             get_auth_user,
             sign_in_with_google,
             sign_out,
-            save_cleanup_key,
-            remove_cleanup_key,
             update_settings,
             get_history,
+            get_analytics,
             delete_history,
             get_microphones,
             get_diagnostics,
@@ -367,6 +368,17 @@ pub fn run() {
         ])
         .setup(|app| {
             let handle = app.handle();
+            if let Err(error) = storage::settings(handle)
+                .and_then(|settings| startup::configure(handle, settings.launch_at_login))
+            {
+                eprintln!("{error}");
+                let _ = handle.emit("app-error", error);
+            }
+            if let Err(error) =
+                recordings::recover(handle).and_then(|_| storage::prune_audio(handle))
+            {
+                let _ = handle.emit("app-error", error);
+            }
             if let Some(overlay) = handle.get_webview_window("overlay") {
                 prepare_overlay_window(&overlay);
             }
@@ -407,7 +419,11 @@ pub fn run() {
                     )?,
                 ],
             )?;
-            let mut tray = tauri::tray::TrayIconBuilder::new()
+            let tray = tauri::tray::TrayIconBuilder::new()
+                .icon(tauri::image::Image::from_bytes(include_bytes!(
+                    "../icons/tray.png"
+                ))?)
+                .icon_as_template(true)
                 .tooltip(format!("{} · voice dictation", environment::app_name()))
                 .menu(&menu)
                 .on_menu_event(|app, event| {
@@ -417,9 +433,6 @@ pub fn run() {
                         dispatch(app, event.id.as_ref());
                     }
                 });
-            if let Some(icon) = app.default_window_icon() {
-                tray = tray.icon(icon.clone());
-            }
             // A missing GNOME tray extension must not prevent the main app from opening.
             let _ = tray.build(app);
             let initial = std::env::args().nth(1).unwrap_or_default();

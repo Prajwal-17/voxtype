@@ -9,6 +9,7 @@ import android.os.Looper
 import androidx.core.content.ContextCompat
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
+import expo.modules.kotlin.functions.Queues
 import java.lang.ref.WeakReference
 
 class VoxTypeNativeModule : Module() {
@@ -24,22 +25,26 @@ class VoxTypeNativeModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("VoxTypeNative")
     Events("onChange")
-    OnCreate { active = WeakReference(this@VoxTypeNativeModule) }
+    OnCreate {
+      active = WeakReference(this@VoxTypeNativeModule)
+    }
 
     AsyncFunction("getSnapshot") {
       val context = requireNotNull(appContext.reactContext)
-      val store = VoxTypeStore(context)
-      val enabled = Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
-        ?.contains("${context.packageName}/${VoxTypeAccessibilityService::class.java.name}", true) == true
-      mapOf(
-        "accessibilityEnabled" to enabled,
-        "microphoneGranted" to (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED),
-        "bubbleEnabled" to store.bubbleEnabled,
-        "cleanupEnabled" to store.cleanupEnabled,
-        "audioLimit" to store.audioLimit,
-        "status" to (VoxTypeAccessibilityService.instance?.status ?: DictationStatus.IDLE.bridge),
-        "dictations" to store.dictations(),
-      )
+      VoxTypeStore(context).use { store ->
+        store.pruneAudio()
+        val enabled = Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
+          ?.contains("${context.packageName}/${VoxTypeAccessibilityService::class.java.name}", true) == true
+        mapOf(
+          "accessibilityEnabled" to enabled,
+          "microphoneGranted" to (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED),
+          "bubbleEnabled" to store.bubbleEnabled,
+          "cleanupEnabled" to store.cleanupEnabled,
+          "audioLimit" to VoxTypeStore.AUDIO_LIMIT,
+          "status" to (VoxTypeAccessibilityService.instance?.status ?: DictationStatus.IDLE.bridge),
+          "inApp" to InAppRecorder.snapshot(),
+        )
+      }
     }
 
     AsyncFunction("openAccessibilitySettings") {
@@ -65,6 +70,7 @@ class VoxTypeNativeModule : Module() {
 
     AsyncFunction("signOut") {
       val context = requireNotNull(appContext.reactContext)
+      mainHandler.post { InAppRecorder.cancel() }
       NativeSession(context).clear()
       mainHandler.post { VoxTypeAccessibilityService.instance?.onSignOut() }
     }
@@ -77,11 +83,6 @@ class VoxTypeNativeModule : Module() {
           value.toBooleanStrictOrNull() ?: throw IllegalArgumentException("bubbleEnabled must be 'true' or 'false'")
         "cleanupEnabled" -> store.cleanupEnabled =
           value.toBooleanStrictOrNull() ?: throw IllegalArgumentException("cleanupEnabled must be 'true' or 'false'")
-        "audioLimit" -> {
-          val limit = value.toIntOrNull()
-            ?: throw IllegalArgumentException("audioLimit must be one of ${VoxTypeStore.VALID_AUDIO_LIMITS}")
-          store.audioLimit = limit
-        }
         else -> throw IllegalArgumentException("Unknown preference: $key")
       }
       refreshBubble()
@@ -101,18 +102,20 @@ class VoxTypeNativeModule : Module() {
       changed()
     }
 
-    AsyncFunction("setAudioLimit") { limit: Int ->
-      VoxTypeStore(requireNotNull(appContext.reactContext)).audioLimit = limit
-      refreshBubble()
-      changed()
-    }
-
     AsyncFunction("copyTranscript") { id: String ->
       VoxTypeStore(requireNotNull(appContext.reactContext)).copyToClipboard(id)
     }
 
-    AsyncFunction("stopRecording") {
-      mainHandler.post { VoxTypeAccessibilityService.instance?.stopRecording() }
+    AsyncFunction("startRecording") {
+      InAppRecorder.start(requireNotNull(appContext.reactContext).applicationContext)
+    }.runOnQueue(Queues.MAIN)
+    AsyncFunction("stopRecording") { InAppRecorder.stop() }.runOnQueue(Queues.MAIN)
+    AsyncFunction("cancelRecording") { InAppRecorder.cancel() }.runOnQueue(Queues.MAIN)
+    AsyncFunction("getTranscripts") { cursor: String? ->
+      val context = requireNotNull(appContext.reactContext)
+      VoxTypeStore(context).use { it.page(requireNotNull(NativeSession(context).userId), cursor) }
     }
+    OnActivityEntersBackground { mainHandler.post { InAppRecorder.stop() } }
+    OnDestroy { mainHandler.post { InAppRecorder.cancel() } }
   }
 }

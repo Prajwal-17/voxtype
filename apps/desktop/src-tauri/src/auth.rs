@@ -18,11 +18,11 @@ struct SessionResponse {
     user: AuthUser,
 }
 
-fn api_url() -> String {
+pub(crate) fn api_url() -> String {
     option_env!("VOXTYPE_API_URL")
         .unwrap_or_else(|| {
             if environment::is_development() {
-                "http://localhost:8787"
+                "http://localhost:8788"
             } else {
                 unreachable!("production builds require VOXTYPE_API_URL")
             }
@@ -33,15 +33,55 @@ fn api_url() -> String {
 
 fn client() -> Result<reqwest::Client, String> {
     reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
         .timeout(Duration::from_secs(20))
         .build()
         .map_err(|_| "VoxType could not prepare a secure connection.".into())
+}
+
+/// Verify the owner using the exact bearer used for this upload batch.
+/// This never reads server dictations and cannot reassign queued text after account changes.
+pub(crate) async fn upload_session() -> Result<Option<(AuthUser, String, reqwest::Client)>, String>
+{
+    let Some(token) = tokio::time::timeout(Duration::from_secs(6), stored_token())
+        .await
+        .map_err(|_| "The account keyring request timed out.")??
+    else {
+        return Ok(None);
+    };
+    let client = client()?;
+    let response = client
+        .get(format!("{}/v1/me", api_url()))
+        .bearer_auth(&token)
+        .send()
+        .await
+        .map_err(|_| "Account verification failed.")?;
+    if !response.status().is_success() {
+        return Ok(None);
+    }
+    let user = response
+        .json::<UserResponse>()
+        .await
+        .map_err(|_| "Invalid account response.")?
+        .data;
+    Ok(Some((user, token, client)))
 }
 
 async fn stored_token() -> Result<Option<String>, String> {
     tokio::task::spawn_blocking(storage::auth_token)
         .await
         .map_err(|_| "The account keyring request failed.".to_string())?
+}
+
+/// Only the account session is persisted. Provider credentials stay on the server.
+pub(crate) async fn speech_request(path: &str) -> Result<reqwest::RequestBuilder, String> {
+    let token = tokio::time::timeout(Duration::from_secs(6), stored_token())
+        .await
+        .map_err(|_| "Unlock your login keyring and try again.")??
+        .ok_or("Sign in with Google to use VoxType dictation.")?;
+    Ok(client()?
+        .post(format!("{}/v1/speech/{path}", api_url()))
+        .bearer_auth(token))
 }
 
 pub async fn current_user() -> Result<Option<AuthUser>, String> {

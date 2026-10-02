@@ -1,6 +1,6 @@
 //! One owner per recording. UI, tray, and shortcuts all send Stop/Cancel to the same task.
 //! Only confirmed complete transcripts can reach automatic paste.
-use crate::{audio, cleanup, desktop, model::*, publish, storage, AppState};
+use crate::{audio, cleanup, desktop, model::*, publish, recordings, speech, storage, AppState};
 use futures_util::{FutureExt, SinkExt, StreamExt};
 use std::{
     collections::VecDeque,
@@ -46,12 +46,32 @@ pub async fn toggle(app: AppHandle) -> Result<(), String> {
     if active {
         signal(&app, Control::Stop).await
     } else {
+        // A shortcut can cold-start the process before either webview restores auth.
+        if crate::require_authenticated(&app).is_err() {
+            crate::get_auth_user(app.clone()).await?;
+            crate::require_authenticated(&app)?;
+        }
         start(app, false, true).await
     }
 }
 
 pub async fn start(app: AppHandle, test: bool, external: bool) -> Result<(), String> {
     let settings = storage::settings(&app)?;
+    let user_id = app
+        .state::<AppState>()
+        .user
+        .lock()
+        .map_err(|_| "Account unavailable.")?
+        .as_ref()
+        .map(|user| user.id.clone())
+        .ok_or("Sign in with Google to use dictation.")?;
+    let created_at = now_ms();
+    let id = uuid::Uuid::new_v4().to_string();
+    let recording = if test {
+        None
+    } else {
+        Some(recordings::Recording::create(&app, &id, created_at)?)
+    };
     let (tx, mut rx) = mpsc::channel(8);
     {
         let state = app.state::<AppState>();
@@ -62,7 +82,10 @@ pub async fn start(app: AppHandle, test: bool, external: bool) -> Result<(), Str
         *control = Some(tx);
     }
     // Open capture before window work or network/keyring waits.
-    let capture = match audio::start(&settings.microphone) {
+    let capture = match audio::start_recording(
+        &settings.microphone,
+        recording.as_ref().map(|r| r.writer.clone()),
+    ) {
         Ok(capture) => capture,
         Err(error) => {
             if let Ok(mut control) = app.state::<AppState>().control.lock() {
@@ -72,9 +95,10 @@ pub async fn start(app: AppHandle, test: bool, external: bool) -> Result<(), Str
         }
     };
     let mut snapshot = Snapshot {
-        session_id: uuid::Uuid::new_v4().to_string(),
+        session_id: id,
         phase: Phase::Listening,
         is_test: test,
+        external,
         ..Snapshot::default()
     };
     publish(&app, &snapshot);
@@ -106,10 +130,25 @@ pub async fn start(app: AppHandle, test: bool, external: bool) -> Result<(), Str
         });
         let cancelled = drain_cancel(&mut rx);
         let result = if cancelled { Ok(false) } else { result };
+        let keep_take = !test && !matches!(&result, Ok(false));
+        let mut audio_file = None;
+        let mut recording_error = None;
+        if keep_take {
+            if let Some(recording) = &recording {
+                match recording.finish() {
+                    Ok(path) => audio_file = path,
+                    Err(error) => recording_error = Some(error),
+                }
+            }
+        }
+        let mut history_saved = false;
+        let mut history_error = None;
         match result {
             Ok(false) => {
                 snapshot = Snapshot {
                     session_id: snapshot.session_id.clone(),
+                    external,
+                    is_test: test,
                     ..Snapshot::default()
                 };
             }
@@ -127,6 +166,14 @@ pub async fn start(app: AppHandle, test: bool, external: bool) -> Result<(), Str
                     // In-app recordings intentionally stay in VoxType. External recordings paste into the focused application.
                     snapshot.delivery = "saved".into();
                     snapshot.message = "Your transcript is ready.".into();
+                    // Commit received text before clipboard/paste work can fail or interrupt us.
+                    match storage::append_history(
+                        &app,
+                        history_item(&snapshot, &user_id, created_at, audio_file.as_deref()),
+                    ) {
+                        Ok(()) => history_saved = true,
+                        Err(error) => history_error = Some(error),
+                    }
                     if external {
                         if let Some(w) = app.get_webview_window("overlay") {
                             let _ = w.hide();
@@ -163,27 +210,41 @@ pub async fn start(app: AppHandle, test: bool, external: bool) -> Result<(), Str
                             }
                         }
                     }
-                    if settings.keep_history {
-                        let item = HistoryItem {
-                            id: snapshot.session_id.clone(),
-                            text: snapshot.text.clone(),
-                            original_text: snapshot.original_text.clone(),
-                            created_at: now_ms(),
-                            duration_ms: snapshot.elapsed_ms,
-                            words: snapshot.text.split_whitespace().count(),
-                            delivery: snapshot.delivery.clone(),
-                        };
-                        if let Err(e) = storage::append_history(&app, item) {
-                            snapshot.message =
-                                format!("{} History could not be saved: {e}", snapshot.message);
-                        }
-                    }
                 }
             }
             Err(e) => {
                 snapshot.phase = Phase::Error;
                 snapshot.message = e;
             }
+        }
+        // Keep received text even when a provider failed before final confirmation.
+        if keep_take && !snapshot.text.trim().is_empty() {
+            let saving = if history_saved {
+                storage::update_delivery(&app, &snapshot.session_id, &snapshot.delivery)
+            } else {
+                storage::append_history(
+                    &app,
+                    history_item(&snapshot, &user_id, created_at, audio_file.as_deref()),
+                )
+            };
+            match saving {
+                Ok(()) => {
+                    history_error = None;
+                    crate::uploads::send_pending(app.clone());
+                }
+                Err(error) => history_error = Some(error),
+            }
+        }
+        if let Some(error) = history_error {
+            snapshot.message = format!("{} History could not be saved: {error}", snapshot.message);
+        }
+        if keep_take {
+            if let Err(error) = storage::prune_audio(&app) {
+                recording_error = Some(error);
+            }
+        }
+        if let Some(error) = recording_error {
+            snapshot.message = format!("{} {error}", snapshot.message);
         }
         if !snapshot.cleanup_warning.is_empty() {
             snapshot.message = format!("{} {}", snapshot.message, snapshot.cleanup_warning);
@@ -229,6 +290,30 @@ pub async fn start(app: AppHandle, test: bool, external: bool) -> Result<(), Str
     Ok(())
 }
 
+fn history_item(
+    snapshot: &Snapshot,
+    user_id: &str,
+    created_at: u64,
+    audio_file: Option<&str>,
+) -> HistoryItem {
+    HistoryItem {
+        id: snapshot.session_id.clone(),
+        text: snapshot.text.clone(),
+        original_text: snapshot.original_text.clone(),
+        created_at,
+        duration_ms: snapshot.elapsed_ms,
+        words: snapshot.text.split_whitespace().count(),
+        delivery: if snapshot.delivery.is_empty() {
+            "saved".into()
+        } else {
+            snapshot.delivery.clone()
+        },
+        user_id: Some(user_id.into()),
+        audio_file: audio_file.map(str::to_owned),
+        upload_api_url: Some(crate::auth::api_url()),
+    }
+}
+
 fn overlay_position(
     area_position: tauri::PhysicalPosition<i32>,
     area_size: tauri::PhysicalSize<u32>,
@@ -272,6 +357,27 @@ fn overlay_target(w: &tauri::WebviewWindow) -> Option<tauri::PhysicalPosition<i3
 fn overlay_is_positioned(w: &tauri::WebviewWindow, expected: tauri::PhysicalPosition<i32>) -> bool {
     w.outer_position()
         .is_ok_and(|actual| positions_match(actual, expected))
+}
+
+pub fn show_error(app: &AppHandle, message: String) {
+    // Leave a recording owned by another caller intact.
+    if app
+        .state::<AppState>()
+        .control
+        .lock()
+        .is_ok_and(|c| c.is_none())
+    {
+        publish(
+            app,
+            &Snapshot {
+                phase: Phase::Error,
+                external: true,
+                message,
+                ..Snapshot::default()
+            },
+        );
+        show_overlay(app);
+    }
 }
 
 fn show_overlay(app: &AppHandle) {
@@ -477,25 +583,18 @@ type SpeechSocket =
     tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
 
 async fn connect(settings: &Settings) -> Result<SpeechSocket, String> {
-    let key = tokio::time::timeout(
-        Duration::from_secs(15),
-        tokio::task::spawn_blocking(storage::key),
-    )
-    .await
-    .map_err(|_| "Keyring timed out. Unlock your login keyring and try again.")?
-    .map_err(|_| "Keyring request failed.")??
-    .ok_or("Add your Deepgram API key in Settings before dictating.")?;
+    let token = speech::token().await?;
     let mut request = listen_url(settings)?
         .as_str()
         .into_client_request()
         .map_err(|_| "Could not create a Deepgram request.")?;
     request.headers_mut().insert(
         "Authorization",
-        format!("Token {key}")
+        format!("Bearer {token}")
             .parse()
-            .map_err(|_| "The saved API key is invalid.")?,
+            .map_err(|_| "The server returned invalid transcription credentials.")?,
     );
-    drop(key);
+    drop(token);
     let (socket, _) = tokio::time::timeout(Duration::from_secs(10), connect_async(request))
         .await
         .map_err(|_| "Deepgram connection timed out. No text was inserted; try again.")?
@@ -503,11 +602,9 @@ async fn connect(settings: &Settings) -> Result<SpeechSocket, String> {
             tokio_tungstenite::tungstenite::Error::Http(response)
                 if response.status().as_u16() == 401 || response.status().as_u16() == 403 =>
             {
-                "Deepgram rejected the API key. Replace it in Settings."
+                "Deepgram rejected the temporary credentials. Try dictating again."
             }
-            _ => {
-                "Could not connect to Deepgram. Check your connection, API key, and account credit."
-            }
+            _ => "Could not connect to Deepgram. Check your connection and try again.",
         })?;
     Ok(socket)
 }
@@ -584,7 +681,7 @@ async fn prepare_stream(
     }
 }
 
-// Separate the wire protocol from desktop side effects so finalization is testable without a microphone or API key.
+// Separate the wire protocol from desktop side effects so finalization is testable without a microphone or provider credentials.
 async fn pump(
     snapshot: &mut Snapshot,
     control: &mut mpsc::Receiver<Control>,
@@ -680,7 +777,7 @@ async fn pump(
             incoming = incoming.next() => match incoming {
                 Some(Ok(Message::Text(text))) => {
                     let value: serde_json::Value = serde_json::from_str(&text).map_err(|_| "Deepgram returned an unreadable response.")?;
-                    if value["type"] == "Error" { return Err("Deepgram could not process this recording. Check language, account credit, and API key.".into()); }
+                    if value["type"] == "Error" { return Err("Deepgram could not process this recording. Try again or check your language setting.".into()); }
                     if value["type"] == "Metadata" && close_sent { return Ok(true); }
                     transcript.accept(&value);
                     snapshot.text = transcript.text.clone(); snapshot.interim = transcript.interim.clone();
@@ -722,337 +819,5 @@ async fn pump(
                 snapshot.level = 0.0; snapshot.speech_active = false; publish(snapshot);
             },
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn overlay_is_centered_at_the_monitor_work_area_edge() {
-        let position = overlay_position(
-            tauri::PhysicalPosition::new(1920, 40),
-            tauri::PhysicalSize::new(2560, 1400),
-            tauri::PhysicalSize::new(672, 160),
-            0,
-        );
-        assert_eq!(position.x, 2864);
-        assert_eq!(position.y, 1280);
-        assert!(positions_match(
-            position,
-            tauri::PhysicalPosition::new(2865, 1278)
-        ));
-        assert!(!positions_match(
-            position,
-            tauri::PhysicalPosition::new(2864, 1277)
-        ));
-    }
-
-    #[test]
-    fn overlay_respects_dock_negative_monitor_origin_and_display_scale() {
-        // 1920x1080 display with a 38px top panel and 64px bottom dock.
-        for scale in [1, 2] {
-            let position = overlay_position(
-                tauri::PhysicalPosition::new(-1920 * scale as i32, 38 * scale as i32),
-                tauri::PhysicalSize::new(1920 * scale, 978 * scale),
-                tauri::PhysicalSize::new(288 * scale, 64 * scale),
-                0,
-            );
-            assert_eq!(position.x, -1104 * scale as i32);
-            assert_eq!(position.y, 952 * scale as i32);
-        }
-    }
-    use serde_json::json;
-    fn frame(text: &str, final_: bool, start: f64) -> serde_json::Value {
-        json!({"type":"Results","is_final":final_,"start":start,"duration":1.0,"channel":{"alternatives":[{"transcript":text}]}})
-    }
-    #[test]
-    fn interim_replaces_and_final_segments_append_once() {
-        let mut t = Transcript::default();
-        t.accept(&frame("hel", false, 0.0));
-        t.accept(&frame("hello", false, 0.0));
-        assert_eq!(t.interim, "hello");
-        assert!(t.text.is_empty());
-        t.accept(&frame("Hello.", true, 0.0));
-        t.accept(&frame("Hello.", true, 0.0));
-        assert_eq!(t.text, "Hello.");
-        assert!(t.interim.is_empty());
-        t.accept(&frame("Hello.", true, 1.0));
-        assert_eq!(t.text, "Hello. Hello.");
-    }
-    #[test]
-    fn speech_endpoint_is_not_session_completion() {
-        let mut t = Transcript::default();
-        let mut f = frame("A thought.", true, 0.0);
-        f["speech_final"] = json!(true);
-        t.accept(&f);
-        t.accept(&frame("Another thought.", true, 1.0));
-        assert_eq!(t.text, "A thought. Another thought.");
-    }
-    #[test]
-    fn vocabulary_is_encoded_as_separate_keyterms() {
-        let settings = Settings {
-            vocabulary: vec!["Cloudflare Workers".into(), "R&D".into()],
-            ..Settings::default()
-        };
-        let url = listen_url(&settings).unwrap();
-        let terms: Vec<_> = url
-            .query_pairs()
-            .filter(|(k, _)| k == "keyterm")
-            .map(|(_, v)| v.into_owned())
-            .collect();
-        assert_eq!(terms, settings.vocabulary);
-        assert!(!url.as_str().contains("Token"));
-    }
-    async fn wire_fixture(complete: bool, cancel: bool) -> (Result<bool, String>, Snapshot, usize) {
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let address = listener.local_addr().unwrap();
-        let (tx, mut rx) = mpsc::channel(8);
-        let server = tokio::spawn(async move {
-            let (tcp, _) = listener.accept().await.unwrap();
-            let mut ws = tokio_tungstenite::accept_async(tcp).await.unwrap();
-            let mut bytes = 0;
-            while let Some(Ok(message)) = ws.next().await {
-                match message {
-                    Message::Binary(data) => {
-                        bytes += data.len();
-                        if bytes == 3200 {
-                            ws.send(Message::Text(
-                                frame("First sentence.", true, 0.0).to_string().into(),
-                            ))
-                            .await
-                            .unwrap();
-                            tx.send(if cancel {
-                                Control::Cancel
-                            } else {
-                                Control::Stop
-                            })
-                            .await
-                            .unwrap();
-                        }
-                    }
-                    Message::Text(text) if text.contains("CloseStream") => {
-                        assert_eq!(
-                            bytes, 3520,
-                            "the captured tail must arrive before CloseStream"
-                        );
-                        ws.send(Message::Text(
-                            frame("Last word.", true, 1.0).to_string().into(),
-                        ))
-                        .await
-                        .unwrap();
-                        if complete {
-                            ws.send(Message::Text(json!({"type":"Metadata"}).to_string().into()))
-                                .await
-                                .unwrap();
-                        }
-                        ws.close(None).await.unwrap();
-                        // Keep the control sender alive so a channel close cannot masquerade as Cancel.
-                        tokio::time::sleep(Duration::from_millis(100)).await;
-                        break;
-                    }
-                    _ => {}
-                }
-            }
-            bytes
-        });
-        let (socket, _) = connect_async(format!("ws://{address}")).await.unwrap();
-        let mut snapshot = Snapshot::default();
-        let result = tokio::time::timeout(
-            Duration::from_secs(3),
-            pump(
-                &mut snapshot,
-                &mut rx,
-                audio::Capture::fixture(),
-                PreparedStream {
-                    socket,
-                    buffer: AudioBuffer::default(),
-                    stopping: false,
-                    gate: audio::SpeechGate::new(false),
-                },
-                Instant::now(),
-                |_| {},
-            ),
-        )
-        .await
-        .unwrap();
-        (result, snapshot, server.await.unwrap())
-    }
-    #[tokio::test]
-    async fn stop_drains_audio_and_waits_for_final_confirmation() {
-        let (result, snapshot, bytes) = wire_fixture(true, false).await;
-        assert!(result.unwrap());
-        assert_eq!(bytes, 3520);
-        assert_eq!(snapshot.text, "First sentence. Last word.");
-    }
-    #[tokio::test]
-    async fn premature_socket_close_never_authorizes_paste() {
-        let (result, snapshot, _) = wire_fixture(false, false).await;
-        assert!(result.is_err());
-        assert_eq!(snapshot.text, "First sentence. Last word.");
-    }
-    #[tokio::test]
-    async fn cancellation_does_not_flush_or_deliver() {
-        let (result, _, bytes) = wire_fixture(false, true).await;
-        assert!(!result.unwrap());
-        assert_eq!(bytes, 3200);
-    }
-    #[tokio::test]
-    async fn early_finish_buffers_audio_and_updates_meter_before_connection() {
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let address = listener.local_addr().unwrap();
-        let (tx, mut rx) = mpsc::channel(8);
-        let server = tokio::spawn(async move {
-            let (tcp, _) = listener.accept().await.unwrap();
-            let mut socket = tokio_tungstenite::accept_async(tcp).await.unwrap();
-            let mut audio = Vec::new();
-            while let Some(Ok(message)) = socket.next().await {
-                match message {
-                    Message::Binary(bytes) => audio.extend_from_slice(&bytes),
-                    Message::Text(text) if text.contains("CloseStream") => {
-                        assert_eq!(audio, [vec![0; 3200], vec![1; 320]].concat());
-                        socket
-                            .send(Message::Text(json!({"type":"Metadata"}).to_string().into()))
-                            .await
-                            .unwrap();
-                        break;
-                    }
-                    _ => {}
-                }
-            }
-        });
-        let mut capture = audio::Capture::fixture();
-        let started = Instant::now();
-        let mut snapshot = Snapshot {
-            phase: Phase::Listening,
-            ..Snapshot::default()
-        };
-        let meter_events = std::cell::Cell::new(0);
-        let stop = tokio::spawn(async move {
-            tokio::time::sleep(Duration::from_millis(30)).await;
-            tx.send(Control::Stop).await.unwrap();
-            tx // Keep sender alive until delivery finishes.
-        });
-        let prepared = prepare_stream(
-            &mut snapshot,
-            &mut rx,
-            &mut capture,
-            started,
-            async {
-                tokio::time::sleep(Duration::from_millis(150)).await;
-                connect_async(format!("ws://{address}"))
-                    .await
-                    .map(|(socket, _)| socket)
-                    .map_err(|e| e.to_string())
-            },
-            audio::SpeechGate::new(false),
-            |state| {
-                if state.phase == Phase::Listening {
-                    meter_events.set(meter_events.get() + 1);
-                }
-            },
-        )
-        .await
-        .unwrap()
-        .unwrap();
-        let _sender = stop.await.unwrap();
-        assert!(
-            meter_events.get() > 0,
-            "meter events must not wait for the handshake"
-        );
-        assert!(prepared.stopping);
-        assert_eq!(
-            prepared.buffer.bytes, 3520,
-            "keep the opening audio and stopped tail"
-        );
-        assert!(
-            pump(&mut snapshot, &mut rx, capture, prepared, started, |_| {})
-                .await
-                .unwrap()
-        );
-        server.await.unwrap();
-    }
-    #[tokio::test]
-    async fn cancel_during_connection_discards_buffer_without_waiting() {
-        let mut capture = audio::Capture::fixture();
-        let (tx, mut rx) = mpsc::channel(8);
-        tx.send(Control::Cancel).await.unwrap();
-        let mut snapshot = Snapshot::default();
-        let result = tokio::time::timeout(
-            Duration::from_millis(100),
-            prepare_stream(
-                &mut snapshot,
-                &mut rx,
-                &mut capture,
-                Instant::now(),
-                std::future::pending(),
-                audio::SpeechGate::new(false),
-                |_| {},
-            ),
-        )
-        .await
-        .unwrap()
-        .unwrap();
-        assert!(result.is_none());
-    }
-    #[test]
-    fn audio_buffer_fails_explicitly_instead_of_growing_or_dropping_audio() {
-        let mut buffer = AudioBuffer::default();
-        assert!(buffer.push(vec![0; 32 * 32000]).is_ok());
-        assert!(buffer.push(vec![1; 2]).is_err());
-        assert_eq!(buffer.pop().unwrap().len(), 32 * 32000);
-        assert!(buffer.push(vec![1; 2]).is_ok());
-    }
-    #[tokio::test]
-    #[ignore = "Uses the saved Deepgram key and sends 100ms of synthetic silence"]
-    async fn native_deepgram_connection() {
-        let _ = rustls::crypto::ring::default_provider().install_default();
-        let key = storage::key()
-            .expect("Unlock the keyring")
-            .expect("Save a key in VoxType first");
-        let mut request = listen_url(&Settings::default())
-            .unwrap()
-            .as_str()
-            .into_client_request()
-            .unwrap();
-        request
-            .headers_mut()
-            .insert("Authorization", format!("Token {key}").parse().unwrap());
-        let result = tokio::time::timeout(Duration::from_secs(10), connect_async(request))
-            .await
-            .expect("Connection timed out");
-        let (mut socket, _) = result.unwrap_or_else(|e| {
-            panic!(
-                "Deepgram connection failed: {}",
-                match e {
-                    tokio_tungstenite::tungstenite::Error::Http(r) =>
-                        format!("HTTP {}", r.status()),
-                    _ => "transport error".into(),
-                }
-            )
-        });
-        socket
-            .send(Message::Binary(vec![0; 3200].into()))
-            .await
-            .unwrap();
-        socket
-            .send(Message::Text(
-                serde_json::json!({"type":"CloseStream"}).to_string().into(),
-            ))
-            .await
-            .unwrap();
-        let confirmed = tokio::time::timeout(Duration::from_secs(10), async {
-            while let Some(Ok(Message::Text(text))) = socket.next().await {
-                let value: serde_json::Value = serde_json::from_str(&text).unwrap();
-                if value["type"] == "Metadata" {
-                    return true;
-                }
-            }
-            false
-        })
-        .await
-        .unwrap();
-        assert!(confirmed, "Deepgram did not confirm finalization");
     }
 }

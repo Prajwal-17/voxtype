@@ -4,9 +4,9 @@ export const settingsSchema = z.object({
   language: z.enum(['en', 'en-US', 'en-GB', 'hi', 'multi', 'es', 'fr', 'de', 'pt', 'ja']),
   microphone: z.string().max(512),
   autoPaste: z.boolean(),
-  keepHistory: z.boolean(),
   cleanupEnabled: z.boolean().default(false),
   voiceDetection: z.boolean().default(true),
+  launchAtLogin: z.boolean().default(true),
   vocabulary: z.array(z.string().trim().min(1).max(100)).max(100),
 });
 export type Settings = z.infer<typeof settingsSchema>;
@@ -14,9 +14,9 @@ export const defaultSettings: Settings = {
   language: 'en',
   microphone: '',
   autoPaste: true,
-  keepHistory: true,
   cleanupEnabled: false,
   voiceDetection: true,
+  launchAtLogin: true,
   vocabulary: [],
 };
 export type Phase = 'idle' | 'listening' | 'finishing' | 'cleaning' | 'done' | 'error';
@@ -31,6 +31,7 @@ export interface Session {
   message: string;
   delivery: string;
   isTest: boolean;
+  external?: boolean;
   originalText?: string;
   cleanupWarning?: string;
 }
@@ -46,11 +47,8 @@ export const idleSession: Session = {
   isTest: false,
 };
 export interface Bootstrap {
+  startupAvailable: boolean;
   settings: Settings;
-  hasKey: boolean;
-  keyError: string | null;
-  hasCleanupKey: boolean;
-  cleanupKeyError: string | null;
   snapshot: Session;
   shortcutRegistered: boolean;
   version: string;
@@ -77,6 +75,8 @@ export interface HistoryItem {
   durationMs: number;
   words: number;
   delivery: string;
+  userId?: string;
+  audioFile?: string;
 }
 export interface Microphone {
   id: string;

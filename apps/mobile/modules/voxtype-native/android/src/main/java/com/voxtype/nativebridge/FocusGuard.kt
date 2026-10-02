@@ -29,7 +29,7 @@ object FocusGuard {
     editorInputType: Int,
     editorNoPersonalizedLearning: Boolean,
   ): Boolean {
-    if (!node.isEditable || node.isPassword) return false
+    if (!node.isEditable || !node.isFocused || !node.isVisibleToUser || !node.isEnabled || node.isPassword) return false
     if (node.packageName?.toString() == ownPackage) return false
     if (Build.VERSION.SDK_INT < 33) return false
     if (editorPackage == null || editorPackage != node.packageName?.toString()) return false

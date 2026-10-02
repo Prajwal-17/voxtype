@@ -1,5 +1,5 @@
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
-import { Check, ChevronRight, Circle } from 'lucide-react';
+import { CheckIcon, CaretRightIcon, CircleIcon } from '../icons';
 import * as React from 'react';
 import { cn } from '../../lib/utils';
 import { Kbd } from './kbd';
@@ -18,14 +18,14 @@ const DropdownMenuSubTrigger = React.forwardRef<
   <DropdownMenuPrimitive.SubTrigger
     ref={ref}
     className={cn(
-      'flex cursor-default items-center gap-2 rounded-[6px] px-3 py-2 text-ui text-ink outline-none select-none focus:bg-subtle',
+      'flex cursor-default items-center gap-2 rounded-[6px] px-3 py-2 text-ui text-ink outline-none select-none focus:bg-accent-soft focus:text-accent-ink',
       inset && 'pl-8',
       className,
     )}
     {...props}
   >
     {children}
-    <ChevronRight size={14} className="ml-auto text-muted" />
+    <CaretRightIcon size={16} className="ml-auto text-muted" aria-hidden="true" />
   </DropdownMenuPrimitive.SubTrigger>
 ));
 DropdownMenuSubTrigger.displayName = DropdownMenuPrimitive.SubTrigger.displayName;
@@ -70,7 +70,7 @@ const DropdownMenuItem = React.forwardRef<
   <DropdownMenuPrimitive.Item
     ref={ref}
     className={cn(
-      'relative flex cursor-default items-center gap-2 rounded-[6px] px-3 py-2 text-ui outline-none select-none focus:bg-subtle focus:text-ink data-[disabled]:pointer-events-none data-[disabled]:opacity-45 [&_svg]:size-4 [&_svg]:text-muted',
+      'relative flex cursor-default items-center gap-2 rounded-[6px] px-3 py-2 text-ui outline-none select-none focus:bg-accent-soft focus:text-accent-ink data-[disabled]:pointer-events-none data-[disabled]:opacity-45 [&_svg]:size-4 [&_svg]:text-muted',
       inset && 'pl-8',
       className,
     )}
@@ -87,14 +87,14 @@ const DropdownMenuCheckboxItem = React.forwardRef<
     ref={ref}
     checked={checked}
     className={cn(
-      'relative flex cursor-default items-center gap-2 rounded-[6px] py-2 pr-3 pl-8 text-ui outline-none select-none focus:bg-subtle data-[disabled]:pointer-events-none data-[disabled]:opacity-45',
+      'relative flex cursor-default items-center gap-2 rounded-[6px] py-2 pr-3 pl-8 text-ui outline-none select-none focus:bg-accent-soft focus:text-accent-ink data-[disabled]:pointer-events-none data-[disabled]:opacity-45',
       className,
     )}
     {...props}
   >
     <span className="absolute left-2 flex size-4 items-center justify-center">
       <DropdownMenuPrimitive.ItemIndicator>
-        <Check size={14} className="text-accent" />
+        <CheckIcon size={16} className="text-accent" aria-hidden="true" />
       </DropdownMenuPrimitive.ItemIndicator>
     </span>
     {children}
@@ -109,14 +109,14 @@ const DropdownMenuRadioItem = React.forwardRef<
   <DropdownMenuPrimitive.RadioItem
     ref={ref}
     className={cn(
-      'relative flex cursor-default items-center gap-2 rounded-[6px] py-2 pr-3 pl-8 text-ui outline-none select-none focus:bg-subtle data-[disabled]:pointer-events-none data-[disabled]:opacity-45',
+      'relative flex cursor-default items-center gap-2 rounded-[6px] py-2 pr-3 pl-8 text-ui outline-none select-none focus:bg-accent-soft focus:text-accent-ink data-[disabled]:pointer-events-none data-[disabled]:opacity-45',
       className,
     )}
     {...props}
   >
     <span className="absolute left-2 flex size-4 items-center justify-center">
       <DropdownMenuPrimitive.ItemIndicator>
-        <Circle size={8} className="fill-accent text-accent" />
+        <CircleIcon size={8} weight="fill" className="text-accent" aria-hidden="true" />
       </DropdownMenuPrimitive.ItemIndicator>
     </span>
     {children}

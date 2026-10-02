@@ -1,8 +1,6 @@
 node_modules
 dist
 target
-test-results
-playwright-report
 apps/desktop/src-tauri/gen
 apps/desktop/src-tauri/icons
 pnpm-lock.yaml
@@ -11,3 +9,9 @@ apps/api/migrations/meta/
 apps/api/worker-configuration.d.ts
 apps/api/.wrangler/
 apps/mobile/src/uniwind-types.d.ts
+
+packages/shared/web.css
+
+apps/mobile/android/
+apps/mobile/modules/voxtype-native/android/build/
+apps/mobile/.expo/

@@ -1,0 +1,27 @@
+{
+  "name": "@voxtype/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": [
+    "./web.css"
+  ],
+  "exports": {
+    ".": "./theme.ts",
+    "./native": "./theme.ts",
+    "./web.css": "./web.css",
+    "./analytics": "./analytics.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "lint": "node generate.mjs --check && eslint . --max-warnings 0",
+    "generate": "node generate.mjs"
+  },
+  "devDependencies": {
+    "@voxtype/eslint-config": "workspace:*",
+    "@voxtype/typescript-config": "workspace:*",
+    "@types/node": "^24.0.0",
+    "eslint": "^10.11.0",
+    "typescript": "^5.9.3"
+  }
+}

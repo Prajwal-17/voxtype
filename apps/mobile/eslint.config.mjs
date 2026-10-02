@@ -1,7 +1,6 @@
 import { createReactConfig } from '@voxtype/eslint-config/react-internal';
 
 export default [
-  { ignores: ['dist-web/**'] },
+  { ignores: ['dist-web/**', 'android/**', '.expo/**'] },
   ...createReactConfig({ tsconfigRootDir: import.meta.dirname }),
-  { files: ['src/components/ui/*.tsx'], rules: { 'react-refresh/only-export-components': 'off' } },
 ];

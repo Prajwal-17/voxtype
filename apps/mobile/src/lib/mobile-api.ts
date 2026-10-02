@@ -1,3 +1,4 @@
+import type { Analytics } from '@voxtype/shared/analytics';
 import * as Crypto from 'expo-crypto';
 import * as WebBrowser from 'expo-web-browser';
 import VoxTypeNative from '../../modules/voxtype-native/src/VoxTypeNativeModule';
@@ -79,4 +80,14 @@ export async function signOut(): Promise<void> {
     }
   }
   await VoxTypeNative.signOut();
+}
+
+export async function getAnalytics(): Promise<Analytics> {
+  const { token } = await VoxTypeNative.getSession();
+  if (!token) throw new Error('Sign in again');
+  const response = await fetch(`${API_URL}/v1/analytics?range=30d`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error('Analytics unavailable');
+  return ((await response.json()) as { data: Analytics }).data;
 }

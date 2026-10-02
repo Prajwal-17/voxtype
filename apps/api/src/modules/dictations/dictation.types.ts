@@ -1,11 +1,11 @@
-export type DictationDelivery = 'saved' | 'copied' | 'pasted';
+export type DictationSource = 'desktop' | 'mobile';
 
 export type DictationInput = {
   text: string;
   originalText?: string | null;
   createdAt: number;
   durationMs: number;
-  delivery: DictationDelivery;
+  source: DictationSource;
 };
 
 export type CreateDictationInput = DictationInput & {
@@ -31,7 +31,7 @@ export type DictationResponse = {
   updatedAt: number;
   durationMs: number;
   words: number;
-  delivery: DictationDelivery;
+  source: DictationSource | null;
 };
 
 export type DictationPage = {

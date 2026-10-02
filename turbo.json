@@ -25,15 +25,10 @@
       "outputs": ["src-tauri/target/release/bundle/**"]
     },
     "lint": {
-      "dependsOn": ["^lint"],
-      "env": ["PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"]
+      "dependsOn": ["^lint"]
     },
     "check-types": {
       "dependsOn": ["^check-types"]
-    },
-    "test": {
-      "dependsOn": ["^build"],
-      "env": ["PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH", "TAURI_WEBVIEW_AUTOMATION"]
     },
     "dev": {
       "cache": false,

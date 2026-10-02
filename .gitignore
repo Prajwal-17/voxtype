@@ -11,8 +11,6 @@ apps/desktop/.tmp/
 apps/desktop/.storage/
 apps/desktop/neutralinojs.log
 target/
-test-results/
-playwright-report/
 .impeccable/review/
 *.deb
 
@@ -20,3 +18,8 @@ playwright-report/
 .impeccable/
 
 apps/mobile/dist-web/
+
+apps/mobile/android/
+apps/mobile/.expo/
+
+apps/mobile/modules/voxtype-native/android/build/

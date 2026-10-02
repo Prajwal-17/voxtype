@@ -87,20 +87,21 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     session = NativeSession(this)
   }
 
-  override fun onServiceConnected() { super.onServiceConnected(); refreshBubble() }
+  override fun onServiceConnected() {
+    super.onServiceConnected(); refreshBubble()
+    store.pruneAudio()
+  }
   override fun onCreateInputMethod(): InputMethod = InputMethod(this)
 
   override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-    if (status == DictationStatus.LISTENING.bridge &&
-      event?.eventType == AccessibilityEvent.TYPE_VIEW_FOCUSED) {
+    // Window changes and a dismissed keyboard can leave an old editor node behind.
+    // Revalidate every event, including while connecting/processing.
+    if (status == DictationStatus.LISTENING.bridge) {
       val current = safeFocus()
       val same = isSameAsTarget(current)
-      if (current !== target) {
-        try { current?.recycle() } catch (e: Exception) { VoxLog.w("node recycle failed", e) }
-      }
-      if (!same) { stopRecording(); return }
+      current?.recycle()
+      if (!same) { stopRecording(); removeBubble(); return }
     }
-    if (status == DictationStatus.PROCESSING.bridge || status == DictationStatus.CONNECTING.bridge) return
     refreshBubble()
   }
   override fun onInterrupt() { stopRecording() }
@@ -119,6 +120,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   private fun focus(): AccessibilityNodeInfo? = rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
 
   private fun safeFocus(): AccessibilityNodeInfo? {
+    if (getWindows().none { it.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_INPUT_METHOD }) return null
     val node = focus() ?: return null
     var owned = true
     try {
@@ -166,7 +168,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   }
 
   fun refreshBubble() {
-    if (session.token == null || !store.bubbleEnabled || !hasValidFocus()) { removeBubble(); return }
+    if (session.token == null || InAppRecorder.busy || !store.bubbleEnabled || ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED || !hasValidFocus()) { removeBubble(); return }
     if (bubble == null) createBubble()
     if (bubble == null) return
     updateBubbleContent()
@@ -206,7 +208,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     }
     val mark = ImageView(this).apply {
       setImageResource(R.drawable.voxtype_logo)
-      alpha = 0.55f
+      alpha = 1f
       layoutParams = FrameLayout.LayoutParams(
         VoxConstants.BUBBLE_ICON_DP.dp, VoxConstants.BUBBLE_ICON_DP.dp, Gravity.CENTER)
       importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
@@ -326,7 +328,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
         bubbleMark?.visibility = View.GONE
         bubbleGlyph?.visibility = View.GONE
         actionsRow?.visibility = View.VISIBLE
-        startBars()
+        barViews.forEach { it.scaleY = 0.65f }
         animateBubbleWidth(VoxConstants.BUBBLE_LISTEN_WIDTH_DP.dp)
       }
       DictationStatus.CONNECTING.bridge, DictationStatus.PROCESSING.bridge -> {
@@ -357,7 +359,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       else -> {
         bg?.setColor(VoxConstants.BUBBLE_MUTED_COLOR)
         bubbleMark?.visibility = View.VISIBLE
-        bubbleMark?.alpha = 0.55f
+        bubbleMark?.alpha = 1f
         bubbleGlyph?.visibility = View.GONE
         actionsRow?.visibility = View.GONE
         animateBubbleWidth(VoxConstants.BUBBLE_SIZE_DP.dp)
@@ -377,6 +379,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   private fun animateBubbleWidth(target: Int) {
     val params = bubbleParams ?: return
     val root = bubble ?: return
+    params.x = params.x.coerceIn(0, (screenBounds().width() - target).coerceAtLeast(0))
     if (params.width == target) return
     if (!ValueAnimator.areAnimatorsEnabled()) {
       params.width = target
@@ -393,23 +396,6 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     }
     motionAnims += anim
     anim.start()
-  }
-
-  /** Desktop-style level bars: five springy bars while listening. */
-  private fun startBars() {
-    if (!ValueAnimator.areAnimatorsEnabled()) return
-    barViews.forEachIndexed { index, bar ->
-      bar.pivotY = (VoxConstants.BUBBLE_BAR_HEIGHT_DP.dp / 2).toFloat()
-      val anim = ObjectAnimator.ofFloat(bar, "scaleY", 0.25f, 1f).apply {
-        duration = VoxConstants.BUBBLE_BAR_ANIM_MS
-        repeatMode = ObjectAnimator.REVERSE
-        repeatCount = ObjectAnimator.INFINITE
-        startDelay = (index * 90).toLong()
-        interpolator = DecelerateInterpolator()
-      }
-      motionAnims += anim
-      anim.start()
-    }
   }
 
   private fun startSpin() {
@@ -564,7 +550,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     bubble = null; bubbleParams = null
     bubbleMark = null; bubbleGlyph = null; actionsRow = null
     cancelBtn = null; doneBtn = null; barViews = emptyList()
-    dragging = false; discardNext = false
+    dragging = false
   }
 
   private fun setStatus(value: DictationStatus) = setStatusBridge(value.bridge)
@@ -585,7 +571,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   }
 
   private fun startRecording() {
-    if (status != DictationStatus.IDLE.bridge && status != DictationStatus.SAVED.bridge) return
+    if (InAppRecorder.busy || (status != DictationStatus.IDLE.bridge && status != DictationStatus.SAVED.bridge)) return
     val node = safeFocus() ?: return
     if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
       node.recycle()
@@ -599,43 +585,47 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       releaseTarget()
       return
     }
-    setStatus(DictationStatus.CONNECTING)
-    val stream = engine ?: DeepgramSession({ session.token }, { session.apiUrl }) {
+    val recordingApiUrl = session.apiUrl ?: run { recordingUserId = null; releaseTarget(); return }
+    val stream = engine ?: DeepgramSession({ session.token }, { session.apiUrl }, {
       main.post {
-        if (status == DictationStatus.LISTENING.bridge) { capture?.stop(); setStatus(DictationStatus.PROCESSING) }
-        else if (status == DictationStatus.CONNECTING.bridge) setStatus(DictationStatus.IDLE)
+        if (status == DictationStatus.LISTENING.bridge) stopRecording()
       }
-    }.also { engine = it }
+    }).also { engine = it }
+    val generation = lifecycleGeneration
     try {
-      stream.begin {
-        if (status != DictationStatus.CONNECTING.bridge) return@begin
-        try {
-          showMicrophoneNotification()
-          capture = AudioCapture(this, { stream.audio(it) }, { file, duration ->
-            main.post {
-              if (discardNext || recordingUserId == null) {
-                discardNext = false
-                try { file?.delete() } catch (e: Exception) { VoxLog.w("discarded audio delete failed", e) }
-                try { stream.abort() } catch (e: Exception) { VoxLog.w("stream abort failed", e) }
-                stopForeground(STOP_FOREGROUND_REMOVE)
-                setStatus(DictationStatus.IDLE)
-                return@post
-              }
-              recordingFile = file
-              recordingDuration = duration
-              stopForeground(STOP_FOREGROUND_REMOVE)
-              stream.finalize { finishDictation(it) }
-            }
-          }).also { it.start() }
-          setStatus(DictationStatus.LISTENING)
-        } catch (e: Exception) {
-          VoxLog.e("start capture failed", e)
+      stream.begin()
+      showMicrophoneNotification()
+      capture = AudioCapture(this, { stream.audio(it) }, { file, duration ->
+        main.post {
+          if (generation != lifecycleGeneration) {
+            try { file?.delete() } catch (e: Exception) { VoxLog.w("discarded audio delete failed", e) }
+            return@post
+          }
+          capture = null
+          if (discardNext || recordingUserId == null) {
+            discardNext = false
+            try { file?.delete() } catch (e: Exception) { VoxLog.w("discarded audio delete failed", e) }
+            recordingUserId = null
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            releaseTarget()
+            setStatus(DictationStatus.IDLE)
+            return@post
+          }
+          recordingFile = file
+          recordingDuration = duration
           stopForeground(STOP_FOREGROUND_REMOVE)
-          setStatus(DictationStatus.IDLE)
+          setStatus(DictationStatus.PROCESSING)
+          stream.finalize { finishDictation(it, recordingApiUrl) }
         }
-      }
+      }).also { it.start() }
+      setStatus(DictationStatus.LISTENING)
     } catch (e: Exception) {
-      VoxLog.e("begin stream failed", e)
+      VoxLog.e("start capture failed", e)
+      capture = null
+      recordingUserId = null
+      stream.abort()
+      releaseTarget()
+      stopForeground(STOP_FOREGROUND_REMOVE)
       setStatus(DictationStatus.IDLE)
     }
   }
@@ -651,6 +641,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   private fun cancelRecording() {
     if (status != DictationStatus.LISTENING.bridge) return
     discardNext = true
+    engine?.abort()
     setStatus(DictationStatus.PROCESSING)
     try { capture?.stop() } catch (e: Exception) { VoxLog.w("capture stop failed", e) }
     capture = null
@@ -661,7 +652,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
       manager.createNotificationChannel(NotificationChannel(VoxConstants.CHANNEL_ID, VoxConstants.CHANNEL_NAME, NotificationManager.IMPORTANCE_LOW))
       val notification = Notification.Builder(this, VoxConstants.CHANNEL_ID)
-        .setSmallIcon(android.R.drawable.ic_btn_speak_now)
+        .setSmallIcon(R.drawable.voxtype_notification)
         .setContentTitle("VoxType is listening")
         .setContentText("Tap the bubble to stop and insert text")
         .setOngoing(true).build()
@@ -673,7 +664,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     }
   }
 
-  private fun finishDictation(original: String) {
+  private fun finishDictation(original: String, apiUrl: String) {
     val userId = recordingUserId ?: return
     val generation = lifecycleGeneration
     val audio = recordingFile
@@ -682,7 +673,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     serviceScope.launch(Dispatchers.IO) {
       val cleaned = if (store.cleanupEnabled) cleanup(original) else original
       val id = try {
-        store.save(userId, cleaned, original, duration, audio)
+        store.save(userId, cleaned, original, duration, audio, apiUrl)
       } catch (e: Exception) {
         VoxLog.e("dictation save failed", e)
         return@launch
@@ -698,6 +689,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
         val delay = if (delivered) VoxConstants.SAVED_AUTO_DISMISS_DELIVERED_MS else VoxConstants.SAVED_AUTO_DISMISS_MS
         main.postDelayed({ if (status == DictationStatus.SAVED.bridge) setStatus(DictationStatus.IDLE) }, delay)
       }
+      if (cleaned.isNotBlank()) TranscriptUploads.sendPending(applicationContext)
     }
   }
 

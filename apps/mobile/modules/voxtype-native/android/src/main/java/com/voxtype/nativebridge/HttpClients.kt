@@ -8,6 +8,10 @@ import java.util.concurrent.TimeUnit
  * which wastes connections and threads.
  */
 object HttpClients {
+  val uploads: OkHttpClient by lazy {
+    default.newBuilder().followRedirects(false).followSslRedirects(false)
+      .callTimeout(20, TimeUnit.SECONDS).build()
+  }
   val default: OkHttpClient by lazy {
     OkHttpClient.Builder()
       .connectTimeout(10, TimeUnit.SECONDS)

@@ -1,7 +1,13 @@
-import { QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { emptyAnalytics, type Analytics } from '@voxtype/shared/analytics';
+import {
+  QueryClient,
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { openUrl } from '@tauri-apps/plugin-opener';
 import { useEffect } from 'react';
 import { toast } from 'sonner';
 import { appEnvironment, isDevelopment, shortcutId, shortcutLabel } from './environment';
@@ -57,14 +63,11 @@ export const api = {
     native
       ? command<Bootstrap>('bootstrap')
       : Promise.resolve<Bootstrap>({
+          startupAvailable: false,
           settings: defaultSettings,
-          hasKey: false,
-          keyError: null,
-          hasCleanupKey: false,
-          cleanupKeyError: null,
           snapshot: idleSession,
           shortcutRegistered: false,
-          version: '0.1.2',
+          version: '0.1.3',
           environment: appEnvironment,
           shortcutId,
           shortcutLabel,
@@ -77,7 +80,14 @@ export const api = {
             { id: 'f8', label: 'F8' },
           ],
         }),
-  history: () => (native ? command<HistoryItem[]>('get_history') : Promise.resolve([])),
+  analytics: () => (native ? command<Analytics>('get_analytics') : Promise.resolve(emptyAnalytics)),
+  history: (cursor: string | null, query: string) =>
+    native
+      ? command<{ items: HistoryItem[]; nextCursor: string | null }>('get_history', {
+          cursor,
+          query,
+        })
+      : Promise.resolve({ items: [] as HistoryItem[], nextCursor: null as string | null }),
   microphones: () => (native ? command<Microphone[]>('get_microphones') : Promise.resolve([])),
   diagnostics: () =>
     native
@@ -92,24 +102,14 @@ export const api = {
   configureShortcut: (shortcutId: string) => command<void>('configure_shortcut', { shortcutId }),
   settings: (settings: Settings) =>
     command<void>('update_settings', { settings: settingsSchema.parse(settings) }),
-  saveKey: (key: string) => command<void>('save_api_key', { key }),
-  removeKey: () => command<void>('remove_api_key'),
-  saveCleanupKey: (key: string) => command<void>('save_cleanup_key', { key }),
-  removeCleanupKey: () => command<void>('remove_cleanup_key'),
   deleteHistory: (id: string | null) => command<void>('delete_history', { id }),
-  start: (test = false) => command<void>('start_dictation', { test }),
+  start: (test = false) => command<string>('start_dictation', { test }),
   stop: () => command<void>('stop_dictation'),
   cancel: () => command<void>('cancel_dictation'),
   copy: (text: string) =>
     native ? command<void>('copy_text', { text }) : navigator.clipboard.writeText(text),
   openMain: () => command<void>('open_main'),
   dismiss: () => command<void>('dismiss_overlay'),
-  openDeepgram: () =>
-    native
-      ? openUrl('https://console.deepgram.com/')
-      : Promise.resolve(
-          window.open('https://console.deepgram.com/', '_blank', 'noopener,noreferrer'),
-        ),
 };
 export const useAuthUser = () =>
   useQuery({
@@ -119,7 +119,21 @@ export const useAuthUser = () =>
     staleTime: Infinity,
   });
 export const useBootstrap = () => useQuery({ queryKey: ['bootstrap'], queryFn: api.bootstrap });
-export const useHistory = () => useQuery({ queryKey: ['history'], queryFn: api.history });
+export const useHistory = (query = '') =>
+  useInfiniteQuery({
+    queryKey: ['history', query],
+    initialPageParam: null as string | null,
+    queryFn: ({ pageParam }) => api.history(pageParam, query),
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+  });
+export const useAnalytics = () => useQuery({ queryKey: ['analytics'], queryFn: api.analytics });
+export const useAppSession = () =>
+  useQuery({
+    queryKey: ['app-session'],
+    queryFn: () => Promise.resolve(idleSession),
+    initialData: idleSession,
+    staleTime: Infinity,
+  });
 export const useSession = () =>
   useQuery({
     queryKey: ['session'],
@@ -136,7 +150,16 @@ export function useNativeEvents() {
     const unlisteners: (() => void)[] = [];
     const subscribe = async () => {
       for (const [event, handler] of [
-        ['session', (data: unknown) => client.setQueryData<Session>(['session'], data as Session)],
+        [
+          'session',
+          (data: unknown) => {
+            const session = data as Session;
+            client.setQueryData<Session>(['session'], session);
+            if (!session.external && !session.isTest)
+              client.setQueryData<Session>(['app-session'], session);
+          },
+        ],
+        ['analytics-changed', () => void client.invalidateQueries({ queryKey: ['analytics'] })],
         ['history-changed', () => void client.invalidateQueries({ queryKey: ['history'] })],
         ['app-error', (data: unknown) => toast.error(String(data))],
       ] as const) {
@@ -180,11 +203,18 @@ export function useAuthActions() {
   const signIn = useMutation({
     meta: { suppressErrorToast: true },
     mutationFn: api.signInWithGoogle,
-    onSuccess: (user) => client.setQueryData<AuthUser>(['auth-user'], user),
+    onSuccess: (user) => {
+      client.removeQueries({ queryKey: ['history'] });
+      client.removeQueries({ queryKey: ['analytics'] });
+      client.setQueryData<AuthUser>(['auth-user'], user);
+    },
   });
   const signOut = useMutation({
     mutationFn: api.signOut,
-    onSuccess: () => client.setQueryData<AuthUser | null>(['auth-user'], null),
+    onSuccess: () => {
+      client.clear();
+      client.setQueryData<AuthUser | null>(['auth-user'], null);
+    },
   });
   return { signIn, signOut };
 }

@@ -6,9 +6,9 @@ pub struct Settings {
     pub language: String,
     pub microphone: String,
     pub auto_paste: bool,
-    pub keep_history: bool,
     pub cleanup_enabled: bool,
     pub voice_detection: bool,
+    pub launch_at_login: bool,
     pub vocabulary: Vec<String>,
 }
 impl Default for Settings {
@@ -17,9 +17,9 @@ impl Default for Settings {
             language: "en".into(),
             microphone: String::new(),
             auto_paste: true,
-            keep_history: true,
             cleanup_enabled: false,
             voice_detection: true,
+            launch_at_login: true,
             vocabulary: vec![],
         }
     }
@@ -48,7 +48,7 @@ impl Settings {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HistoryItem {
     pub id: String,
@@ -59,6 +59,12 @@ pub struct HistoryItem {
     pub duration_ms: u64,
     pub words: usize,
     pub delivery: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub user_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub audio_file: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub upload_api_url: Option<String>,
 }
 
 #[derive(Clone, Default, Serialize)]
@@ -76,6 +82,7 @@ pub struct Snapshot {
     pub message: String,
     pub delivery: String,
     pub is_test: bool,
+    pub external: bool,
     pub cleanup_warning: String,
 }
 
@@ -94,11 +101,8 @@ pub enum Phase {
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Bootstrap {
+    pub startup_available: bool,
     pub settings: Settings,
-    pub has_key: bool,
-    pub key_error: Option<String>,
-    pub has_cleanup_key: bool,
-    pub cleanup_key_error: Option<String>,
     pub snapshot: Snapshot,
     pub shortcut_registered: bool,
     pub version: String,

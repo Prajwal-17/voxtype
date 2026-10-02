@@ -72,11 +72,13 @@ export function createDictationRepository(database: D1Database) {
             updatedAt: new Date(),
             durationMs: values.durationMs,
             wordCount: values.wordCount,
-            delivery: values.delivery,
+            source: values.source,
           },
+          // Protect ownership even if another account inserts this ID after findOwner.
+          setWhere: eq(dictation.userId, values.userId),
         })
         .returning();
-      return saved!;
+      return saved;
     },
 
     remove(userId: string, id: string) {

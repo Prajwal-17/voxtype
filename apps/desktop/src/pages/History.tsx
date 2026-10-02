@@ -1,187 +1,103 @@
-import { useMemo, useState } from 'react';
-import { ArrowRight, AudioLines, Copy, History, Search, Trash2 } from 'lucide-react';
+import { useState, useDeferredValue } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
-import { api, useCopy, useHistory } from '../lib/api';
-import { duration } from '../lib/types';
+import { CopyIcon, TrashSimpleIcon } from '../components/icons';
 import { PageHeader } from '../components/layout';
-import { Button, Confirm, IconButton } from '../components/ui';
+import { Loader } from '../components/loader';
+import { Button, IconButton } from '../components/ui';
 import { Card } from '../components/ui/card';
 import { Input } from '../components/ui/input';
-import { Skeleton } from '../components/ui/skeleton';
-
+import { api, useHistory, useCopy } from '../lib/api';
+import { duration } from '../lib/types';
 export function HistoryPage({ onRecord }: { onRecord: () => void }) {
   const [search, setSearch] = useState('');
-  const history = useHistory();
-  const copy = useCopy();
+  const query = useDeferredValue(search);
+  const history = useHistory(query);
   const client = useQueryClient();
+  const copy = useCopy();
   const remove = useMutation({
     mutationFn: api.deleteHistory,
-    onSuccess: () => {
-      void client.invalidateQueries({ queryKey: ['history'] });
-      toast.success('History deleted');
-    },
+    onSuccess: () => void client.invalidateQueries({ queryKey: ['history'] }),
   });
-  const filtered = useMemo(
-    () =>
-      history.data?.filter((item) =>
-        item.text.toLocaleLowerCase().includes(search.toLocaleLowerCase()),
-      ) ?? [],
-    [history.data, search],
-  );
-
+  const items = history.data?.pages.flatMap((page) => page.items) ?? [];
   return (
     <>
-      <PageHeader
-        title="History"
-        description="Browse and reuse transcripts stored on this device."
-        actions={
-          !!history.data?.length && (
-            <Confirm
-              title="Delete all history?"
-              description="This permanently removes every saved transcript from this device."
-              onConfirm={() => remove.mutate(null)}
-              pending={remove.isPending}
-              trigger={
-                <Button variant="outline" size="sm">
-                  <Trash2 size={14} /> Clear history
-                </Button>
-              }
-            />
-          )
-        }
+      <PageHeader title="Transcripts" />
+      <Input
+        type="search"
+        placeholder="Search transcripts"
+        aria-label="Search transcripts"
+        value={search}
+        onChange={(event) => setSearch(event.target.value)}
+        className="mb-5 max-w-sm"
       />
-
-      <Card className="overflow-hidden">
-        <div className="flex min-h-16 items-center justify-between gap-5 border-b border-line bg-raised px-5 max-md:flex-wrap max-md:gap-3 max-md:py-3">
-          <label className="flex w-80 max-w-full items-center gap-2 rounded-control border border-line-strong bg-surface px-3 text-muted focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent max-md:w-full">
-            <Search size={16} className="shrink-0" />
-            <Input
-              type="search"
-              placeholder="Search transcripts"
-              aria-label="Search history"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              disabled={!history.data?.length}
-              className="py-2"
-            />
-          </label>
-          <span className="shrink-0 text-caption text-muted">
-            {search
-              ? `${filtered.length} of ${history.data?.length ?? 0}`
-              : (history.data?.length ?? 0)}{' '}
-            {(search ? filtered.length : history.data?.length) === 1 ? 'dictation' : 'dictations'}
-          </span>
-        </div>
-
+      <Card className="overflow-hidden border-0 shadow-none">
         {history.isPending ? (
-          <div className="space-y-5 p-6">
-            <Skeleton className="h-5 w-36" />
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-24 w-full" />
-          </div>
+          <Loader />
         ) : history.isError ? (
-          <div className="px-6 py-16 text-center">
-            <h2 className="text-title font-semibold">History couldn’t load</h2>
-            <p className="mt-2 mb-5 text-body text-muted">
-              VoxType couldn’t read your local history. Nothing was deleted.
-            </p>
-            <Button onClick={() => void history.refetch()}>Try again</Button>
+          <div className="p-8" role="alert">
+            Couldn’t load transcripts. <Button onClick={() => void history.refetch()}>Retry</Button>
           </div>
-        ) : !filtered.length ? (
-          <div className="flex min-h-[390px] flex-col items-center justify-center px-6 py-16 text-center">
-            <History size={26} strokeWidth={1.6} className="mb-5 text-faint" />
-            <h2 className="text-title font-semibold">
-              {search ? 'No matching transcripts' : 'No dictations yet'}
-            </h2>
-            <p className="mt-2 mb-6 max-w-sm text-body text-muted">
-              {search
-                ? 'Try another word or clear the search to see all transcripts.'
-                : 'Finished dictations will appear here when local history is enabled.'}
-            </p>
-            {search ? (
-              <Button variant="outline" onClick={() => setSearch('')}>
-                Clear search
-              </Button>
-            ) : (
-              <Button variant="primary" onClick={onRecord}>
-                <AudioLines size={16} /> Start a dictation <ArrowRight size={14} />
-              </Button>
-            )}
+        ) : !items.length ? (
+          <div className="py-16 text-center">
+            <p className="mb-5 text-muted">{search ? 'No matches' : 'No transcripts yet'}</p>
+            <Button onClick={search ? () => setSearch('') : onRecord}>
+              {search ? 'Clear search' : 'Record'}
+            </Button>
           </div>
         ) : (
           <div className="divide-y divide-line">
-            {filtered.map((item) => (
-              <article
-                className="px-6 py-5 transition-colors hover:bg-raised max-md:px-5"
-                key={item.id}
-              >
-                <div className="flex justify-between gap-3 text-caption text-muted tabular-nums max-md:flex-wrap">
-                  <time
-                    dateTime={new Date(item.createdAt).toISOString()}
-                    className="font-medium text-ink"
-                  >
-                    {new Intl.DateTimeFormat(undefined, {
+            {items.map((item) => (
+              <article key={item.id} className="px-6 py-5">
+                <div className="flex items-center justify-between gap-3 text-caption text-muted tabular-nums">
+                  <time dateTime={new Date(item.createdAt).toISOString()}>
+                    {new Date(item.createdAt).toLocaleString(undefined, {
                       month: 'short',
                       day: 'numeric',
                       hour: 'numeric',
                       minute: '2-digit',
-                    }).format(item.createdAt)}
+                    })}
                   </time>
                   <span>
                     {duration(item.durationMs)} · {item.words} words
                   </span>
                 </div>
-                <p className="mt-3 max-w-4xl whitespace-pre-wrap [overflow-wrap:anywhere] text-body leading-7">
-                  {item.text}
-                </p>
-                {item.originalText && (
-                  <details className="mt-4 text-ui text-muted">
-                    <summary className="w-fit cursor-pointer py-1 font-medium text-ink">
-                      Original transcript
-                    </summary>
-                    <p className="my-2 max-w-4xl whitespace-pre-wrap [overflow-wrap:anywhere] text-body">
-                      {item.originalText}
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => copy.mutate(item.originalText!)}
-                    >
-                      <Copy size={14} /> Copy original
-                    </Button>
-                  </details>
-                )}
-                <div className="mt-4 flex items-center justify-between gap-3">
-                  <span className="text-caption text-muted">
-                    {item.delivery === 'pasted'
-                      ? 'Pasted into the active app'
-                      : item.delivery === 'copied'
-                        ? 'Copied to the clipboard'
-                        : 'Recorded in VoxType'}
-                  </span>
-                  <div className="flex gap-1 text-muted">
-                    <IconButton label="Copy transcript" onClick={() => copy.mutate(item.text)}>
-                      <Copy size={15} />
-                    </IconButton>
-                    <IconButton
-                      label="Delete transcript"
-                      onClick={() => remove.mutate(item.id)}
-                      disabled={remove.isPending}
-                    >
-                      <Trash2 size={15} />
-                    </IconButton>
-                  </div>
+                <details className="group mt-3">
+                  <summary className="cursor-pointer list-none whitespace-pre-wrap text-body [overflow-wrap:anywhere]">
+                    <span className="line-clamp-2 group-open:hidden">
+                      {item.text || 'Empty transcript'}
+                    </span>
+                  </summary>
+                  <p className="mt-3 whitespace-pre-wrap text-body [overflow-wrap:anywhere]">
+                    {item.text}
+                  </p>
+                </details>
+                <div className="mt-2 flex justify-end gap-1">
+                  <IconButton label="Copy transcript" onClick={() => copy.mutate(item.text)}>
+                    <CopyIcon size={16} aria-hidden="true" />
+                  </IconButton>
+                  <IconButton
+                    label="Delete transcript"
+                    disabled={remove.isPending}
+                    onClick={() => remove.mutate(item.id)}
+                  >
+                    <TrashSimpleIcon size={16} aria-hidden="true" />
+                  </IconButton>
                 </div>
               </article>
             ))}
           </div>
         )}
       </Card>
-
-      <p className="mt-4 text-caption text-muted">
-        VoxType keeps up to 200 dictations locally. Nothing is synced to the cloud.
-      </p>
+      {history.hasNextPage && (
+        <Button
+          className="mx-auto mt-5 flex"
+          variant="outline"
+          loading={history.isFetchingNextPage}
+          onClick={() => void history.fetchNextPage()}
+        >
+          Load more
+        </Button>
+      )}
     </>
   );
 }
