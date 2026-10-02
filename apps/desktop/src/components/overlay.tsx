@@ -68,7 +68,7 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
         </span>
       )}
       <button
-        className="inline-flex size-8 items-center justify-center rounded-full border-0 bg-overlay-raised p-0 text-overlay-text transition-[transform,background-color] duration-150 ease-out enabled:active:scale-[.97] enabled:hover:bg-navigation-line enabled:hover:text-white focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-overlay-text disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100"
+        className="inline-flex size-8 items-center justify-center rounded-full border-0 bg-overlay-raised p-0 text-overlay-text transition-[transform,background-color] duration-150 ease-out enabled:active:scale-[.97] enabled:hover:bg-overlay-line enabled:hover:text-white focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-overlay-text disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100"
         title={active ? 'Cancel dictation' : 'Dismiss overlay'}
         aria-label={active ? 'Cancel dictation' : 'Dismiss overlay'}
         disabled={!!preview || cancel.isPending}
@@ -106,7 +106,7 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
         )}
       </div>
       <button
-        className="inline-flex size-8 items-center justify-center rounded-full border-0 bg-overlay-text p-0 text-navigation transition-[transform,background-color] duration-150 ease-out enabled:active:scale-[.97] enabled:hover:bg-inverse-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-overlay-text disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100"
+        className="inline-flex size-8 items-center justify-center rounded-full border-0 bg-overlay-text p-0 text-overlay transition-[transform,background-color] duration-150 ease-out enabled:active:scale-[.97] enabled:hover:bg-inverse-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-overlay-text disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100"
         title={failed || done ? 'Open transcript' : 'Finish dictation'}
         aria-label={failed || done ? 'Open VoxType to recover transcript' : 'Finish dictation'}
         disabled={!!preview || finishing || stop.isPending || (!active && !failed && !done)}
@@ -115,7 +115,7 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
         {failed || done ? (
           <ArrowUpRightIcon size={16} aria-hidden="true" />
         ) : (
-          <StopIcon size={11} weight="fill" aria-hidden="true" />
+          <StopIcon size={14} weight="fill" aria-hidden="true" />
         )}
       </button>
 

@@ -31,9 +31,11 @@ def save(path, size, **kwargs):
 for name,size in [('32x32.png',32),('128x128.png',128),('128x128@2x.png',256),('icon.png',512)]:
     save('apps/desktop/src-tauri/icons/'+name,size)
 render(256).save(ROOT/'apps/desktop/src-tauri/icons/icon.ico',sizes=[(16,16),(32,32),(48,48),(128,128),(256,256)])
+save('apps/desktop/src-tauri/icons/tray.png',48,mark_only=True,monochrome=True,scale=1.2)
 save('apps/mobile/assets/icon.png',1024)
 save('apps/mobile/assets/adaptive-icon.png',1024,mark_only=True,scale=0.72)
 save('apps/mobile/assets/monochrome-icon.png',1024,mark_only=True,monochrome=True,scale=0.72)
 save('apps/mobile/assets/splash-icon.png',288,scale=0.7)
 save('apps/mobile/assets/favicon.png',48)
 save('apps/mobile/modules/voxtype-native/android/src/main/res/drawable-nodpi/voxtype_logo.png',96,mark_only=True)
+save('apps/mobile/modules/voxtype-native/android/src/main/res/drawable-nodpi/voxtype_notification.png',96,mark_only=True,monochrome=True,scale=1.2)

@@ -24,7 +24,12 @@ export function SettingsPage({ boot, active }: { boot: Bootstrap; active: boolea
     <>
       <PageHeader title="Settings" />
       <div className="max-w-3xl">
-        <Preferences key={JSON.stringify(boot.settings)} settings={boot.settings} active={active} />
+        <Preferences
+          key={JSON.stringify(boot.settings)}
+          settings={boot.settings}
+          active={active}
+          startupAvailable={boot.startupAvailable}
+        />
         <DesktopSetup boot={boot} active={active} />
       </div>
     </>
@@ -44,7 +49,15 @@ const LANGUAGES = [
   ['ja', 'Japanese'],
 ] as const;
 
-function Preferences({ settings, active }: { settings: Settings; active: boolean }) {
+function Preferences({
+  settings,
+  active,
+  startupAvailable,
+}: {
+  settings: Settings;
+  active: boolean;
+  startupAvailable: boolean;
+}) {
   const [draft, setDraft] = useState(settings);
   const [vocabulary, setVocabulary] = useState(settings.vocabulary.join('\n'));
   const client = useQueryClient();
@@ -175,7 +188,15 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
         </FieldRow>
       </section>
       <section className="mb-5 rounded-panel border border-line bg-surface p-5 max-md:p-4">
-        <SectionHeader title="Recording preferences" />
+        <SectionHeader title="Preferences" />
+        {startupAvailable && (
+          <Toggle
+            label="Launch at login"
+            checked={draft.launchAtLogin}
+            onChange={(v) => set('launchAtLogin', v)}
+            disabled={active}
+          />
+        )}
         <Toggle
           label="Skip long pauses"
           checked={draft.voiceDetection}

@@ -16,7 +16,7 @@ const TooltipContent = React.forwardRef<
       ref={ref}
       sideOffset={sideOffset}
       className={cn(
-        'z-50 rounded-control bg-navigation px-3 py-2 text-caption text-inverse shadow-floating [transform-origin:var(--radix-tooltip-content-transform-origin)] [&_svg]:fill-navigation',
+        'z-50 max-w-64 rounded-menu-item bg-ink px-3 py-2 text-caption text-inverse shadow-panel [transform-origin:var(--radix-tooltip-content-transform-origin)] [&_svg]:fill-ink',
         className,
       )}
       {...props}

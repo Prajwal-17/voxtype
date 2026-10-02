@@ -14,7 +14,7 @@
         "minWidth": 760,
         "minHeight": 600,
         "center": true,
-        "backgroundColor": "#f3f4f5"
+        "backgroundColor": "#dce6e5"
       },
       {
         "label": "overlay",

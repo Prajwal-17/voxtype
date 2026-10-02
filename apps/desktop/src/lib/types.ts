@@ -6,6 +6,7 @@ export const settingsSchema = z.object({
   autoPaste: z.boolean(),
   cleanupEnabled: z.boolean().default(false),
   voiceDetection: z.boolean().default(true),
+  launchAtLogin: z.boolean().default(true),
   vocabulary: z.array(z.string().trim().min(1).max(100)).max(100),
 });
 export type Settings = z.infer<typeof settingsSchema>;
@@ -15,6 +16,7 @@ export const defaultSettings: Settings = {
   autoPaste: true,
   cleanupEnabled: false,
   voiceDetection: true,
+  launchAtLogin: true,
   vocabulary: [],
 };
 export type Phase = 'idle' | 'listening' | 'finishing' | 'cleaning' | 'done' | 'error';
@@ -45,6 +47,7 @@ export const idleSession: Session = {
   isTest: false,
 };
 export interface Bootstrap {
+  startupAvailable: boolean;
   settings: Settings;
   snapshot: Session;
   shortcutRegistered: boolean;

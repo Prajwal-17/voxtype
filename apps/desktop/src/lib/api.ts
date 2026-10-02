@@ -63,6 +63,7 @@ export const api = {
     native
       ? command<Bootstrap>('bootstrap')
       : Promise.resolve<Bootstrap>({
+          startupAvailable: false,
           settings: defaultSettings,
           snapshot: idleSession,
           shortcutRegistered: false,

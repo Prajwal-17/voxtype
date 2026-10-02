@@ -119,7 +119,7 @@ export const SidebarMenuButton = React.forwardRef<
       data-active={isActive}
       aria-current={isActive ? 'page' : undefined}
       className={cn(
-        'flex min-h-11 w-full items-center gap-3 overflow-hidden rounded-control px-3 py-2 text-left text-ui font-medium text-muted transition-[background-color,color] duration-150 hover:bg-navigation-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-50 data-[active=true]:bg-accent data-[active=true]:text-inverse   [&>svg]:shrink-0 [&>span:last-child]:truncate motion-reduce:transition-none',
+        'flex min-h-11 w-full items-center gap-3 overflow-hidden rounded-control px-3 py-2 text-left text-ui font-medium text-muted transition-[background-color,color] duration-150 hover:bg-accent-soft hover:text-accent-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-50 data-[active=true]:bg-accent data-[active=true]:text-inverse data-[active=true]:hover:bg-accent-hover data-[active=true]:hover:text-inverse [&>svg]:shrink-0 [&>span:last-child]:truncate motion-reduce:transition-none',
         className,
       )}
       {...props}

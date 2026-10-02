@@ -37,7 +37,7 @@ export function IconButton({
           variant="ghost"
           size="icon"
           aria-label={label}
-          className={cn('shrink-0 text-current hover:bg-line', className)}
+          className={cn('shrink-0 text-current', className)}
           {...props}
         >
           {children}

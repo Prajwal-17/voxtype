@@ -8,7 +8,7 @@ function Kbd({ className, ...props }: React.ComponentProps<'kbd'>) {
       className={cn(
         'pointer-events-none inline-flex h-5 w-fit min-w-5 select-none items-center justify-center gap-1 rounded-sm bg-subtle px-1 align-middle font-sans text-caption font-medium text-muted',
         "[&_svg:not([class*='size-'])]:size-3",
-        'group-[.sidebar]:bg-navigation group-[.sidebar]:text-inverse',
+        'group-[.sidebar]:bg-navigation group-[.sidebar]:text-ink',
         className,
       )}
       {...props}

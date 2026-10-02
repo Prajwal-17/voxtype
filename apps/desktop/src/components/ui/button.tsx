@@ -10,14 +10,17 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: 'bg-accent text-inverse shadow-action hover:bg-accent-hover',
-        primary: 'bg-accent text-inverse shadow-action hover:bg-accent-hover',
-        secondary: 'border-line bg-surface text-ink shadow-control hover:bg-subtle',
-        outline: 'border-line-strong bg-surface text-ink hover:bg-subtle',
-        ghost: 'bg-transparent text-muted hover:bg-subtle hover:text-ink',
-        destructive: 'bg-danger text-inverse hover:brightness-90',
-        danger: 'bg-danger text-inverse hover:brightness-90',
-        link: 'bg-transparent text-accent underline-offset-4 hover:text-accent-hover hover:underline',
+        default: 'bg-accent text-inverse shadow-action not-disabled:hover:bg-accent-hover',
+        primary: 'bg-accent text-inverse shadow-action not-disabled:hover:bg-accent-hover',
+        secondary:
+          'border-line bg-surface text-ink shadow-control not-disabled:hover:bg-accent-soft not-disabled:hover:text-accent-ink',
+        outline:
+          'border-line-strong bg-surface text-ink not-disabled:hover:bg-accent-soft not-disabled:hover:text-accent-ink',
+        ghost:
+          'bg-transparent text-muted not-disabled:hover:bg-accent-soft not-disabled:hover:text-accent-ink',
+        destructive: 'bg-danger text-inverse not-disabled:hover:brightness-90',
+        danger: 'bg-danger text-inverse not-disabled:hover:brightness-90',
+        link: 'bg-transparent text-accent underline-offset-4 not-disabled:hover:text-accent-hover not-disabled:hover:underline',
       },
       size: {
         sm: 'min-h-10 px-3 py-1.5 text-[length:var(--text-caption)] leading-[var(--text-caption--line-height)]',

@@ -46,6 +46,11 @@ pub async fn toggle(app: AppHandle) -> Result<(), String> {
     if active {
         signal(&app, Control::Stop).await
     } else {
+        // A shortcut can cold-start the process before either webview restores auth.
+        if crate::require_authenticated(&app).is_err() {
+            crate::get_auth_user(app.clone()).await?;
+            crate::require_authenticated(&app)?;
+        }
         start(app, false, true).await
     }
 }
@@ -352,6 +357,27 @@ fn overlay_target(w: &tauri::WebviewWindow) -> Option<tauri::PhysicalPosition<i3
 fn overlay_is_positioned(w: &tauri::WebviewWindow, expected: tauri::PhysicalPosition<i32>) -> bool {
     w.outer_position()
         .is_ok_and(|actual| positions_match(actual, expected))
+}
+
+pub fn show_error(app: &AppHandle, message: String) {
+    // Leave a recording owned by another caller intact.
+    if app
+        .state::<AppState>()
+        .control
+        .lock()
+        .is_ok_and(|c| c.is_none())
+    {
+        publish(
+            app,
+            &Snapshot {
+                phase: Phase::Error,
+                external: true,
+                message,
+                ..Snapshot::default()
+            },
+        );
+        show_overlay(app);
+    }
 }
 
 fn show_overlay(app: &AppHandle) {

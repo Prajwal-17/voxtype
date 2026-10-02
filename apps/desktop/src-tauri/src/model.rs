@@ -8,6 +8,7 @@ pub struct Settings {
     pub auto_paste: bool,
     pub cleanup_enabled: bool,
     pub voice_detection: bool,
+    pub launch_at_login: bool,
     pub vocabulary: Vec<String>,
 }
 impl Default for Settings {
@@ -18,6 +19,7 @@ impl Default for Settings {
             auto_paste: true,
             cleanup_enabled: false,
             voice_detection: true,
+            launch_at_login: true,
             vocabulary: vec![],
         }
     }
@@ -99,6 +101,7 @@ pub enum Phase {
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Bootstrap {
+    pub startup_available: bool,
     pub settings: Settings,
     pub snapshot: Snapshot,
     pub shortcut_registered: bool,

@@ -8,6 +8,7 @@ mod model;
 mod recordings;
 mod session;
 mod speech;
+mod startup;
 mod storage;
 mod uploads;
 
@@ -98,6 +99,7 @@ async fn bootstrap(app: tauri::AppHandle) -> Result<Bootstrap, String> {
         shortcut_id: shortcut.id,
         shortcut_label: shortcut.label,
         shortcut_options,
+        startup_available: startup::available(),
     })
 }
 #[tauri::command]
@@ -158,6 +160,7 @@ fn update_settings(app: tauri::AppHandle, settings: Settings) -> Result<(), Stri
     {
         return Err("Finish your dictation before changing settings.".into());
     }
+    startup::configure(&app, settings.launch_at_login)?;
     storage::save_settings(&app, &settings)
 }
 #[tauri::command]
@@ -278,31 +281,24 @@ fn dismiss_overlay(app: tauri::AppHandle) {
 }
 
 fn dispatch(app: &tauri::AppHandle, action: &str) {
-    if action == "toggle" {
-        if let Err(error) = require_authenticated(app) {
-            let _ = app.emit("app-error", error);
-            show_main(app);
-            return;
-        }
-    }
     let app = app.clone();
-    match action {
+    match startup::action(action) {
+        startup::Action::Background => {}
         #[cfg(debug_assertions)]
-        "preview-overlay" => session::preview_overlay(&app),
-        "toggle" => {
+        startup::Action::PreviewOverlay => session::preview_overlay(&app),
+        startup::Action::Toggle => {
             tauri::async_runtime::spawn(async move {
                 if let Err(error) = session::toggle(app.clone()).await {
-                    let _ = app.emit("app-error", &error);
-                    show_main(&app);
+                    session::show_error(&app, error);
                 }
             });
         }
-        "cancel" => {
+        startup::Action::Cancel => {
             tauri::async_runtime::spawn(async move {
                 let _ = session::signal(&app, session::Control::Cancel).await;
             });
         }
-        _ => show_main(&app),
+        startup::Action::Open => show_main(&app),
     }
 }
 
@@ -344,6 +340,12 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_opener::init())
+        .plugin(
+            tauri_plugin_autostart::Builder::new()
+                .app_name(environment::app_name())
+                .arg("--background")
+                .build(),
+        )
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
             bootstrap,
@@ -366,6 +368,12 @@ pub fn run() {
         ])
         .setup(|app| {
             let handle = app.handle();
+            if let Err(error) = storage::settings(handle)
+                .and_then(|settings| startup::configure(handle, settings.launch_at_login))
+            {
+                eprintln!("{error}");
+                let _ = handle.emit("app-error", error);
+            }
             if let Err(error) =
                 recordings::recover(handle).and_then(|_| storage::prune_audio(handle))
             {
@@ -411,7 +419,11 @@ pub fn run() {
                     )?,
                 ],
             )?;
-            let mut tray = tauri::tray::TrayIconBuilder::new()
+            let tray = tauri::tray::TrayIconBuilder::new()
+                .icon(tauri::image::Image::from_bytes(include_bytes!(
+                    "../icons/tray.png"
+                ))?)
+                .icon_as_template(true)
                 .tooltip(format!("{} · voice dictation", environment::app_name()))
                 .menu(&menu)
                 .on_menu_event(|app, event| {
@@ -421,9 +433,6 @@ pub fn run() {
                         dispatch(app, event.id.as_ref());
                     }
                 });
-            if let Some(icon) = app.default_window_icon() {
-                tray = tray.icon(icon.clone());
-            }
             // A missing GNOME tray extension must not prevent the main app from opening.
             let _ = tray.build(app);
             let initial = std::env::args().nth(1).unwrap_or_default();

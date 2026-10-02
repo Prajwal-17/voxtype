@@ -39,3 +39,43 @@ Reduced motion has code paths; slow-motion/device playback was not performed.
 Verdict: Approve for the inspected web layouts. Not verified: real microphone sessions,
 Android accessibility/bubble behavior, permission prompts, launcher masks and splash
 on physical hardware. These remain device release checks.
+
+## Overlay and interaction follow-up
+
+Mode: full within the reported desktop overlay, tooltip, hover and icon scope.
+React/Tailwind/Radix styling remains in the existing utility and base layers.
+
+| Category    | Evidence inspected                                                                        | Result                                                              |
+| ----------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Typography  | Tooltip text and computed foreground/background                                           | Readable pale text on dark ink                                      |
+| Surfaces    | html/body/root backgrounds, tooltip, menu highlight, dialog scrims                        | Overlay roots transparent; main canvas retained                     |
+| Animations  | Existing 150ms color transitions; refresh hover slowed to 10%                             | Continuous color change; no added entrance motion                   |
+| Icons       | Stop SVG, desktop PNG/tray, Android adaptive/monochrome/splash and notification resources | Larger dark stop; centered assets; dedicated small monochrome marks |
+| Performance | Desktop production build and shared component changes                                     | No new animation or frontend library                                |
+
+| Severity | Location                                                                                                                                           | Before                                                              | After                                                                                                                        | Why                                                          |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| HIGH     | `apps/desktop/src/styles.css:17`                                                                                                                   | Unlayered body canvas overrode transparent utility                  | Body defaults in base layer                                                                                                  | Overlay must not obscure the screen with an opaque rectangle |
+| HIGH     | `apps/desktop/src/components/overlay.tsx:109`                                                                                                      | Pale sidebar token on pale stop button; 11px glyph                  | Dark overlay foreground; 14px glyph                                                                                          | Stop must remain immediately distinguishable                 |
+| MEDIUM   | `apps/desktop/src/components/ui/tooltip.tsx:19`                                                                                                    | Pale navigation surface and pale text                               | Dark ink, pale text, bounded width, compact radius/shadow                                                                    | Consistent legible tooltip surface                           |
+| MEDIUM   | `apps/desktop/src/components/ui/button.tsx:13`, `ui.tsx:40`, `ui/sidebar.tsx:122`, `ui/select.tsx:18`, `ui/dropdown-menu.tsx:21`, `overlay.tsx:71` | Mixed hover fills and navigation colors assumed dark surfaces       | Soft accent/dark text on light controls; overlay-specific hover; active navigation stays dark; disabled buttons retain state | Coherent interaction contrast                                |
+| MEDIUM   | `apps/desktop/src/styles.css:70`, `components/ui/kbd.tsx:11`, `ui/dialog.tsx:18`, `ui/alert-dialog.tsx:16`                                         | Inverse foregrounds and light dialog scrims tied to sidebar tokens  | Correct light-sidebar foreground mappings and dark ink scrims                                                                | Semantic surfaces must retain readable foregrounds           |
+| MEDIUM   | `apps/desktop/src-tauri/src/lib.rs:422`, Android `VoxTypeAccessibilityService.kt:655`, `scripts/generate-icons.py`                                 | Full launcher tile in tray; generic Android notification microphone | Dedicated transparent monochrome VoxType marks                                                                               | Small system icons need a clean silhouette                   |
+| LOW      | `apps/desktop/src-tauri/tauri.dev.conf.json:17`                                                                                                    | Old white native main-window background                             | Shared canvas color                                                                                                          | Avoid mismatched startup paint                               |
+
+Considered and rejected: forcing every surface transparent with `!important` (would hide
+the CSS layering defect); changing the whole palette again (the errors were incorrect
+token pairings); using the full tile for notification icons (Android needs an alpha mask).
+
+Browser verification: overlay html/body/root computed to transparent; stop foreground
+was `rgb(22,60,64)` at 14px. Main body retained `rgb(220,230,229)`. Tooltip used
+`rgb(25,59,62)` with `rgb(241,247,245)` text. Highlighted language option and hovered
+refresh button used the soft accent with dark accent text. Active sidebar hover stayed
+dark. Icon audit checked visible bounds and Android generated adaptive resource links.
+Desktop types, ESLint, Rust Clippy, production build and startup/routing tests are run
+for this follow-up; Android compile and targeted lint check the new notification resource.
+
+Verdict: Approve for inspected browser surfaces and asset configuration. Not verified:
+native compositor transparency after this patch, real desktop login/reboot, Android
+launcher/notification rendering on hardware. Existing full Android dependency-lint
+limitation still applies.

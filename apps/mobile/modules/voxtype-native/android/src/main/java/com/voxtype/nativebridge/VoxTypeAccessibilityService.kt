@@ -652,7 +652,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
       manager.createNotificationChannel(NotificationChannel(VoxConstants.CHANNEL_ID, VoxConstants.CHANNEL_NAME, NotificationManager.IMPORTANCE_LOW))
       val notification = Notification.Builder(this, VoxConstants.CHANNEL_ID)
-        .setSmallIcon(android.R.drawable.ic_btn_speak_now)
+        .setSmallIcon(R.drawable.voxtype_notification)
         .setContentTitle("VoxType is listening")
         .setContentText("Tap the bubble to stop and insert text")
         .setOngoing(true).build()
