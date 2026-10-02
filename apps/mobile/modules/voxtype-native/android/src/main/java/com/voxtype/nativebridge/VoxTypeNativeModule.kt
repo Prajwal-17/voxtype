@@ -9,6 +9,7 @@ import android.os.Looper
 import androidx.core.content.ContextCompat
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
+import expo.modules.kotlin.functions.Queues
 import java.lang.ref.WeakReference
 
 class VoxTypeNativeModule : Module() {
@@ -41,7 +42,7 @@ class VoxTypeNativeModule : Module() {
         "cleanupEnabled" to store.cleanupEnabled,
         "audioLimit" to VoxTypeStore.AUDIO_LIMIT,
         "status" to (VoxTypeAccessibilityService.instance?.status ?: DictationStatus.IDLE.bridge),
-        "dictations" to store.dictations(),
+        "inApp" to InAppRecorder.snapshot(),
       )
     }
 
@@ -68,6 +69,7 @@ class VoxTypeNativeModule : Module() {
 
     AsyncFunction("signOut") {
       val context = requireNotNull(appContext.reactContext)
+      mainHandler.post { InAppRecorder.cancel() }
       NativeSession(context).clear()
       mainHandler.post { VoxTypeAccessibilityService.instance?.onSignOut() }
     }
@@ -103,8 +105,16 @@ class VoxTypeNativeModule : Module() {
       VoxTypeStore(requireNotNull(appContext.reactContext)).copyToClipboard(id)
     }
 
-    AsyncFunction("stopRecording") {
-      mainHandler.post { VoxTypeAccessibilityService.instance?.stopRecording() }
+    AsyncFunction("startRecording") {
+      InAppRecorder.start(requireNotNull(appContext.reactContext).applicationContext)
+    }.runOnQueue(Queues.MAIN)
+    AsyncFunction("stopRecording") { InAppRecorder.stop() }.runOnQueue(Queues.MAIN)
+    AsyncFunction("cancelRecording") { InAppRecorder.cancel() }.runOnQueue(Queues.MAIN)
+    AsyncFunction("getTranscripts") { cursor: String? ->
+      val context = requireNotNull(appContext.reactContext)
+      VoxTypeStore(context).use { it.page(requireNotNull(NativeSession(context).userId), cursor) }
     }
+    OnActivityEntersBackground { mainHandler.post { InAppRecorder.stop() } }
+    OnDestroy { mainHandler.post { InAppRecorder.cancel() } }
   }
 }

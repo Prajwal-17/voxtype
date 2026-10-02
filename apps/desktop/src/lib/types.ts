@@ -29,6 +29,7 @@ export interface Session {
   message: string;
   delivery: string;
   isTest: boolean;
+  external?: boolean;
   originalText?: string;
   cleanupWarning?: string;
 }

@@ -94,16 +94,14 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   override fun onCreateInputMethod(): InputMethod = InputMethod(this)
 
   override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-    if (status == DictationStatus.LISTENING.bridge &&
-      event?.eventType == AccessibilityEvent.TYPE_VIEW_FOCUSED) {
+    // Window changes and a dismissed keyboard can leave an old editor node behind.
+    // Revalidate every event, including while connecting/processing.
+    if (status == DictationStatus.LISTENING.bridge) {
       val current = safeFocus()
       val same = isSameAsTarget(current)
-      if (current !== target) {
-        try { current?.recycle() } catch (e: Exception) { VoxLog.w("node recycle failed", e) }
-      }
-      if (!same) { stopRecording(); return }
+      current?.recycle()
+      if (!same) { stopRecording(); removeBubble(); return }
     }
-    if (status == DictationStatus.PROCESSING.bridge || status == DictationStatus.CONNECTING.bridge) return
     refreshBubble()
   }
   override fun onInterrupt() { stopRecording() }
@@ -122,6 +120,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   private fun focus(): AccessibilityNodeInfo? = rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
 
   private fun safeFocus(): AccessibilityNodeInfo? {
+    if (getWindows().none { it.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_INPUT_METHOD }) return null
     val node = focus() ?: return null
     var owned = true
     try {
@@ -169,7 +168,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   }
 
   fun refreshBubble() {
-    if (session.token == null || !store.bubbleEnabled || !hasValidFocus()) { removeBubble(); return }
+    if (session.token == null || InAppRecorder.busy || !store.bubbleEnabled || ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED || !hasValidFocus()) { removeBubble(); return }
     if (bubble == null) createBubble()
     if (bubble == null) return
     updateBubbleContent()
@@ -209,7 +208,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     }
     val mark = ImageView(this).apply {
       setImageResource(R.drawable.voxtype_logo)
-      alpha = 0.55f
+      alpha = 1f
       layoutParams = FrameLayout.LayoutParams(
         VoxConstants.BUBBLE_ICON_DP.dp, VoxConstants.BUBBLE_ICON_DP.dp, Gravity.CENTER)
       importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
@@ -329,7 +328,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
         bubbleMark?.visibility = View.GONE
         bubbleGlyph?.visibility = View.GONE
         actionsRow?.visibility = View.VISIBLE
-        startBars()
+        barViews.forEach { it.scaleY = 0.65f }
         animateBubbleWidth(VoxConstants.BUBBLE_LISTEN_WIDTH_DP.dp)
       }
       DictationStatus.CONNECTING.bridge, DictationStatus.PROCESSING.bridge -> {
@@ -360,7 +359,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       else -> {
         bg?.setColor(VoxConstants.BUBBLE_MUTED_COLOR)
         bubbleMark?.visibility = View.VISIBLE
-        bubbleMark?.alpha = 0.55f
+        bubbleMark?.alpha = 1f
         bubbleGlyph?.visibility = View.GONE
         actionsRow?.visibility = View.GONE
         animateBubbleWidth(VoxConstants.BUBBLE_SIZE_DP.dp)
@@ -567,7 +566,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     bubble = null; bubbleParams = null
     bubbleMark = null; bubbleGlyph = null; actionsRow = null
     cancelBtn = null; doneBtn = null; barViews = emptyList()
-    dragging = false; discardNext = false
+    dragging = false
   }
 
   private fun setStatus(value: DictationStatus) = setStatusBridge(value.bridge)
@@ -588,7 +587,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   }
 
   private fun startRecording() {
-    if (status != DictationStatus.IDLE.bridge && status != DictationStatus.SAVED.bridge) return
+    if (InAppRecorder.busy || (status != DictationStatus.IDLE.bridge && status != DictationStatus.SAVED.bridge)) return
     val node = safeFocus() ?: return
     if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
       node.recycle()

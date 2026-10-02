@@ -1,7 +1,7 @@
 //! Each new transcript sends local unsent transcripts once. No audio is uploaded.
 use crate::{auth, model::HistoryItem, storage, AppState};
 use serde::Serialize;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -54,6 +54,7 @@ async fn flush(app: &AppHandle) -> Result<(), String> {
             .map_err(|_| "Transcript kept locally until the next dictation.")?;
         if response.status().is_success() {
             storage::acknowledge_upload(app, item)?;
+            let _ = app.emit("analytics-changed", ());
         } else if response.status().as_u16() == 401 || response.status().as_u16() == 403 {
             break;
         }

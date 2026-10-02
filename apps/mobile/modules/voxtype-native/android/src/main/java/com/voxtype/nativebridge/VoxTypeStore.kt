@@ -69,9 +69,19 @@ class VoxTypeStore(
     return id
   }
 
-  fun dictations(): List<Map<String, Any?>> {
+  fun page(userId: String, cursor: String?): Map<String, Any?> {
+    val parts = cursor?.split(":", limit = 2)
+    val time = parts?.firstOrNull()?.toLongOrNull() ?: Long.MAX_VALUE
+    val id = parts?.getOrNull(1) ?: ""
+    val items = dictations(userId, time, id)
+    val more = items.size > 12
+    val page = items.take(12)
+    val last = page.lastOrNull()
+    return mapOf("items" to page, "nextCursor" to if (more && last != null) "${last["createdAt"]}:${last["id"]}" else null)
+  }
+  fun dictations(userId: String, before: Long = Long.MAX_VALUE, beforeId: String = ""): List<Map<String, Any?>> {
     val result = mutableListOf<Map<String, Any?>>()
-    readableDatabase.rawQuery("SELECT id,user_id,text,original_text,created_at,updated_at,duration_ms,word_count,delivery,audio_file FROM dictations ORDER BY created_at DESC", null).use { cursor ->
+    readableDatabase.rawQuery("SELECT id,user_id,text,original_text,created_at,updated_at,duration_ms,word_count,delivery,audio_file FROM dictations WHERE user_id = ? AND (created_at < ? OR (created_at = ? AND id < ?)) ORDER BY created_at DESC, id DESC LIMIT 13", arrayOf(userId, before.toString(), before.toString(), beforeId)).use { cursor ->
       while (cursor.moveToNext()) result += mapOf(
         "id" to cursor.getString(0), "userId" to cursor.getString(1), "text" to cursor.getString(2),
         "originalText" to cursor.getString(3), "createdAt" to cursor.getLong(4), "updatedAt" to cursor.getLong(5),

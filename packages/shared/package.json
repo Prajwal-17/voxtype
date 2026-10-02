@@ -1,25 +1,21 @@
 {
-  "name": "@voxtype/design-system",
+  "name": "@voxtype/shared",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "sideEffects": [
-    "./src/web.css"
+    "./web.css"
   ],
   "exports": {
-    ".": {
-      "types": "./src/index.ts",
-      "default": "./src/index.ts"
-    },
-    "./native": {
-      "types": "./src/native.ts",
-      "default": "./src/native.ts"
-    },
-    "./web.css": "./src/web.css"
+    ".": "./theme.ts",
+    "./native": "./theme.ts",
+    "./web.css": "./web.css",
+    "./analytics": "./analytics.ts"
   },
   "scripts": {
     "check-types": "tsc --noEmit",
-    "lint": "eslint . --max-warnings 0"
+    "lint": "node generate.mjs --check && eslint . --max-warnings 0",
+    "generate": "node generate.mjs"
   },
   "devDependencies": {
     "@voxtype/eslint-config": "workspace:*",

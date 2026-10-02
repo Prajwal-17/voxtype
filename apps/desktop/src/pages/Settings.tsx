@@ -1,20 +1,12 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  CheckIcon,
-  CaretDownIcon,
-  CircleNotchIcon,
-  MicrophoneIcon,
-  ArrowsClockwiseIcon,
-  StopIcon,
-  WarningIcon,
-} from '../components/icons';
+import { MicrophoneIcon, ArrowsClockwiseIcon, StopIcon } from '../components/icons';
 import { toast } from 'sonner';
 import { api, native, useRecording, useSession } from '../lib/api';
 import { captureShortcut } from '../lib/shortcuts';
 import { cn } from '../lib/utils';
 import { parseVocabulary, settingsSchema, type Bootstrap, type Settings } from '../lib/types';
-import { Button, IconButton, Shortcut, Toggle } from '../components/ui';
+import { Button, IconButton, Toggle } from '../components/ui';
 import { FieldRow, PageHeader, SectionHeader } from '../components/layout';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
@@ -30,27 +22,12 @@ import { Waveform } from '../components/waveform';
 export function SettingsPage({ boot, active }: { boot: Bootstrap; active: boolean }) {
   return (
     <>
-      <PageHeader title="Settings" description="Audio, transcription, and desktop integration." />
-      <div className="max-w-5xl">
-        <SpeechConnection />
+      <PageHeader title="Settings" />
+      <div className="max-w-3xl">
         <Preferences key={JSON.stringify(boot.settings)} settings={boot.settings} active={active} />
         <DesktopSetup boot={boot} active={active} />
       </div>
     </>
-  );
-}
-
-function SpeechConnection() {
-  return (
-    <section className="mb-5 rounded-panel border border-line bg-surface p-5 max-md:p-4">
-      <SectionHeader
-        title="Transcription connection"
-        description="Your VoxType account connects transcription automatically."
-      />
-      <p className="text-ui text-muted">
-        Audio streams directly to Deepgram. Start speaking as soon as recording begins.
-      </p>
-    </section>
   );
 }
 
@@ -99,15 +76,8 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
       }}
     >
       <section className="mb-5 rounded-panel border border-line bg-surface p-5 max-md:p-4">
-        <SectionHeader
-          title="Voice & language"
-          description="Choose your input device and transcription language."
-        />
-        <FieldRow
-          label="Microphone"
-          htmlFor="microphone"
-          description="Choose the input you use for dictation."
-        >
+        <SectionHeader title="Voice & language" />
+        <FieldRow label="Microphone" htmlFor="microphone">
           <div className="flex shrink-0 items-center gap-1.5 max-md:w-full max-md:max-w-full">
             <Select
               value={draft.microphone || '__default'}
@@ -155,8 +125,8 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
               {session.isTest && active
                 ? 'Listening to your microphone…'
                 : dirty
-                  ? 'Save your microphone selection before testing.'
-                  : 'Test the selected microphone.'}
+                  ? 'Save before testing'
+                  : 'Microphone test'}
             </span>
           </div>
           <Waveform level={session.isTest ? session.level : 0} active={session.isTest && active} />
@@ -185,11 +155,7 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
             {session.message}
           </p>
         )}
-        <FieldRow
-          label="Language"
-          htmlFor="language"
-          description="Use multilingual for supported mixed-language speech."
-        >
+        <FieldRow label="Language" htmlFor="language">
           <Select
             value={draft.language}
             onValueChange={(v) => set('language', v as Settings['language'])}
@@ -209,65 +175,46 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
         </FieldRow>
       </section>
       <section className="mb-5 rounded-panel border border-line bg-surface p-5 max-md:p-4">
-        <SectionHeader
-          title="Recording preferences"
-          description="Control text insertion and local storage."
-        />
+        <SectionHeader title="Recording preferences" />
         <Toggle
-          label="Detect speech locally"
-          description="Use on-device voice detection to skip long pauses. A short lead-in and tail protect word boundaries. Turn off if quiet speech is missed."
+          label="Skip long pauses"
           checked={draft.voiceDetection}
           onChange={(v) => set('voiceDetection', v)}
           disabled={active}
         />
         <Toggle
           label="Paste when I finish"
-          description="For shortcut recordings, send Ctrl+V to the focused app. Otherwise, copy the text."
           checked={draft.autoPaste}
           onChange={(v) => set('autoPaste', v)}
           disabled={active}
         />
         <Toggle
-          label="Clean up dictation"
-          description="Send the finished transcript through VoxType for DeepSeek cleanup before pasting. If cleanup fails, the original is kept."
+          label="Clean up wording"
           checked={draft.cleanupEnabled}
           onChange={(v) => set('cleanupEnabled', v)}
           disabled={active}
         />
-        <p className="pt-4 text-caption text-muted">
-          All transcripts stay on this device. The newest 10 audio recordings are kept locally;
-          older audio is deleted automatically. Transcripts are also sent to your account with a
-          desktop tag. Audio files stay on this device.
-        </p>
       </section>
       <section className="mb-5 rounded-panel border border-line bg-surface p-5 max-md:p-4">
-        <SectionHeader
-          title="Personal vocabulary"
-          description="Help Deepgram recognize names, projects, and technical terms."
-        />
+        <SectionHeader title="Personal vocabulary" />
         <Label className="sr-only" htmlFor="vocabulary">
           Personal vocabulary
         </Label>
         <Textarea
           id="vocabulary"
           rows={4}
-          placeholder={'One word or phrase per line\nFor example: Cloudflare Workers'}
+          placeholder={'One word or phrase per line'}
           value={vocabulary}
           onChange={(e) => setVocabulary(e.target.value)}
           disabled={active}
         />
         <div className="mt-2 flex justify-between gap-3 text-caption text-muted max-md:flex-col max-md:gap-1">
-          <span>Recognition hints, not automatic replacements.</span>
           <span>{value.vocabulary.length} / 100 terms</span>
         </div>
       </section>
       <div className="settings-save-bar sticky bottom-4 z-10 mb-5 flex items-center justify-between gap-3 rounded-panel border border-line bg-surface px-4 py-3 text-caption text-muted shadow-panel">
         <span>
-          {active
-            ? 'Finish recording to change preferences.'
-            : dirty
-              ? 'You have unsaved changes.'
-              : 'All preferences saved.'}
+          {active ? 'Finish recording to change preferences.' : dirty ? 'Unsaved changes' : ''}
         </span>
         <Button
           variant="primary"
@@ -275,7 +222,7 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
           loading={save.isPending}
           disabled={!dirty || active || !native}
         >
-          Save preferences
+          Save changes
         </Button>
       </div>
     </form>
@@ -283,7 +230,6 @@ function Preferences({ settings, active }: { settings: Settings; active: boolean
 }
 
 function DesktopSetup({ boot, active }: { boot: Bootstrap; active: boolean }) {
-  const [expanded, setExpanded] = useState(false);
   const [shortcutId, setShortcutId] = useState(boot.shortcutId);
   const [recordingShortcut, setRecordingShortcut] = useState(false);
   const [customLabel, setCustomLabel] = useState<string | null>(null);
@@ -310,23 +256,15 @@ function DesktopSetup({ boot, active }: { boot: Bootstrap; active: boolean }) {
     <section className="mb-7 rounded-panel border border-line bg-surface p-5 max-md:p-4">
       <div className="mb-5">
         <div className="flex items-center justify-between gap-4">
-          <h2 className="text-title font-semibold tracking-[-.02em]">Ubuntu desktop setup</h2>
+          <h2 className="text-title font-semibold tracking-[-.02em]">Shortcut</h2>
           <Button variant="ghost" onClick={() => void checks.refetch()} loading={checks.isFetching}>
             <ArrowsClockwiseIcon size={16} aria-hidden="true" /> Check again
           </Button>
         </div>
-        <p className="mt-1 text-ui text-muted">
-          Check the services used for shortcuts and text insertion.
-        </p>
       </div>
       <div className="mb-5 flex items-center justify-between gap-6 rounded-control bg-subtle p-4 max-lg:gap-4 max-md:flex-wrap">
         <div className="min-w-0">
           <Label>Recording shortcut</Label>
-          <p className="mt-1 max-w-lg text-ui text-muted">
-            {boot.shortcutRegistered
-              ? 'Press once to record. Press again to finish.'
-              : 'Choose a key combination to start and stop dictation from any app.'}
-          </p>
           <div className="mt-3 flex items-center gap-3 max-md:flex-wrap">
             <Select
               value={shortcutId}
@@ -396,60 +334,13 @@ function DesktopSetup({ boot, active }: { boot: Bootstrap; active: boolean }) {
           Save shortcut
         </Button>
       </div>
-      <div className="grid grid-cols-2 gap-x-6 gap-y-5 max-md:grid-cols-1">
-        {checks.isPending ? (
-          <p className="flex items-center gap-2 text-ui text-muted">
-            <CircleNotchIcon size={16} className="animate-spin" aria-hidden="true" /> Checking your
-            desktop…
+      {checks.data
+        ?.filter((check) => check.status !== 'ok')
+        .map((check) => (
+          <p key={check.name} className="mt-3 text-ui text-warning">
+            {check.detail}
           </p>
-        ) : checks.isError ? (
-          <p className="mt-2 text-ui text-danger">
-            VoxType couldn’t check desktop services. Nothing was changed. Select Check again.
-          </p>
-        ) : (
-          checks.data?.map((check) => (
-            <div className="flex items-start gap-2" key={check.name}>
-              {check.status === 'ok' ? (
-                <CheckIcon className="mt-0.5 text-success" size={16} aria-hidden="true" />
-              ) : (
-                <WarningIcon className="mt-0.5 text-warning" size={16} aria-hidden="true" />
-              )}
-              <div>
-                <strong className="text-ui font-medium">{check.name}</strong>
-                <p className="mt-1 text-caption text-muted">{check.detail}</p>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-      <button
-        className="mt-6 flex w-full items-center justify-between border-0 border-t border-line bg-transparent pt-5 text-ui font-medium"
-        onClick={() => setExpanded(!expanded)}
-        aria-expanded={expanded}
-      >
-        Shortcut & paste setup{' '}
-        <CaretDownIcon
-          size={16}
-          className="transition-transform duration-150"
-          style={{ transform: expanded ? 'rotate(180deg)' : undefined }}
-          aria-hidden="true"
-        />
-      </button>
-      {expanded && (
-        <div className="pt-4">
-          <p className="mb-3 text-ui text-muted">
-            <Shortcut label={boot.shortcutLabel} /> toggles recording. Use the cancel button in the
-            voice overlay to discard a recording. Keep your cursor in the destination field while
-            recording.
-          </p>
-          <p className="mb-3 text-ui text-muted">
-            Wayland paste needs <code className="text-caption text-accent-ink">ydotoold</code>{' '}
-            running with access to <code className="text-caption text-accent-ink">/dev/uinput</code>
-            . The app checks the service; it does not change system permissions. The README includes
-            installation steps.
-          </p>
-        </div>
-      )}
+        ))}
     </section>
   );
 }

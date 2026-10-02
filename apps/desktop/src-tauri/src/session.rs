@@ -93,6 +93,7 @@ pub async fn start(app: AppHandle, test: bool, external: bool) -> Result<(), Str
         session_id: id,
         phase: Phase::Listening,
         is_test: test,
+        external,
         ..Snapshot::default()
     };
     publish(&app, &snapshot);

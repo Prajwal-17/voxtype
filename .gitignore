@@ -18,3 +18,6 @@ target/
 .impeccable/
 
 apps/mobile/dist-web/
+
+apps/mobile/android/
+apps/mobile/.expo/

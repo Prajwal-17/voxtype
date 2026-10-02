@@ -18,7 +18,8 @@
     "better-auth": "^1.7.6",
     "drizzle-orm": "^0.45.3",
     "hono": "^4.13.9",
-    "zod": "^4.6.5"
+    "zod": "^4.6.5",
+    "@voxtype/shared": "workspace:*"
   },
   "devDependencies": {
     "@voxtype/typescript-config": "workspace:*",

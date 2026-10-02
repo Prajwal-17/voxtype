@@ -161,8 +161,60 @@ fn update_settings(app: tauri::AppHandle, settings: Settings) -> Result<(), Stri
     storage::save_settings(&app, &settings)
 }
 #[tauri::command]
-fn get_history(app: tauri::AppHandle) -> Result<Vec<HistoryItem>, String> {
-    storage::history(&app)
+fn get_history(
+    app: tauri::AppHandle,
+    cursor: Option<String>,
+    query: Option<String>,
+) -> Result<serde_json::Value, String> {
+    require_authenticated(&app)?;
+    let user_id = app
+        .state::<AppState>()
+        .user
+        .lock()
+        .map_err(|_| "Account unavailable.")?
+        .as_ref()
+        .map(|u| u.id.clone())
+        .ok_or("Sign in again.")?;
+    let mut items: Vec<_> = storage::history(&app)?
+        .into_iter()
+        .filter(|item| item.user_id.as_deref() == Some(user_id.as_str()))
+        .collect();
+    items.sort_by(|a, b| b.created_at.cmp(&a.created_at).then(b.id.cmp(&a.id)));
+    let query = query.unwrap_or_default().to_lowercase();
+    items.retain(|item| item.text.to_lowercase().contains(&query));
+    if let Some(cursor) = cursor {
+        let (time, id) = cursor.split_once(':').ok_or("Invalid cursor.")?;
+        let time: u64 = time.parse().map_err(|_| "Invalid cursor.")?;
+        items.retain(|item| {
+            item.created_at < time || (item.created_at == time && item.id.as_str() < id)
+        });
+    }
+    let more = items.len() > 12;
+    items.truncate(12);
+    let next = if more {
+        items
+            .last()
+            .map(|item| format!("{}:{}", item.created_at, item.id))
+    } else {
+        None
+    };
+    Ok(serde_json::json!({"items": items, "nextCursor": next}))
+}
+#[tauri::command]
+async fn get_analytics(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    require_authenticated(&app)?;
+    let (_, bearer, client) = auth::upload_session().await?.ok_or("Sign in again.")?;
+    let response = client
+        .get(format!("{}/v1/analytics?range=30d", auth::api_url()))
+        .bearer_auth(bearer)
+        .send()
+        .await
+        .map_err(|_| "Couldn’t load analytics.")?;
+    if !response.status().is_success() {
+        return Err("Couldn’t load analytics.".into());
+    }
+    let body: serde_json::Value = speech::read_json(response, 256_000).await?;
+    Ok(body["data"].clone())
 }
 #[tauri::command]
 fn delete_history(app: tauri::AppHandle, id: Option<String>) -> Result<(), String> {
@@ -309,6 +361,7 @@ pub fn run() {
             sign_out,
             update_settings,
             get_history,
+            get_analytics,
             delete_history,
             get_microphones,
             get_diagnostics,

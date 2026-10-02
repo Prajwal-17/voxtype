@@ -15,10 +15,13 @@
     "format:check": "prettier --check . && cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check",
     "lint": "turbo run lint",
     "check-types": "turbo run check-types",
-    "check": "pnpm format:check && turbo run lint check-types"
+    "check": "pnpm format:check && turbo run lint check-types",
+    "test": "tsx --test tests/*.test.ts"
   },
   "devDependencies": {
+    "miniflare": "5.20260926.0-alpha",
     "prettier": "^3.9.9",
+    "tsx": "^4.23.15",
     "turbo": "^2.11.4",
     "typescript": "^5.9.3"
   }

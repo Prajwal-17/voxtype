@@ -44,11 +44,7 @@ export function LoginPage({
     headingRef.current?.focus();
   }, []);
 
-  const status = checking
-    ? 'Checking your account'
-    : pending
-      ? 'Waiting for Google sign-in in your browser'
-      : '';
+  const status = checking ? 'Loading' : pending ? 'Signing in' : '';
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-canvas px-5 py-10 text-ink selection:bg-accent-soft selection:text-accent-ink">
@@ -64,9 +60,6 @@ export function LoginPage({
             >
               Sign in to {appName}
             </h1>
-            <p className="mx-auto mt-2 max-w-[34ch] text-body text-muted">
-              Continue to your dictation workspace.
-            </p>
 
             {error && (
               <div
@@ -87,11 +80,7 @@ export function LoginPage({
               disabled={checking}
             >
               {!checking && !pending && <GoogleMark />}
-              {checking
-                ? 'Checking your account'
-                : pending
-                  ? 'Waiting for Google'
-                  : 'Sign in with Google'}
+              {checking ? 'Loading' : pending ? 'Waiting for Google' : 'Sign in with Google'}
             </Button>
             <span className="sr-only" role="status" aria-live="polite">
               {status}

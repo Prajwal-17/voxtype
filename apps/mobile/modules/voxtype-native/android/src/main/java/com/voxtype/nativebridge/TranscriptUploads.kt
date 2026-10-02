@@ -39,7 +39,7 @@ object TranscriptUploads {
         .put(item.payload.toString().toRequestBody("application/json".toMediaType())).build()
       client.newCall(request).execute().use { response ->
         if (response.code == 401 || response.code == 403) return
-        if (response.isSuccessful) store.acknowledgeUpload(item)
+        if (response.isSuccessful) { store.acknowledgeUpload(item); VoxTypeNativeModule.changed() }
       }
     }
   }

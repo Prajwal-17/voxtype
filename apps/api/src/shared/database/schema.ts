@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { index, integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 export const user = sqliteTable('user', {
   id: text('id').primaryKey(),
@@ -109,3 +109,19 @@ export const schema = { account, dictation, session, user, verification };
 
 export type Dictation = typeof dictation.$inferSelect;
 export type NewDictation = typeof dictation.$inferInsert;
+
+export const speechUsage = sqliteTable(
+  'speech_usage',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    createdAt: integer('created_at').notNull(),
+    inputTokens: integer('input_tokens'),
+    cachedTokens: integer('cached_tokens'),
+    outputTokens: integer('output_tokens'),
+    costUsd: real('cost_usd'),
+  },
+  (table) => [index('speech_usage_user_created_idx').on(table.userId, table.createdAt)],
+);

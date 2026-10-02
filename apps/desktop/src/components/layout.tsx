@@ -8,7 +8,7 @@ export function PageHeader({
   actions,
 }: {
   title: string;
-  description: string;
+  description?: string;
   actions?: React.ReactNode;
 }) {
   const headingRef = React.useRef<HTMLHeadingElement>(null);
@@ -27,7 +27,7 @@ export function PageHeader({
         >
           {title}
         </h1>
-        <p className="mt-1.5 text-body text-muted">{description}</p>
+        {description && <p className="mt-1.5 text-body text-muted">{description}</p>}
       </div>
       {actions}
     </div>
@@ -35,11 +35,11 @@ export function PageHeader({
 }
 
 // Section header — replaces [&_h2]: / [&_p]: soup.
-export function SectionHeader({ title, description }: { title: string; description: string }) {
+export function SectionHeader({ title, description }: { title: string; description?: string }) {
   return (
     <div className="mb-5">
       <h2 className="text-title font-semibold tracking-[-.015em]">{title}</h2>
-      <p className="mt-1 text-ui text-muted">{description}</p>
+      {description && <p className="mt-1 text-ui text-muted">{description}</p>}
     </div>
   );
 }
@@ -66,7 +66,7 @@ export function FieldRow({
   children,
 }: {
   label: React.ReactNode;
-  description: string;
+  description?: string;
   htmlFor?: string;
   children: React.ReactNode;
 }) {
@@ -80,7 +80,7 @@ export function FieldRow({
         ) : (
           label
         )}
-        <p className="mt-1 max-w-lg text-ui text-muted">{description}</p>
+        {description && <p className="mt-1 max-w-lg text-ui text-muted">{description}</p>}
       </div>
       {children}
     </div>

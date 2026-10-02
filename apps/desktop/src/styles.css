@@ -1,6 +1,5 @@
 @import 'tailwindcss';
-@import '@voxtype/design-system/web.css';
-@import './design-trial.css';
+@import '@voxtype/shared/web.css';
 
 @layer base {
   * {
@@ -56,7 +55,7 @@
   --color-popover: var(--palette-surface);
   --color-popover-foreground: var(--palette-ink);
   --color-primary: var(--palette-accent);
-  --color-primary-foreground: var(--trial-on-accent, var(--palette-inverse));
+  --color-primary-foreground: var(--palette-inverse);
   --color-secondary: var(--palette-surface-subtle);
   --color-secondary-foreground: var(--palette-ink);
   --color-muted-foreground: var(--palette-muted);
@@ -69,9 +68,23 @@
   --color-sidebar: var(--palette-navigation);
   --color-sidebar-foreground: var(--palette-inverse);
   --color-sidebar-primary: var(--palette-accent);
-  --color-sidebar-primary-foreground: var(--trial-on-accent, var(--palette-inverse));
+  --color-sidebar-primary-foreground: var(--palette-inverse);
   --color-sidebar-accent: var(--palette-navigation-raised);
   --color-sidebar-accent-foreground: var(--palette-inverse);
   --color-sidebar-border: var(--palette-navigation-line);
   --color-sidebar-ring: var(--palette-accent);
+}
+
+body {
+  background: var(--palette-canvas);
+  color: var(--palette-ink);
+  -webkit-font-smoothing: antialiased;
+}
+h1 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 400 !important;
+  font-size: 36px;
+}
+.settings-save-bar {
+  bottom: 16px;
 }

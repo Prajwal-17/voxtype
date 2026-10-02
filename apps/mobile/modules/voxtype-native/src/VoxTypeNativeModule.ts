@@ -1,6 +1,6 @@
 import { NativeModule, requireNativeModule } from 'expo';
 
-import type { Snapshot, VoxTypeNativeModuleEvents } from './VoxTypeNative.types';
+import type { Snapshot, TranscriptPage, VoxTypeNativeModuleEvents } from './VoxTypeNative.types';
 
 declare class VoxTypeNativeModule extends NativeModule<VoxTypeNativeModuleEvents> {
   getSnapshot(): Promise<Snapshot>;
@@ -13,7 +13,10 @@ declare class VoxTypeNativeModule extends NativeModule<VoxTypeNativeModuleEvents
   setBubbleEnabled?: (enabled: boolean) => Promise<void>;
   setCleanupEnabled?: (enabled: boolean) => Promise<void>;
   copyTranscript(id: string): Promise<boolean>;
+  startRecording(): Promise<void>;
   stopRecording(): Promise<void>;
+  cancelRecording(): Promise<void>;
+  getTranscripts(cursor: string | null): Promise<TranscriptPage>;
 }
 
 let cached: VoxTypeNativeModule | null | undefined;
@@ -68,6 +71,9 @@ const VoxTypeNative = {
     requireVoxTypeModule().setCleanupEnabled?.(enabled) ??
     requireVoxTypeModule().setPreference('cleanupEnabled', String(enabled)),
   copyTranscript: (id: string) => requireVoxTypeModule().copyTranscript(id),
+  getTranscripts: (cursor: string | null) => requireVoxTypeModule().getTranscripts(cursor),
+  startRecording: () => requireVoxTypeModule().startRecording(),
+  cancelRecording: () => requireVoxTypeModule().cancelRecording(),
   stopRecording: () => requireVoxTypeModule().stopRecording(),
   addListener: <EventName extends keyof VoxTypeNativeModuleEvents>(
     eventName: EventName,

@@ -33,18 +33,18 @@ object VoxConstants {
   const val BYTE_RATE = 32_000
   const val WAV_HEADER_BYTES = 44
 
-  val BUBBLE_COLOR = 0xFF20221F.toInt()
+  val BUBBLE_COLOR = VoxTheme.overlay
   // Idle bubble stays small and muted; color appears only on interaction.
-  val BUBBLE_MUTED_COLOR = 0xB820221F.toInt()
-  val BUBBLE_ACTIVE_COLOR = 0xFF464944.toInt()
-  val BUBBLE_ACTION_COLOR = 0xFF30332F.toInt()
-  val BUBBLE_DONE_COLOR = 0xFFF6F6F2.toInt()
-  val BUBBLE_DONE_ICON = 0xFF20221F.toInt()
-  val BUBBLE_SAVED_COLOR = 0xFF396B50.toInt()
-  val CLOSE_COLOR = 0xFF93433F.toInt()
-  val CLOSE_HOT_COLOR = 0xFFA34A45.toInt()
+  val BUBBLE_MUTED_COLOR = VoxTheme.accent
+  val BUBBLE_ACTIVE_COLOR = VoxTheme.accent
+  val BUBBLE_ACTION_COLOR = VoxTheme.overlayRaised
+  val BUBBLE_DONE_COLOR = VoxTheme.inverse
+  val BUBBLE_DONE_ICON = VoxTheme.ink
+  val BUBBLE_SAVED_COLOR = VoxTheme.success
+  val CLOSE_COLOR = VoxTheme.danger
+  val CLOSE_HOT_COLOR = VoxTheme.danger
   const val BUBBLE_RADIUS_DP = 16
-  const val BUBBLE_ELEVATION_DP = 8
+  const val BUBBLE_ELEVATION_DP = 3
   const val BUBBLE_ICON_DP = 24
   const val BUBBLE_EDGE_DP = 12
   const val BUBBLE_PAD_H_DP = 16
@@ -52,15 +52,15 @@ object VoxConstants {
   const val BUBBLE_TEXT_DP = 8
   // Compact chat-head sizing: idle is a small square, listening expands to
   // [cancel | level bars | done] like the desktop overlay.
-  const val BUBBLE_SIZE_DP = 56
+  const val BUBBLE_SIZE_DP = 48
   const val BUBBLE_LISTEN_WIDTH_DP = 176
-  const val BUBBLE_ACTION_DP = 40
+  const val BUBBLE_ACTION_DP = 44
   const val BUBBLE_GLYPH_SP = 22f
   const val BUBBLE_BAR_DP = 4
   const val BUBBLE_BAR_HEIGHT_DP = 18
   const val CLOSE_SIZE_DP = 72
   const val CLOSE_BOTTOM_MARGIN_DP = 96
   const val DRAG_SLOP_DP = 10
-  const val BUBBLE_WIDTH_ANIM_MS = 220L
+  const val BUBBLE_WIDTH_ANIM_MS = 150L
   const val BUBBLE_BAR_ANIM_MS = 380L
 }

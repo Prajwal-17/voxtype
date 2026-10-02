@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { nativeTheme as theme } from '@voxtype/design-system/native';
-import { Button } from '@/components/ui/button';
-import { Text } from '@/components/ui/text';
+import { nativeTheme as theme } from '@voxtype/shared';
+import { Action, Text, Loader } from '@/components/primitives';
 import { exchangeGrant } from '@/lib/mobile-api';
 
 const c = theme.colors;
@@ -67,27 +66,31 @@ export default function AuthCallback() {
           Google sign-in was not completed.
         </Text>
         <Text
-          style={{ color: c.textMuted, fontSize: 14, marginTop: 8, marginBottom: 20, textAlign: 'center' }}
+          style={{
+            color: c.textMuted,
+            fontSize: 14,
+            marginTop: 8,
+            marginBottom: 20,
+            textAlign: 'center',
+          }}
         >
           The sign-in link expired or the account is not allowed. Return home and try again.
         </Text>
-        <Button
-          accessibilityLabel="Back home"
-          onPress={() => router.replace('/')}
-          className="min-h-12 rounded-[10px] px-5"
-          style={{ backgroundColor: c.primary }}
-        >
-          <Text style={{ color: c.onPrimary, fontSize: 14, fontWeight: '600' }}>Back home</Text>
-        </Button>
+        <Action label="Back home" onPress={() => router.replace('/')} />
       </View>
     );
   }
 
   return (
     <View
-      style={{ flex: 1, backgroundColor: c.background, alignItems: 'center', justifyContent: 'center' }}
+      style={{
+        flex: 1,
+        backgroundColor: c.background,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
     >
-      <Text style={{ color: c.textMuted, fontSize: 14 }}>Finishing sign-in…</Text>
+      <Loader label="Signing in" />
     </View>
   );
 }

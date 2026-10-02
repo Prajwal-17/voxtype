@@ -80,6 +80,7 @@ pub struct Snapshot {
     pub message: String,
     pub delivery: String,
     pub is_test: bool,
+    pub external: bool,
     pub cleanup_warning: String,
 }
 

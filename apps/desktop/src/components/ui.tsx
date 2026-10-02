@@ -56,7 +56,7 @@ export function Toggle({
   disabled,
 }: {
   label: string;
-  description: string;
+  description?: string;
   checked: boolean;
   onChange: (value: boolean) => void;
   disabled?: boolean;
@@ -66,9 +66,11 @@ export function Toggle({
     <div className="flex items-center justify-between gap-6 border-b border-line py-4 last:border-b-0 last:pb-0 max-lg:gap-4 max-md:flex-wrap">
       <div className="min-w-0">
         <Label htmlFor={id}>{label}</Label>
-        <p id={`${id}-description`} className="mt-1 max-w-lg text-ui text-muted">
-          {description}
-        </p>
+        {description && (
+          <p id={`${id}-description`} className="mt-1 max-w-lg text-ui text-muted">
+            {description}
+          </p>
+        )}
       </div>
       <Switch
         id={id}
@@ -92,7 +94,7 @@ export function Confirm({
 }: {
   trigger: ReactNode;
   title: string;
-  description: string;
+  description?: string;
   onConfirm: () => void;
   pending?: boolean;
   cancelLabel?: string;
@@ -134,20 +136,7 @@ export function Logo({
       aria-label={appName}
       className={cn('relative flex items-center gap-2.5', className)}
     >
-      <img
-        src="/voxtype.svg"
-        alt=""
-        width={32}
-        height={32}
-        className="brand-mark-original size-8 shrink-0"
-      />
-      <img
-        src="/voxtype-tide.svg"
-        alt=""
-        width={32}
-        height={32}
-        className="brand-mark-tide hidden size-8 shrink-0"
-      />
+      <img src="/voxtype.svg" alt="" width={32} height={32} className="size-8 shrink-0" />
       <span
         aria-hidden="true"
         className={cn(

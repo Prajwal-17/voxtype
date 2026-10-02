@@ -15,7 +15,7 @@ export const createDictationSchema = dictationInputSchema.extend({
 });
 
 export const listDictationsSchema = z.object({
-  limit: z.coerce.number().int().min(1).max(100).default(50),
+  limit: z.coerce.number().int().min(1).max(100).default(12),
   cursor: z.string().max(512).optional(),
   q: z.string().trim().max(100).optional(),
 });
