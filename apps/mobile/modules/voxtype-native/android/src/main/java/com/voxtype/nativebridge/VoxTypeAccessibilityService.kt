@@ -9,6 +9,7 @@ import android.animation.ValueAnimator
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
@@ -27,6 +28,7 @@ import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.animation.DecelerateInterpolator
+import android.view.inputmethod.EditorInfo
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ImageView
@@ -49,6 +51,7 @@ import java.io.File
 
 class VoxTypeAccessibilityService : AccessibilityService() {
   companion object { var instance: VoxTypeAccessibilityService? = null; private set }
+  private enum class ForegroundMode { NONE, BUBBLE, MICROPHONE }
 
   private val main = Handler(Looper.getMainLooper())
   private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -64,6 +67,8 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   private var waveform: BubbleWaveformView? = null
   private var spinner: ProgressBar? = null
   private var dismissedForKeyboard = false
+  private var foregroundMode = ForegroundMode.NONE
+  private val bubbleRefresh = Runnable { if (connected) refreshBubble() }
   var connected = false; private set
   @Volatile private var audioLevel = 0f
   private var placementAnimator: ValueAnimator? = null
@@ -78,7 +83,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   private var dragStartX = 0
   private var dragStartY = 0
   private var dragging = false
-    private var discardNext = false
+  private var discardNext = false
   private var engine: DeepgramSession? = null
   private var capture: AudioCapture? = null
   private var target: AccessibilityNodeInfo? = null
@@ -108,31 +113,45 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     serviceScope.launch(Dispatchers.IO) { runCatching { store.pruneAudio() }.onFailure { VoxLog.w("audio pruning failed", it) } }
     VoxTypeNativeModule.changed()
   }
-  override fun onCreateInputMethod(): InputMethod = InputMethod(this)
+  override fun onCreateInputMethod(): InputMethod = object : InputMethod(this) {
+    override fun onStartInput(attribute: EditorInfo, restarting: Boolean) {
+      super.onStartInput(attribute, restarting)
+      // EditorInfo can arrive after the window/focus event that first showed the keyboard.
+      requestBubbleRefresh()
+    }
+    override fun onFinishInput() {
+      super.onFinishInput()
+      stopRecording()
+      removeBubble()
+      requestBubbleRefresh()
+    }
+  }
+
+  private fun requestBubbleRefresh() {
+    main.removeCallbacks(bubbleRefresh)
+    main.postDelayed(bubbleRefresh, VoxConstants.BUBBLE_REFRESH_DELAY_MS)
+  }
 
   override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-    // Window changes and a dismissed keyboard can leave an old editor node behind.
-    // Revalidate every event, including while connecting/processing.
-    try {
-    if (status == DictationStatus.LISTENING.bridge) {
-      val current = safeFocus()
-      val same = isSameAsTarget(current)
-      current?.recycle()
-      if (!same) { stopRecording(); removeBubble(); return }
-    }
     refreshBubble()
-    } catch (error: Exception) { VoxLog.w("accessibility event failed", error); removeBubble() }
+    // A transient empty window list must not leave the overlay hidden indefinitely.
+    requestBubbleRefresh()
   }
   override fun onInterrupt() { stopRecording() }
   override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
     super.onConfigurationChanged(newConfig)
-    if (bubble != null && !dragging) placeBubble(animate = false)
+    refreshBubble()
+    requestBubbleRefresh()
   }
   override fun onUnbind(intent: android.content.Intent?): Boolean {
     connected = false
+    main.removeCallbacks(bubbleRefresh)
     VoxLog.d("accessibility unbound")
     VoxTypeNativeModule.changed()
     stopRecording()
+    removeBubble()
+    stopForeground(STOP_FOREGROUND_REMOVE)
+    foregroundMode = ForegroundMode.NONE
     return super.onUnbind(intent)
   }
   override fun onDestroy() {
@@ -141,6 +160,8 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     main.removeCallbacksAndMessages(null)
     lifecycleGeneration++; recordingUserId = null
     capture?.stop(); engine?.close(); removeBubble(); instance = null
+    stopForeground(STOP_FOREGROUND_REMOVE)
+    foregroundMode = ForegroundMode.NONE
     releaseTarget()
     serviceScope.cancel()
     super.onDestroy()
@@ -206,6 +227,24 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   private fun expanded(): Boolean = status in listOf("listening", "processing", "connecting", "saved")
 
   fun refreshBubble() {
+    try {
+      refreshBubbleState()
+    } catch (error: Exception) {
+      VoxLog.w("bubble refresh failed", error)
+      removeBubble()
+    }
+  }
+
+  private fun refreshBubbleState() {
+    updateBubbleForeground()
+    if (!connected) { removeBubble(); return }
+    // Revalidate the target on both accessibility events and delayed editor callbacks.
+    if (status == DictationStatus.LISTENING.bridge) {
+      val current = safeFocus()
+      val same = isSameAsTarget(current)
+      current?.recycle()
+      if (!same || !store.bubbleEnabled) { stopRecording(); removeBubble(); return }
+    }
     if (!keyboardVisible()) dismissedForKeyboard = false
     if (dismissedForKeyboard) { removeBubble(); return }
     if (session.token == null || InAppRecorder.busy || !store.bubbleEnabled || ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED || !hasValidFocus()) { removeBubble(); return }
@@ -296,7 +335,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   }
 
   /**
-   * Muted edge-docked capsule. Expands inwards for recording, with real microphone
+   * Muted edge-docked rounded square. Expands inwards for recording, with real microphone
    * history between cancel and stop. Drag release docks to the nearest edge.
    */
   private fun createBubble() {
@@ -312,7 +351,8 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       isFocusable = false
     }
     val mark = ImageView(this).apply {
-      setImageResource(R.drawable.voxtype_logo)
+      setImageResource(R.drawable.voxtype_bubble_mark)
+      scaleType = ImageView.ScaleType.FIT_CENTER
       setColorFilter(VoxTheme.accentInk)
       alpha = 1f
       layoutParams = FrameLayout.LayoutParams(
@@ -336,7 +376,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       text = "✕"; setTextColor(VoxTheme.ink); textSize = 18f; gravity = Gravity.CENTER
       background = GradientDrawable().apply {
         setColor(VoxConstants.BUBBLE_ACTION_COLOR)
-        cornerRadius = VoxConstants.BUBBLE_RADIUS_DP.dp.toFloat()
+        cornerRadius = VoxConstants.BUBBLE_ACTION_RADIUS_DP.dp.toFloat()
       }
       layoutParams = LinearLayout.LayoutParams(actionSize, actionSize).apply {
         marginEnd = 4.dp
@@ -352,7 +392,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       text = "■"; setTextColor(VoxConstants.BUBBLE_DONE_ICON); textSize = 18f; gravity = Gravity.CENTER
       background = GradientDrawable().apply {
         setColor(VoxConstants.BUBBLE_DONE_COLOR)
-        cornerRadius = VoxConstants.BUBBLE_RADIUS_DP.dp.toFloat()
+        cornerRadius = VoxConstants.BUBBLE_ACTION_RADIUS_DP.dp.toFloat()
       }
       layoutParams = LinearLayout.LayoutParams(actionSize, actionSize).apply {
         marginStart = 4.dp
@@ -363,7 +403,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     }
     row.addView(cancel); row.addView(bars); row.addView(done)
     row.setPadding(4.dp, 0, 4.dp, 0)
-    // Visual circles are inset while the full 44dp touch targets remain intact.
+    // Inset rounded controls retain their full 44dp touch targets.
     cancel.background = InsetDrawable(cancel.background, 7.dp)
     done.background = InsetDrawable(done.background, 7.dp)
     val loader = ProgressBar(this, null, android.R.attr.progressBarStyleSmall).apply {
@@ -706,14 +746,14 @@ class VoxTypeAccessibilityService : AccessibilityService() {
             discardNext = false
             try { file?.delete() } catch (e: Exception) { VoxLog.w("discarded audio delete failed", e) }
             recordingUserId = null
-            stopForeground(STOP_FOREGROUND_REMOVE)
+            releaseMicrophoneForeground()
             releaseTarget()
             setStatus(DictationStatus.IDLE)
             return@post
           }
           recordingFile = file
           recordingDuration = duration
-          stopForeground(STOP_FOREGROUND_REMOVE)
+          releaseMicrophoneForeground()
           setStatus(DictationStatus.PROCESSING)
           stream.finalize { finishDictation(it, recordingApiUrl) }
         }
@@ -730,7 +770,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       recordingUserId = null
       stream.abort()
       releaseTarget()
-      stopForeground(STOP_FOREGROUND_REMOVE)
+      releaseMicrophoneForeground()
       setStatus(DictationStatus.IDLE)
     }
   }
@@ -767,9 +807,55 @@ class VoxTypeAccessibilityService : AccessibilityService() {
         .setOngoing(true).build()
       if (Build.VERSION.SDK_INT >= 29) startForeground(VoxConstants.NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
       else startForeground(VoxConstants.NOTIFICATION_ID, notification)
+      foregroundMode = ForegroundMode.MICROPHONE
     } catch (e: Exception) {
       VoxLog.e("foreground notification failed", e)
       throw e
+    }
+  }
+
+  private fun releaseMicrophoneForeground() {
+    // stopForeground clears the microphone type before returning to idle specialUse.
+    stopForeground(STOP_FOREGROUND_REMOVE)
+    foregroundMode = ForegroundMode.NONE
+    updateBubbleForeground()
+  }
+
+  private fun updateBubbleForeground() {
+    // Keep the system-bound accessibility process important between dictations too.
+    // Never start microphone capture merely to keep the bubble alive.
+    if (foregroundMode == ForegroundMode.MICROPHONE) return
+    val enabled = connected && store.bubbleEnabled && session.userId != null
+    if (!enabled) {
+      if (foregroundMode != ForegroundMode.NONE) stopForeground(STOP_FOREGROUND_REMOVE)
+      foregroundMode = ForegroundMode.NONE
+      return
+    }
+    if (foregroundMode == ForegroundMode.BUBBLE) return
+    try {
+      val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+      manager.createNotificationChannel(NotificationChannel(
+        VoxConstants.BUBBLE_CHANNEL_ID, VoxConstants.BUBBLE_CHANNEL_NAME, NotificationManager.IMPORTANCE_LOW))
+      val builder = Notification.Builder(this, VoxConstants.BUBBLE_CHANNEL_ID)
+        .setSmallIcon(R.drawable.voxtype_notification)
+        .setContentTitle("VoxType voice bubble is ready")
+        .setContentText("Open a text field to dictate. Manage the bubble in VoxType.")
+        .setOnlyAlertOnce(true)
+        .setOngoing(true)
+      packageManager.getLaunchIntentForPackage(packageName)?.let { intent ->
+        builder.setContentIntent(PendingIntent.getActivity(this, 0, intent,
+          PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
+      }
+      if (Build.VERSION.SDK_INT >= 34) {
+        startForeground(VoxConstants.NOTIFICATION_ID, builder.build(), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+      } else {
+        // API 33 predates specialUse; explicitly avoid the manifest's microphone type.
+        startForeground(VoxConstants.NOTIFICATION_ID, builder.build(), ServiceInfo.FOREGROUND_SERVICE_TYPE_NONE)
+      }
+      foregroundMode = ForegroundMode.BUBBLE
+    } catch (error: Exception) {
+      // OEM background restrictions must not crash and disconnect accessibility.
+      VoxLog.w("bubble foreground notification unavailable", error)
     }
   }
 
@@ -879,6 +965,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     recordingUserId = null; recordingFile = null; lastSavedId = null
     releaseTarget()
     try { stopForeground(STOP_FOREGROUND_REMOVE) } catch (e: Exception) { VoxLog.w("stopForeground failed", e) }
+    foregroundMode = ForegroundMode.NONE
     removeBubble()
     setStatus(DictationStatus.IDLE)
   }

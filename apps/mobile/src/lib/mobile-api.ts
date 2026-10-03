@@ -2,13 +2,9 @@ import type { Analytics } from '@voxtype/shared/analytics';
 import * as Crypto from 'expo-crypto';
 import * as WebBrowser from 'expo-web-browser';
 import VoxTypeNative from '../../modules/voxtype-native/src/VoxTypeNativeModule';
+import { resolveApiUrl } from './environment';
 
-const configuredApiUrl: unknown = process.env.EXPO_PUBLIC_API_URL;
-export const API_URL = (
-  typeof configuredApiUrl === 'string' && configuredApiUrl
-    ? configuredApiUrl
-    : 'https://voxtype-api-production.prajwalreddy-dev.workers.dev'
-).replace(/\/$/, '');
+export const API_URL = resolveApiUrl(process.env.EXPO_PUBLIC_API_URL, __DEV__);
 const REDIRECT_URL = 'voxtype://auth/callback';
 
 export type User = { id: string; name: string; email: string; image: string | null };

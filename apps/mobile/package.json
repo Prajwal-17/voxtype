@@ -1,6 +1,6 @@
 {
   "name": "@voxtype/mobile",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "main": "expo-router/entry",
   "dependencies": {
     "@rn-primitives/slot": "^1.5.2",

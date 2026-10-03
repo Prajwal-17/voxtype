@@ -5,6 +5,7 @@
   <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
   <application>
     <service android:name="com.voxtype.nativebridge.TranscriptSyncJob"
       android:permission="android.permission.BIND_JOB_SERVICE" android:exported="true" />
@@ -13,10 +14,12 @@
       android:label="VoxType voice bubble"
       android:description="@string/voxtype_accessibility_description"
       android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
-      android:foregroundServiceType="microphone"
+      android:foregroundServiceType="microphone|specialUse"
       android:exported="true">
       <intent-filter><action android:name="android.accessibilityservice.AccessibilityService" /></intent-filter>
       <meta-data android:name="android.accessibilityservice" android:resource="@xml/voxtype_accessibility" />
+      <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+        android:value="Keep the user-enabled dictation accessibility bubble available beside editable fields without capturing microphone audio while idle." />
     </service>
   </application>
 </manifest>

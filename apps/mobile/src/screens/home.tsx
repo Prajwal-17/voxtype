@@ -443,7 +443,8 @@ export default function Home() {
                         />
                         {snapshot.accessibilityEnabled && !snapshot.accessibilityConnected && (
                           <Text style={[ui.muted, { color: c.danger }]}>
-                            Service disconnected. Re-enable accessibility.
+                            Waiting for Android to reconnect VoxType. If it stays disconnected,
+                            check accessibility and the app’s battery settings.
                           </Text>
                         )}
                         <PermissionRow

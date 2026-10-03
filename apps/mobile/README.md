@@ -5,9 +5,42 @@ The app keeps the active keyboard. Its accessibility service shows a small muted
 ## Configuration
 
 - Requires Android 13+ (API 33). This is a local Expo module, so the native service needs a development client or installed app; Expo Go cannot run it.
-- `EXPO_PUBLIC_API_URL` sets the Worker URL. It defaults to the production VoxType Worker. It contains no provider secret. For an Android emulator using a local Worker, use `http://10.0.2.2:8788` and appropriate local network settings.
+- Development builds default to the local API at `http://localhost:8788`; release builds default to the production VoxType Worker. `EXPO_PUBLIC_API_URL` overrides either default and contains no provider secret.
 - The Worker needs `DEEPGRAM_API_KEY` and `DEEPSEEK_API_KEY` as Wrangler secrets, plus its existing Google and Better Auth secrets. The Deepgram key must support `/v1/auth/grant`.
 - Google sign-in uses a fixed Worker OAuth callback followed by `voxtype://auth/callback` with a one-time grant. The signed bearer session is encrypted with Android Keystore. Google OAuth redirect URIs still point to the Worker's `/api/auth/callback/google`.
+
+## Local development
+
+Configure `apps/api/.dev.vars`, add `http://localhost:8788/api/auth/callback/google` to the Google OAuth client's authorized redirect URIs, and run:
+
+```sh
+pnpm --filter @voxtype/api db:migrate:local
+pnpm dev:api
+# In another terminal, with an emulator or USB-connected Android phone:
+adb reverse tcp:8788 tcp:8788
+pnpm --filter @voxtype/mobile start
+```
+
+Install a native development build; Expo Go cannot load the accessibility service.
+ADB forwarding lets both the app and the Google callback use the same localhost URL.
+The Worker and D1 data run entirely on this machine. Google sign-in, Deepgram, and optional
+DeepSeek cleanup still use their external providers.
+
+## Bubble availability
+
+The idle bubble is a 48dp rounded square with a centered vector voice mark. Its 224dp recording
+surface keeps the same 14dp corners; the inset controls retain 44dp touch targets.
+
+While signed in with the voice bubble enabled, the system-bound accessibility service keeps a
+quiet **VoxType voice bubble is ready** foreground notification between dictations. The idle
+service does not capture microphone audio. Finishing or canceling a take releases the microphone
+foreground type and restores the ready notification. Turning the bubble off, signing out, or
+disabling accessibility removes it. Editor callbacks and a bounded delayed refresh recover from
+window/focus events that arrive before Android supplies the editor information.
+
+Android owns accessibility permission and service binding. This does not silently grant revoked
+permission or bypass a user force-stop. The recurring shutdown still needs testing on the
+affected phone, including its battery restrictions.
 
 The Deepgram socket remains open for seven minutes after the last completed dictation, with the idle deadline reset after each take; active recording never expires at the idle deadline. Idle KeepAlive text frames are sent every four seconds; a dropped socket gets a fresh short-lived token on reconnect. Connection setup is bounded to 20 seconds. Failed or unconfirmed sessions retire their socket so late results cannot enter another take. The microphone is released between dictations. DeepSeek cleanup is optional and falls back to the original transcript.
 
@@ -36,6 +69,7 @@ Native behavior remains to be checked on an Android device; these steps are for 
 6. Focus password, PIN, and verification-code fields. Confirm no bubble appears and no transcript can be pasted there. Try a field that rejects insertion and confirm recovery text remains in VoxType.
 7. Dictate with cleanup enabled, then simulate a DeepSeek failure. Confirm the original transcript survives. Save more than 10 recordings and verify only the newest 10 WAV files remain while every transcript stays in local history. Go offline before a finished transcript is uploaded, restart the app, and reconnect. Confirm no upload happens until the next new transcript; then confirm both transcripts reach the server with a mobile tag and no audio. Confirm no server transcripts appear in local history.
 8. Test offline and socket-drop cases, app backgrounding, sign-out during recording, larger system text, reduced motion, landscape, and one tablet or foldable width.
+9. Leave the bubble enabled while using another app for at least 15 minutes, including after a completed and canceled dictation. Lock/unlock the phone and reopen a normal field. Confirm the ready notification remains and the bubble returns without toggling accessibility. Turn the bubble off and sign out; confirm the ready notification disappears. Disable/re-enable accessibility once and confirm there is only one bubble and notification after reconnecting.
 
 ## Interface and native checks
 

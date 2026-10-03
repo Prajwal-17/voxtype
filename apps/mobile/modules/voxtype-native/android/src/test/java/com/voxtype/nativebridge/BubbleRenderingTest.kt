@@ -3,6 +3,9 @@ package com.voxtype.nativebridge
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.ProgressBar
+import android.widget.ImageView
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.VectorDrawable
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -21,6 +24,31 @@ class BubbleRenderingTest {
   private fun status(service: VoxTypeAccessibilityService, value: String) {
     service.javaClass.getDeclaredField("status").apply { isAccessible = true }.set(service, value)
     invoke(service, "updateBubbleContent")
+  }
+
+  @Test fun idleBubbleIsARoundedSquareWithACenteredVectorMark() {
+    val controller = Robolectric.buildService(VoxTypeAccessibilityService::class.java).create()
+    val service = controller.get()
+    try {
+      invoke(service, "createBubble")
+      status(service, "idle")
+      val root = field(service, "bubble") as FrameLayout
+      val width = root.layoutParams.width
+      val height = root.layoutParams.height
+      root.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+        View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
+      root.layout(0, 0, width, height)
+      val density = service.resources.displayMetrics.density
+      val radius = (root.background as GradientDrawable).cornerRadius
+      assertEquals(width, height)
+      assertEquals(14f * density, radius, 1f)
+      assertTrue("Corners do not make a circle", radius < height / 2f)
+      val mark = field(service, "bubbleMark") as ImageView
+      assertTrue(mark.drawable is VectorDrawable)
+      assertEquals(24f * density, mark.width.toFloat(), 1f)
+      assertEquals(width / 2f, mark.left + mark.width / 2f, 1f)
+      assertEquals(height / 2f, mark.top + mark.height / 2f, 1f)
+    } finally { controller.destroy() }
   }
 
   @Test fun processingKeepsRecordingWidthAndUsesNativeSpinner() {
