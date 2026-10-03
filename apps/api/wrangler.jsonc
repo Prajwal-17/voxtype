@@ -1,6 +1,9 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "voxtype-api",
+  // The default target exists only on this machine. Cloud commands use env.production.
+  "name": "voxtype-api-local",
+  "workers_dev": false,
+  "preview_urls": false,
   "main": "src/index.ts",
   "compatibility_date": "2026-09-27",
   "compatibility_flags": ["nodejs_compat"],
@@ -28,6 +31,7 @@
       "binding": "DB",
       "database_name": "voxtype-local",
       "database_id": "00000000-0000-0000-0000-000000000000",
+      "remote": false,
       "migrations_dir": "migrations",
     },
   ],
@@ -38,6 +42,8 @@
   "env": {
     "production": {
       "name": "voxtype-api-production",
+      "workers_dev": true,
+      "preview_urls": true,
       "vars": {
         "ALLOWED_EMAIL": "prajwalreddy.dev@gmail.com",
         "API_URL": "https://voxtype-api-production.prajwalreddy-dev.workers.dev",

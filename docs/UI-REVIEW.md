@@ -155,3 +155,49 @@ reported recurring accessibility switch-off, OEM background restrictions, or pro
 The Android shutdown cause remains unconfirmed. Production database migrations and API deployment
 are still required separately. Cloud restore covers transcript text/metadata; audio and settings
 remain local. Verdict: Block for claiming the accessibility shutdown is fixed; it remains unverified on the affected phone. The separately validated UI, protocol, and transcript-sync changes can be released with that limitation.
+
+## Rounded mobile bubble and availability
+
+Full review of the requested native Android bubble and its Settings recovery message. The
+implementation uses the existing Kotlin Views, GradientDrawable surfaces, and shared VoxTheme
+palette; the Settings message uses the existing React Native styles. Android hardware was not
+connected, so the affected phone's recurring shutdown cannot be claimed resolved.
+
+| Category    | Evidence inspected                                              | Result                                                                                     |
+| ----------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Typography  | Existing bubble glyphs and `home.tsx` accessibility status      | Existing text sizes retained; recovery copy explains Android reconnecting                  |
+| Surfaces    | `VoxConstants.kt`, `createBubble`, native layout regression     | 48dp square, 14dp outer corners, 10dp inset control corners, existing 44dp control targets |
+| Animations  | Placement, press feedback, recording/processing/saved rendering | Existing motion retained; device playback at 10% speed not verified                        |
+| Icons       | Original `assets/logo.svg`, vector mark, native measured layout | Same five voice bars centered on their visible 38×38 bounds in a 24dp view                 |
+| Performance | Editor callbacks, delayed refresh, foreground transitions       | One debounced 250ms refresh; idle notification does not start microphone capture           |
+
+| Severity | Location                                                                                                 | Before                                                                                                     | After                                                                                                                              | Why                                                                                   |
+| -------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| MEDIUM   | `VoxConstants.kt:46`, `VoxTypeAccessibilityService.kt:createBubble`                                      | 24dp corners made the idle bubble circular and recording surface a pill                                    | 14dp corners throughout; inset controls use 10dp corners                                                                           | Rounded square shape requested by the user; touch targets stay usable                 |
+| MEDIUM   | `VoxTypeAccessibilityService.kt:createBubble`, `res/drawable/voxtype_bubble_mark.xml`                    | Padded launcher bitmap made the visible mark smaller within its 24dp view                                  | Original voice bars fill a centered vector viewport                                                                                | Optical alignment and rendering at the intended icon size                             |
+| HIGH     | `VoxTypeAccessibilityService.kt:updateBubbleForeground`, `onCreateInputMethod`, `VoxTypeNativeModule.kt` | Foreground priority ended after each take; an early window event could hide the bubble until another event | Ready foreground notification between takes, editor-driven delayed refresh, foreground activity refresh, guarded cleanup on unbind | Availability and recovery without instructing the user to routinely toggle permission |
+| MEDIUM   | `home.tsx` accessibility status                                                                          | Every disconnection instructed the user to re-enable accessibility                                         | Explains Android reconnecting and points to settings only for a persistent disconnection                                           | Clear feedback for a system-managed service                                           |
+
+| Location         | Candidate                                                            | Rejected because                                                                                        |
+| ---------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Idle service     | Keep microphone capture active to preserve foreground status         | Microphone access belongs only to an explicit dictation; idle uses Android's specialUse foreground type |
+| Service recovery | Write Android's accessibility settings or manually start its service | Accessibility permission and binding belong to Android and require the user's grant                     |
+| Bubble geometry  | Shrink the 48dp bubble or 44dp action targets                        | The requested shape and alignment can be fixed without reducing touch areas                             |
+
+Regression coverage includes Android 13/15 ready notifications, microphone-to-idle transitions,
+disable/unbind/rebind cleanup, delayed editor refresh, rounded-square layout, centered vector
+placement, and the existing recording/processing geometry and stream tests. See
+`apps/mobile/README.md` for the 15-minute idle, screen-lock, and reconnect device checks.
+
+Verification passed: 29 native JVM tests on Android 13/15, native Kotlin compilation, and
+`./gradlew :voxtype-native:compileDebugKotlin :voxtype-native:testDebugUnitTest :voxtype-native:lintDebug -x :react-native-worklets:lintAnalyzeDebug`.
+The tests used a temporary Gradle init script selecting `https://repo.maven.apache.org/maven2`
+for Robolectric downloads. Dependency lint is excluded because worklets' Kotlin lint crashes
+with `Cannot find a KaModule`; VoxType's native lint passed. Also passed:
+`pnpm --filter @voxtype/mobile check-types`, `pnpm --filter @voxtype/mobile lint`,
+`pnpm exec tsx --test tests/*.test.ts` (six tests), API types, and `pnpm format:check`.
+
+Verdict: implementation is ready for device validation. **Not verified:** the affected phone's
+long-running accessibility availability, OEM battery restrictions, touch/haptics, or animation
+playback at 10% speed. These remain a block on claiming the recurring shutdown is conclusively
+fixed on that phone.

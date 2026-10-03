@@ -26,6 +26,10 @@ pnpm dev:api
 pnpm dev:web    # browser preview only, no mic
 ```
 
+Android development also uses the local API. Run `adb reverse tcp:8788 tcp:8788` for an
+emulator or USB-connected phone, then `pnpm --filter @voxtype/mobile start` with a native
+development build. See the [mobile setup](apps/mobile/README.md#local-development).
+
 With the desktop development app running, `apps/desktop/src-tauri/target/debug/voxtype-desktop preview-overlay`
 shows the native overlay for 15 seconds without recording or calling transcription services.
 It should stay above other apps at the bottom of the monitor under the pointer, clear of the dock,

@@ -126,6 +126,7 @@ class VoxTypeNativeModule : Module() {
       VoxTypeStore(context).use { it.page(requireNotNull(NativeSession(context).userId), cursor) }
     }
     OnActivityEntersBackground { mainHandler.post { InAppRecorder.stop() } }
+    OnActivityEntersForeground { refreshBubble() }
     OnDestroy {
       if (active.get() === this@VoxTypeNativeModule) active.clear()
       mainHandler.post { InAppRecorder.cancel() }

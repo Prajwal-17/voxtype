@@ -24,6 +24,14 @@ authorized redirect URIs for local sign-in.
 
 Dev is local-only — no cloud worker or D1.
 
+The default Wrangler target is `voxtype-api-local`, with workers.dev and preview URLs disabled,
+an explicitly local D1 binding, and no real cloud database ID. `pnpm dev` uses `wrangler dev --local`
+to disable remote bindings. Local secrets remain in the ignored `.dev.vars` file. Desktop and
+mobile development builds both use `http://localhost:8788` by default; Android uses
+`adb reverse tcp:8788 tcp:8788` to reach it. Google and speech providers still require network access.
+
+Cloud deployment and migrations must explicitly select `env.production` through the scripts below.
+
 Prod (`env.production`) is remote. Fill `API_URL`, `CLIENT_ORIGINS`,
 D1 `database_id` (from `pnpm wrangler d1 create voxtype-production`), set prod
 secrets, add the prod `/api/auth/callback/google` redirect, then:

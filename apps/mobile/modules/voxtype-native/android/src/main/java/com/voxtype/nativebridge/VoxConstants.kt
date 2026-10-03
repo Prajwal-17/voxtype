@@ -5,6 +5,9 @@ object VoxConstants {
   const val NOTIFICATION_ID = 7341
   const val CHANNEL_ID = "voxtype_recording"
   const val CHANNEL_NAME = "VoxType recording"
+  const val BUBBLE_CHANNEL_ID = "voxtype_bubble"
+  const val BUBBLE_CHANNEL_NAME = "VoxType voice bubble"
+  const val BUBBLE_REFRESH_DELAY_MS = 250L
 
   const val SOCKET_KEEP_ALIVE_MS = 420_000L
   const val MAINTENANCE_INTERVAL_MS = 4_000L
@@ -40,11 +43,12 @@ object VoxConstants {
   val BUBBLE_SAVED_COLOR = androidx.core.graphics.ColorUtils.setAlphaComponent(VoxTheme.successSoft, 240)
   val CLOSE_COLOR = androidx.core.graphics.ColorUtils.setAlphaComponent(VoxTheme.dangerSoft, 240)
   val CLOSE_HOT_COLOR = VoxTheme.dangerSoft
-  const val BUBBLE_RADIUS_DP = 24
+  const val BUBBLE_RADIUS_DP = 14
+  const val BUBBLE_ACTION_RADIUS_DP = 10
   const val BUBBLE_ELEVATION_DP = 3
   const val BUBBLE_ICON_DP = 24
   const val BUBBLE_EDGE_DP = 12
-  // Compact capsule sizing: idle is circular, listening expands to
+  // Compact rounded square: listening expands to
   // [cancel | level bars | done] like the desktop overlay.
   const val BUBBLE_SIZE_DP = 48
   const val BUBBLE_LISTEN_WIDTH_DP = 224
