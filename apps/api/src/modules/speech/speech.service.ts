@@ -31,7 +31,7 @@ export async function grantDeepgramToken(apiKey: string, fetcher: typeof fetch =
   const response = await fetcher('https://api.deepgram.com/v1/auth/grant', {
     method: 'POST',
     headers: { Authorization: `Token ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ttl_seconds: 60 }),
+    body: JSON.stringify({ ttl_seconds: 600 }),
   });
   if (!response.ok) {
     await logDeepgramFailure('provider_rejected', response);
@@ -62,6 +62,9 @@ export async function cleanTranscript(
   fetcher: typeof fetch = fetch,
 ): Promise<{ text: string; cleaned: boolean; usage?: TokenUsage | null; metered?: boolean }> {
   if (!originalText.trim()) return { text: originalText, cleaned: false };
+  // Long dictations need headroom: cleaned output runs ~input length, so
+  // budget ~2x input tokens plus margin instead of a fixed 1024 cap.
+  const maxTokens = Math.min(8000, Math.max(1024, Math.ceil(originalText.length / 2) + 256));
   try {
     const response = await fetcher('https://api.deepseek.com/chat/completions', {
       method: 'POST',
@@ -71,7 +74,7 @@ export async function cleanTranscript(
         stream: false,
         temperature: 0,
         thinking: { type: 'disabled' },
-        max_tokens: 1024,
+        max_tokens: maxTokens,
         messages: [
           {
             role: 'system',
