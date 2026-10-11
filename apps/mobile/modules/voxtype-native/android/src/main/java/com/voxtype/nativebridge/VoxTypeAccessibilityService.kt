@@ -844,9 +844,15 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     capture = null
   }
 
+  fun refreshVocabulary() {
+    if (status == DictationStatus.LISTENING.bridge || status == DictationStatus.PROCESSING.bridge) return
+    engine?.close()
+    engine = null
+  }
+
   private fun speechStream(): DeepgramSession = engine ?: DeepgramSession({ session.token }, { session.apiUrl }, {
     main.post { if (status == DictationStatus.LISTENING.bridge) stopRecording() }
-  }).also { engine = it }
+  }, vocabulary = { VoxTypeStore(this).use { it.vocabulary } }).also { engine = it }
 
   /** ✕ while listening: drop the take entirely, no transcript, no insert. */
   private fun cancelRecording() {

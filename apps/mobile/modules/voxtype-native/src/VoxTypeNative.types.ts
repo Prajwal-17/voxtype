@@ -17,6 +17,7 @@ export type Snapshot = {
   microphoneGranted: boolean;
   bubbleEnabled: boolean;
   cleanupEnabled: boolean;
+  vocabulary?: string[];
   syncing: boolean;
   syncError: string;
   audioLimit: 10;

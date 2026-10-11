@@ -63,3 +63,29 @@ The existing Android recovery and diagnostic-report work remains part of this br
 Repository checks and native CI are recorded with the PR; browser captures verify layout
 and interaction only. Physical Android insertion/permissions and Linux overlay focus,
 scaling/multi-monitor behavior still require the corresponding device/runtime checks.
+
+## Approved follow-up
+
+- Existing Settings screens and real-data Insights (full-history streaks, 14-week
+  activity grid, ranges and CSV) are retained. Desktop already had a persisted
+  personal vocabulary, sent as Deepgram keyterms. Android now has the same
+  device-local dictionary limit (100 terms, 100 characters each), explicit save,
+  discard and native validation. Both in-app and bubble streams use it; changing
+  it drops an idle prewarmed bubble socket so the next take uses the new terms.
+- The desktop main window now has an app-owned draggable title bar with minimize,
+  maximize/restore (including double-click) and close. Its capabilities are scoped
+  to the main window; the recording capsule keeps its existing window behavior.
+- Android's browser callback and Router deep link share one grant exchange and
+  its result. Both require the persisted random state (10-minute validity),
+  including cold starts. Sign-out/new attempts invalidate completion state.
+- `.github/workflows/mobile-dev-build.yaml` adapts Relay's manual build flow to
+  this monorepo. Select a branch/commit and explicitly supply an HTTPS API origin.
+  It checks source, batches native tests/lint with a standalone APK build and
+  uploads a seven-day artifact. It does not deploy or create a release. The APK
+  uses the existing app identity and generated development signing configuration;
+  it is a test build, not a production-signed release. GitHub normally exposes a
+  new workflow's manual Run button after it exists on the default branch.
+
+Installed Android OAuth, dictation/keyterm recognition and bubble insertion still
+need device E2E. Browser builds and native unit tests do not establish those results.
+The analytics API must ship with these clients in a separately authorized release.

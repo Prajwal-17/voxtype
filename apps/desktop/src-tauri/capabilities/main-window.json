@@ -1,0 +1,11 @@
+{
+  "identifier": "main-window",
+  "description": "Window controls for the main app only",
+  "windows": ["main"],
+  "permissions": [
+    "core:window:allow-start-dragging",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-close"
+  ]
+}

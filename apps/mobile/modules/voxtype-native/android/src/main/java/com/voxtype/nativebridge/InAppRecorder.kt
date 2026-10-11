@@ -38,7 +38,7 @@ object InAppRecorder {
     check(session.token != null) { "Sign in again." }
     val current = ++generation
     text = ""; error = ""; durationMs = 0L; level = 0f; lastLevelAt = 0L
-    val stream = DeepgramSession({ session.token }, { session.apiUrl }, { main.post { stop() } })
+    val stream = DeepgramSession({ session.token }, { session.apiUrl }, { main.post { stop() } }, vocabulary = { VoxTypeStore(context).use { it.vocabulary } })
     engine = stream
     try {
       status = "listening"

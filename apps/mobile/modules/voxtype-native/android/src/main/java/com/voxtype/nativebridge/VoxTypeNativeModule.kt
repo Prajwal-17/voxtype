@@ -72,6 +72,7 @@ class VoxTypeNativeModule : Module() {
           "microphoneGranted" to (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED),
           "bubbleEnabled" to store.bubbleEnabled,
           "cleanupEnabled" to store.cleanupEnabled,
+          "vocabulary" to store.vocabulary,
           "audioLimit" to VoxTypeStore.AUDIO_LIMIT,
           "syncing" to TranscriptUploads.syncing,
           "syncError" to TranscriptUploads.error,
@@ -90,6 +91,22 @@ class VoxTypeNativeModule : Module() {
         VoxLog.e("openAccessibilitySettings failed", e)
         throw e
       }
+    }
+
+    AsyncFunction("setAuthState") { state: String ->
+      requireNotNull(appContext.reactContext).getSharedPreferences("voxtype_oauth", 0).edit()
+        .putString("state", state).putLong("created", System.currentTimeMillis()).commit()
+      Unit
+    }
+    AsyncFunction("getAuthState") {
+      val prefs = requireNotNull(appContext.reactContext).getSharedPreferences("voxtype_oauth", 0)
+      if (System.currentTimeMillis() - prefs.getLong("created", 0) < 600_000) prefs.getString("state", null) else null
+    }
+    AsyncFunction("setVocabulary") { terms: List<String> ->
+      VoxTypeStore(requireNotNull(appContext.reactContext)).use { it.vocabulary = terms }
+      // Drop any prewarmed socket so the next take uses the saved dictionary.
+      mainHandler.post { VoxTypeAccessibilityService.instance?.refreshVocabulary() }
+      changed()
     }
 
     AsyncFunction("setSession") { token: String, userId: String, apiUrl: String ->

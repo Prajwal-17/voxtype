@@ -20,6 +20,23 @@ class CloudRestoreTest {
   private fun row(id: String) = JSONObject().put("id", id).put("text", "Cloud transcript")
     .put("createdAt", 1000).put("updatedAt", 1000).put("durationMs", 3000).put("words", 2)
 
+  @Test fun dictionaryPersistsAndRejectsOversizedEditsWithoutLosingSavedTerms() {
+    VoxTypeStore(context, onChanged = {}).use { store ->
+      assertTrue(store.vocabulary.isEmpty())
+      store.vocabulary = listOf(" VoxType ", "", "VoxType", "C++", "नमस्ते")
+      assertEquals(listOf("VoxType", "C++", "नमस्ते"), store.vocabulary)
+      for (invalid in listOf(List(101) { "term$it" }, listOf("x".repeat(101)))) {
+        try { store.vocabulary = invalid; fail("Invalid dictionary must fail") }
+        catch (_: IllegalArgumentException) { }
+      }
+    }
+    VoxTypeStore(context, onChanged = {}).use {
+      assertEquals(listOf("VoxType", "C++", "नमस्ते"), it.vocabulary)
+      it.vocabulary = emptyList()
+      assertTrue(it.vocabulary.isEmpty())
+    }
+  }
+
   @Test fun freshInstallRestoresHistoryWithoutReuploadingIt() {
     VoxTypeStore(context, onChanged = {}).use { store ->
       val rows = JSONArray().put(row("cloud-1"))

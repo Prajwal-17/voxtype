@@ -2,6 +2,7 @@ import { Linking, View } from 'react-native';
 import { router } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { nativeTheme as theme } from '@voxtype/shared';
+import { Dictionary } from '../components/dictionary';
 import { Screen } from '../components/screen';
 import { Action, Card, Setting, Text } from '../components/primitives';
 import { styles as ui } from '../components/styles';
@@ -113,6 +114,13 @@ export default function SettingsScreen() {
           }
         />
       </Card>
+      {snapshot && (
+        <Dictionary
+          key={app.user?.id}
+          terms={snapshot.vocabulary ?? []}
+          disabled={!app.available || app.busy || active}
+        />
+      )}
       {snapshot?.bubbleEnabled && (
         <Card style={{ gap: 12 }}>
           <Text accessibilityRole="header" style={ui.title}>

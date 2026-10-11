@@ -54,6 +54,18 @@ class VoxTypeStore(
   var cleanupEnabled: Boolean
     get() = setting(KEY_CLEANUP, "0") == "1"
     set(value) = putSetting(KEY_CLEANUP, if (value) "1" else "0")
+  var vocabulary: List<String>
+    get() {
+      val entries = JSONArray(setting("vocabulary", "[]"))
+      return List(entries.length()) { entries.getString(it) }
+    }
+    set(value) {
+      val terms = value.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+      require(terms.size <= 100 && terms.all { it.length <= 100 }) {
+        "Use at most 100 dictionary terms, each 1–100 characters."
+      }
+      putSetting("vocabulary", JSONArray(terms).toString())
+    }
   fun save(userId: String, text: String, original: String, duration: Long, audio: File?, apiUrl: String?): String {
     val id = UUID.randomUUID().toString()
     val now = System.currentTimeMillis()

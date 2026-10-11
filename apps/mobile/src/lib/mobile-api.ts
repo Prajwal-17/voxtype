@@ -2,6 +2,7 @@ import { clientTimezone, type AnalyticsRange, type Analytics } from '@voxtype/sh
 import * as Crypto from 'expo-crypto';
 import * as WebBrowser from 'expo-web-browser';
 import VoxTypeNative from '../../modules/voxtype-native/src/VoxTypeNativeModule';
+import { createAuthCompletion } from './auth-completion';
 import { resolveApiUrl } from './environment';
 
 export const API_URL = resolveApiUrl(process.env.EXPO_PUBLIC_API_URL, __DEV__);
@@ -28,11 +29,17 @@ export async function currentUser(): Promise<User | null> {
 
 export async function signIn(): Promise<User> {
   const state = Crypto.randomUUID();
+  authCompletion.reset();
+  await VoxTypeNative.setAuthState(state);
   const result = await WebBrowser.openAuthSessionAsync(
     `${API_URL}/api/mobile-auth/start?state=${encodeURIComponent(state)}`,
     REDIRECT_URL,
   );
-  if (result.type !== 'success') throw new Error('Google sign-in was not completed.');
+  if (result.type !== 'success') {
+    const pending = authCompletion.resultFor(state);
+    if (pending) return pending;
+    throw new Error('Google sign-in was not completed.');
+  }
   const callback = new URL(result.url);
   if (
     `${callback.protocol}//${callback.host}${callback.pathname}` !== REDIRECT_URL ||
@@ -40,14 +47,22 @@ export async function signIn(): Promise<User> {
   ) {
     throw new Error('Sign-in response could not be verified. Try again.');
   }
-  if (callback.searchParams.has('error')) throw new Error('This Google account could not sign in.');
-  const grant = callback.searchParams.get('token');
-  if (!grant) throw new Error('Sign-in link expired. Try again.');
-  return exchangeGrant(grant);
+  return completeAuth(
+    callback.searchParams.get('state') ?? undefined,
+    callback.searchParams.get('token') ?? undefined,
+    callback.searchParams.get('error') ?? undefined,
+  );
 }
 
+const authCompletion = createAuthCompletion<User>({
+  pendingState: () => VoxTypeNative.getAuthState(),
+  exchange: exchangeGrant,
+});
+export const completeAuth = authCompletion.complete;
+
 /** Exchange the single-use grant from `voxtype://auth/callback` for a native session. */
-export async function exchangeGrant(grant: string): Promise<User> {
+async function exchangeGrant(grant: string): Promise<User> {
+  const state = await VoxTypeNative.getAuthState();
   const response = await fetch(`${API_URL}/api/auth/one-time-token/verify`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -56,11 +71,16 @@ export async function exchangeGrant(grant: string): Promise<User> {
   const bearer = response.headers.get('set-auth-token');
   if (!response.ok || !bearer) throw new Error('Sign-in link expired. Try again.');
   const body = (await response.json()) as { user: User };
+  if (!state || state !== (await VoxTypeNative.getAuthState())) {
+    throw new Error('Sign-in attempt changed. Try again.');
+  }
   await VoxTypeNative.setSession(bearer, body.user.id, API_URL);
   return body.user;
 }
 
 export async function signOut(): Promise<void> {
+  authCompletion.reset();
+  await VoxTypeNative.setAuthState('');
   const { token } = await VoxTypeNative.getSession();
   if (token) {
     try {

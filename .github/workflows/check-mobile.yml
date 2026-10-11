@@ -7,7 +7,7 @@ on:
       - 'packages/shared/**'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
-      - 'tests/mobile-bubble-health.test.ts'
+      - 'tests/mobile-*.test.ts'
       - '.github/workflows/check-mobile.yml'
   workflow_dispatch:
 
@@ -40,7 +40,7 @@ jobs:
         run: |
           pnpm --filter @voxtype/mobile check-types
           pnpm --filter @voxtype/mobile lint
-          pnpm exec tsx --test tests/mobile-bubble-health.test.ts
+          pnpm exec tsx --test tests/mobile-*.test.ts
       - name: Generate Android project
         run: pnpm --dir apps/mobile exec expo prebuild --platform android --clean --no-install
       - name: Check native lifecycle and lint

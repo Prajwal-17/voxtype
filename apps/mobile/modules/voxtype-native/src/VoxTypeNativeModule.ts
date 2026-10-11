@@ -3,6 +3,9 @@ import { NativeModule, requireNativeModule } from 'expo';
 import type { Snapshot, TranscriptPage, VoxTypeNativeModuleEvents } from './VoxTypeNative.types';
 
 declare class VoxTypeNativeModule extends NativeModule<VoxTypeNativeModuleEvents> {
+  setVocabulary(terms: string[]): Promise<void>;
+  setAuthState(state: string): Promise<void>;
+  getAuthState(): Promise<string | null>;
   getSnapshot(): Promise<Snapshot>;
   getSession(): Promise<{ token: string | null; userId: string | null }>;
   setSession(token: string, userId: string, apiUrl: string): Promise<void>;
@@ -59,6 +62,9 @@ function requireVoxTypeModule(): VoxTypeNativeModule {
  * when the native side is absent.
  */
 const VoxTypeNative = {
+  setVocabulary: (terms: string[]) => requireVoxTypeModule().setVocabulary(terms),
+  setAuthState: (state: string) => requireVoxTypeModule().setAuthState(state),
+  getAuthState: () => requireVoxTypeModule().getAuthState(),
   getSnapshot: (): Promise<Snapshot> => requireVoxTypeModule().getSnapshot(),
   getSession: () => requireVoxTypeModule().getSession(),
   setSession: (token: string, userId: string, apiUrl: string) =>

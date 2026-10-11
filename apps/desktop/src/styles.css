@@ -199,3 +199,13 @@
     scroll-behavior: auto !important;
   }
 }
+
+.native-window body {
+  padding-top: 40px;
+}
+.native-window [data-sidebar='sidebar'] {
+  top: 40px;
+}
+.native-window .min-h-svh {
+  min-height: calc(100svh - 40px);
+}
