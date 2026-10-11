@@ -30,7 +30,8 @@ Account screen, with the same hierarchy adapted to touch targets and safe areas.
 - A separate browser IPC fixture checks recording continuity, external-session
   separation, settings save/discard, transcript expansion/copy/search/pagination,
   failed deletion and retry, focus return, range requests, calendar keyboard selection
-  and CSV invocation. Fixture data and scripts are excluded from production and Git.
+  and CSV invocation. All five desktop capsule phase states fit the 288×76 development
+  canvas with reduced motion. Fixture data and scripts are excluded from production and Git.
 - Android generation passes. Local native compilation/tests cannot download the
   React Native 0.86 AAR: Maven redirects to `repo.reactnative.dev`, which the managed
   environment blocks. The existing mobile PR workflow runs the actual Kotlin,

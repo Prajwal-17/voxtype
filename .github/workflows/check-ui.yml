@@ -40,6 +40,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev libssl-dev libdbus-1-dev patchelf xdg-utils
       - run: pnpm install --frozen-lockfile
+      - name: Generate Worker types
+        run: pnpm --filter @voxtype/api exec wrangler types
       - name: Check workspace and native desktop
         run: pnpm check
       - name: Test analytics and native desktop
