@@ -79,6 +79,21 @@ object TranscriptUploads {
     }
   }
 
+  /** Serialize delete with restore/upload so a queued PUT cannot resurrect the record. */
+  suspend fun delete(context: Context, id: String, client: OkHttpClient = HttpClients.uploads) = lock.withLock {
+    require(id.length in 1..200 && id.matches(Regex("[A-Za-z0-9-]+"))) { "Invalid transcript ID" }
+    val session = NativeSession(context)
+    val userId = requireNotNull(session.userId) { "Sign in again" }
+    val apiUrl = requireNotNull(session.apiUrl) { "Sign in again" }
+    val bearer = requireNotNull(session.token) { "Sign in again" }
+    val request = Request.Builder().url("$apiUrl/v1/dictations/$id").header("Authorization", "Bearer $bearer").delete().build()
+    client.newCall(request).execute().use { response ->
+      if (!response.isSuccessful && response.code != 404) throw java.io.IOException("Couldn’t delete cloud transcript. Check your connection.")
+    }
+    if (session.userId != userId || session.apiUrl != apiUrl || session.token != bearer) throw java.io.IOException("Account changed. Try again.")
+    VoxTypeStore(context).use { it.delete(userId,id,apiUrl) }
+  }
+
   internal fun sendPending(
     store: VoxTypeStore,
     userId: String,

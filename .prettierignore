@@ -15,3 +15,5 @@ packages/shared/web.css
 apps/mobile/android/
 apps/mobile/modules/voxtype-native/android/build/
 apps/mobile/.expo/
+
+work/

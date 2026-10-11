@@ -28,7 +28,7 @@
         "title": "VoxType dictation",
         "url": "index.html?window=overlay",
         "width": 288,
-        "height": 56,
+        "height": 68,
         "decorations": false,
         "transparent": true,
         "shadow": false,

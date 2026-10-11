@@ -63,7 +63,7 @@ test('costs use duration and provider token usage, never word count', () => {
   assert.equal(wordsPerMinute(12, 0), 0);
   assert.equal(wordsPerMinute(100, 60000), 100);
   assert.equal(startOfRange('all'), null);
-  assert.equal(startOfRange('7d', 604800000)?.getTime(), 0);
+  assert.equal(startOfRange('7d', 604800000)?.getTime(), 86400000);
 });
 test('cursor pagination is stable for equal timestamps and excludes other accounts', async () => {
   const now = Date.now();
@@ -157,4 +157,119 @@ test('cleanup preserves original on failure and returns real usage on success', 
   );
   assert.equal(missing.usage, null);
   assert.equal(missing.metered, true);
+});
+
+test('local calendar ranges handle fractional offsets, midnight and DST without losing records', async () => {
+  const userId = 'calendar';
+  await db
+    .prepare(
+      'INSERT INTO user (id,name,email,email_verified,created_at,updated_at) VALUES (?,?,?,0,0,0)',
+    )
+    .bind(userId, userId, 'calendar@example.test')
+    .run();
+  const add = async (id: string, time: string, words = 2) =>
+    transcripts.upsert(userId, id, {
+      text: Array<string>(words).fill('word').join(' '),
+      createdAt: Date.parse(time),
+      durationMs: 60000,
+      source: 'mobile',
+    });
+  await add('before-india-midnight', '2026-10-10T18:29:59Z');
+  await add('after-india-midnight', '2026-10-10T18:30:00Z');
+  const india = await analytics.get(userId, '7d', 'Asia/Kolkata', Date.parse('2026-10-11T12:00Z'));
+  assert.equal(india.period.start, '2026-10-05');
+  assert.equal(india.daily.find((d) => d.date === '2026-10-10')?.dictations, 1);
+  assert.equal(india.daily.find((d) => d.date === '2026-10-11')?.dictations, 1);
+  assert.deepEqual(india.streaks, { current: 2, longest: 2 });
+  assert.equal(india.activity.days.length, 98);
+  assert.equal(new Date(`${india.activity.start}T12:00Z`).getUTCDay(), 1);
+  await add('outside-seven', '2026-10-27T03:59:59Z');
+  await add('start-seven', '2026-10-27T04:00:00Z');
+  await add('dst-first-130', '2026-11-01T05:30:00Z');
+  await add('dst-second-130', '2026-11-01T06:30:00Z');
+  await add('future', '2026-11-03T10:00Z');
+  const ny = await analytics.get(userId, '7d', 'America/New_York', Date.parse('2026-11-02T16:00Z'));
+  assert.equal(ny.period.start, '2026-10-27');
+  assert.equal(ny.summary.dictations, 3);
+  assert.equal(ny.daily.find((d) => d.date === '2026-11-01')?.dictations, 2);
+  assert.equal(ny.daily.find((d) => d.date === '2026-11-02')?.dictations, 0);
+  const { startOfRange: rangeStart } =
+    await import('../apps/api/src/modules/analytics/analytics.utils');
+  assert.equal(
+    rangeStart('7d', Date.parse('2026-11-02T16:00Z'), 'America/New_York')?.toISOString(),
+    '2026-10-27T04:00:00.000Z',
+  );
+});
+
+test('full-history streaks remain independent of range and the bounded calendar; CSV contains real daily data', async () => {
+  const owner = 'streaks';
+  await db
+    .prepare(
+      'INSERT INTO user (id,name,email,email_verified,created_at,updated_at) VALUES (?,?,?,0,0,0)',
+    )
+    .bind(owner, owner, 'streaks@example.test')
+    .run();
+  for (let day = 1; day <= 10; day++)
+    await transcripts.upsert(owner, `old-${day}`, {
+      text: 'one two three',
+      createdAt: Date.parse(`2025-01-${String(day).padStart(2, '0')}T12:00Z`),
+      durationMs: 30000,
+      source: 'desktop',
+    });
+  for (const day of ['2026-10-10', '2026-10-11'])
+    await transcripts.upsert(owner, day, {
+      text: 'four words in session',
+      createdAt: Date.parse(`${day}T10:00Z`),
+      durationMs: 60000,
+      source: 'mobile',
+    });
+  const now = Date.parse('2026-10-11T12:00Z');
+  const short = await analytics.get(owner, '7d', 'UTC', now),
+    all = await analytics.get(owner, 'all', 'UTC', now);
+  assert.deepEqual(short.streaks, { current: 2, longest: 10 });
+  assert.deepEqual(all.streaks, short.streaks);
+  assert.deepEqual(all.activity, short.activity);
+  assert.equal(short.summary.activeDays, 2);
+  assert.equal(short.summary.averageWordsPerMinute, 4);
+  assert.equal(all.summary.dictations, 12);
+  assert.ok(all.trend.days.length <= 120);
+  assert.equal(
+    all.trend.days.reduce((n, d) => n + d.words, 0),
+    all.summary.totalWords,
+  );
+  assert.ok(Buffer.byteLength(JSON.stringify(all)) < 256000);
+  const csv = await analytics.csv(owner, 'all', 'UTC', now);
+  assert.match(csv, /2025-01-01,3,1,30000,6,all,UTC/);
+  assert.match(csv, /2025-01-11,0,0,0,0,all,UTC/);
+  assert.match(csv, /2026-10-11,4,1,60000,4,all,UTC/);
+  await transcripts.remove(owner, '2026-10-11');
+  const deleted = await analytics.get(owner, '30d', 'UTC', now);
+  assert.equal(deleted.streaks.current, 1);
+  assert.equal(deleted.summary.dictations, 1);
+});
+
+test('timezone validation rejects SQL-like input and long-history trend payloads stay bounded', async () => {
+  const { analyticsQuerySchema } =
+    await import('../apps/api/src/modules/analytics/analytics.validation');
+  assert.equal(
+    analyticsQuerySchema.safeParse({ timezone: 'Asia/Kolkata', range: 'all' }).success,
+    true,
+  );
+  assert.equal(
+    analyticsQuerySchema.safeParse({ timezone: "UTC'); DROP TABLE dictation;--" }).success,
+    false,
+  );
+  assert.equal(analyticsQuerySchema.safeParse({ timezone: 'Mars/Olympus' }).success, false);
+  const { trend } = await import('../apps/api/src/modules/analytics/analytics.utils');
+  const data = trend([
+    { date: '1970-01-01', dictations: 1, words: 100, durationMs: 60000, wordsPerMinute: 100 },
+    { date: '2026-10-11', dictations: 1, words: 200, durationMs: 120000, wordsPerMinute: 100 },
+  ]);
+  assert.equal(data.bucket, 'year');
+  assert.ok(data.days.length <= 120);
+  assert.equal(
+    data.days.reduce((n, d) => n + d.words, 0),
+    300,
+  );
+  assert.equal(data.days[1]?.words, 0);
 });

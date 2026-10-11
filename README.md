@@ -72,12 +72,15 @@ migrations, local development, and deployment. Set `DEEPGRAM_API_KEY` and `DEEPS
 the Worker. Desktop and mobile use authenticated `/v1/speech/token` and `/v1/speech/cleanup`
 endpoints; neither app stores provider keys. The desktop keyring holds only the VoxType account session.
 
-Every transcript stays in local history until explicitly deleted. Each device retains its newest
-10 audio recordings and deletes older audio automatically. Saving a new transcript sends its text
-and metadata plus any previously unsent transcripts, using stable dictation IDs and a `desktop` or
-`mobile` source tag. Failed sends stay local until the next new transcript. There are no scheduled,
-startup, or sign-in uploads. History is read from the device, with no transcript downloads. Audio
-files never go to the Worker.
+Transcripts sync with the signed-in account across desktop and Android. Each device keeps a
+local account cache and retains its newest 10 audio recordings. Sign-in restores account
+history; failed uploads are retried in the background. Cloud deletion must succeed before a
+transcript is removed locally. Device preferences and retained audio files stay local; audio
+is sent to the speech provider for transcription, not stored in the account API.
+
+The refined Still interface includes Home, Transcripts, Insights and Settings, with separate
+Account access. Insights uses local calendar dates, full-history streaks, a compact activity
+grid and native CSV export. Deploy the updated analytics API alongside the revamped clients.
 
 After pulling database changes, apply the local API migrations before running development:
 

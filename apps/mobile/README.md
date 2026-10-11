@@ -1,6 +1,6 @@
 # VoxType for Android
 
-The app keeps the active keyboard. Its accessibility service shows a small muted bubble near an editable field. The muted, translucent bubble docks to the nearest screen edge after dragging. It remembers its edge and relative height, stays above the keyboard, and expands inward while recording. Dropping it on the ✕ close mark stops recording and turns it off. A tap immediately starts a microphone foreground session and saves a private WAV file. While credentials and the socket connect, a bounded queue holds up to 32 seconds of 16 kHz PCM; the queue is sent in order before live audio. Finish works during connection setup, flushing recorded audio before `Finalize`. Cancel drops the queue and retires its socket. While listening the bubble expands to ✕ cancel and ■ stop controls with a rolling waveform driven by microphone PCM, a short width transition, press feedback and gentle docking haptics. System reduced-motion settings disable animated movement. Finishing sends Deepgram `Finalize`; the finished transcript is inserted through Android 13's accessibility input connection if the same safe field still has focus. A transcript stays in local SQLite when insertion cannot be verified, with Copy and Paste recovery in the app. Password and sensitive fields are excluded.
+The app keeps the active keyboard. Its accessibility service shows a small muted bubble near an editable field. The muted bubble docks to the nearest screen edge after dragging. It remembers its edge and relative height, stays above the keyboard, and expands inward while recording. Dropping it on the ✕ close mark stops recording and turns it off. A tap immediately starts a microphone foreground session and saves a private WAV file. While credentials and the socket connect, a bounded queue holds up to 32 seconds of 16 kHz PCM; the queue is sent in order before live audio. Finish works during connection setup, flushing recorded audio before `Finalize`. Cancel drops the queue and retires its socket. While listening the bubble expands to ✕ cancel and ■ stop controls with a rolling waveform driven by microphone PCM, a short width transition, press feedback and gentle docking haptics. System reduced-motion settings disable animated movement. Finishing sends Deepgram `Finalize`; the finished transcript is inserted through Android 13's accessibility input connection if the same safe field still has focus. A transcript stays in local SQLite when insertion cannot be verified, with Copy and Paste recovery in the app. Password and sensitive fields are excluded.
 
 ## Configuration
 
@@ -29,7 +29,7 @@ DeepSeek cleanup still use their external providers.
 ## Bubble availability
 
 The idle bubble is a 48dp rounded square with a centered vector voice mark. Its 224dp recording
-surface keeps the same 14dp corners; the inset controls retain 44dp touch targets.
+surface uses fully rounded ends and an opaque dark petrol background; the inset controls retain 44dp touch targets.
 
 While signed in with the voice bubble enabled, the system-bound accessibility service keeps a
 quiet **VoxType voice bubble is ready** foreground notification between dictations. The idle
@@ -166,3 +166,25 @@ have the API migrations and current Worker code before new transcript uploads ca
 Accessibility status distinguishes enabled permission from a connected service. Event/bridge
 errors are caught and lifecycle transitions logged. Actual permission revocation on a particular
 phone still needs device logs; a browser cannot verify or fix that OS-level behavior.
+
+## Refined Still interface
+
+Expo Router provides Home, Transcripts, Insights and Settings tabs, with Account
+outside the tab bar. Auth/session state lives above the routes, so navigating during
+recording retains the take. A compact Finish/Cancel banner remains on secondary screens.
+Mona Sans, shared Still colors, safe areas and system text scaling apply throughout.
+
+Home puts Dictation first. Transcripts use a virtualized list with inline expansion,
+complete-account-cache search before 12-row paging, copy and confirmed cloud deletion.
+Deletion is serialized with restore/upload and removes local data only after cloud success;
+connection failures preserve pending text. Search treats SQL wildcards literally.
+
+Insights uses the same range/timezone analytics contract as desktop, a compact 98-day
+calendar and bounded trend data. Full-size previous/next controls and the calendar's
+adjustable accessibility summary expose exact daily values. Export CSV downloads actual
+daily account data and opens Android's share chooser through a restricted cache FileProvider.
+No additional permissions are requested. Ship the API update alongside the clients.
+
+In-app PCM levels emit a separate event at most every 80ms. Only the focused waveform
+view subscribes; levels do not refresh transcripts or analytics. Floating recording
+surfaces use the shared dark capsule, with no mic tile or elapsed-time text.

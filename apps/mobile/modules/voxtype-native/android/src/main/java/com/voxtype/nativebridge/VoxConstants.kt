@@ -35,22 +35,23 @@ object VoxConstants {
   const val BYTE_RATE = 32_000
   const val WAV_HEADER_BYTES = 44
 
-  // Translucent light surfaces keep underlying content visible; controls stay opaque.
-  val BUBBLE_MUTED_COLOR = androidx.core.graphics.ColorUtils.setAlphaComponent(VoxTheme.surfaceSubtle, 205)
-  val BUBBLE_ACTIVE_COLOR = androidx.core.graphics.ColorUtils.setAlphaComponent(VoxTheme.surfaceRaised, 205)
-  val BUBBLE_ACTION_COLOR = VoxTheme.surface
-  val BUBBLE_DONE_COLOR = VoxTheme.accent
-  val BUBBLE_DONE_ICON = VoxTheme.inverse
-  val BUBBLE_SAVED_COLOR = androidx.core.graphics.ColorUtils.setAlphaComponent(VoxTheme.successSoft, 240)
+  // Stable dark capsule; idle handle uses a quiet navigation surface.
+  val BUBBLE_MUTED_COLOR = VoxTheme.surfaceSubtle
+  val BUBBLE_ACTIVE_COLOR = VoxTheme.overlay
+  val BUBBLE_ACTION_COLOR = VoxTheme.overlayRaised
+  val BUBBLE_DONE_COLOR = VoxTheme.overlayRaised
+  val BUBBLE_DONE_ICON = VoxTheme.overlayText
+  val BUBBLE_SAVED_COLOR = VoxTheme.overlay
   val CLOSE_COLOR = androidx.core.graphics.ColorUtils.setAlphaComponent(VoxTheme.dangerSoft, 240)
   val CLOSE_HOT_COLOR = VoxTheme.dangerSoft
   const val BUBBLE_RADIUS_DP = 14
-  const val BUBBLE_ACTION_RADIUS_DP = 10
+  const val BUBBLE_CAPSULE_RADIUS_DP = 999
+  const val BUBBLE_ACTION_RADIUS_DP = 999
   const val BUBBLE_ELEVATION_DP = 3
   const val BUBBLE_ICON_DP = 24
   const val BUBBLE_EDGE_DP = 12
   // Compact rounded square: listening expands to
-  // [cancel | level bars | done] like the desktop overlay.
+  // [level bars | done | cancel] like the desktop overlay.
   const val BUBBLE_SIZE_DP = 48
   const val BUBBLE_LISTEN_WIDTH_DP = 224
   const val BUBBLE_ACTION_DP = 44

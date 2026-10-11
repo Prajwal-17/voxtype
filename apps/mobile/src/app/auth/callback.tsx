@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { nativeTheme as theme } from '@voxtype/shared';
 import { Action, Text, Loader } from '@/components/primitives';
+import { useAppState } from '@/state/app-state';
 import { exchangeGrant } from '@/lib/mobile-api';
 
 const c = theme.colors;
@@ -26,6 +27,7 @@ function firstParam(value: string | string[] | undefined): string | undefined {
  */
 export default function AuthCallback() {
   const router = useRouter();
+  const { acceptUser, refresh } = useAppState();
   const params = useLocalSearchParams();
   const [failed, setFailed] = useState(() => {
     const error = firstParam(params.error);
@@ -39,8 +41,12 @@ export default function AuthCallback() {
     if (!grant) return;
     let cancelled = false;
     void exchangeGrant(grant).then(
-      () => {
-        if (!cancelled) router.replace('/');
+      (user) => {
+        if (!cancelled) {
+          acceptUser(user);
+          void refresh();
+          router.replace('/');
+        }
       },
       () => {
         if (!cancelled) setFailed(true);
@@ -49,7 +55,7 @@ export default function AuthCallback() {
     return () => {
       cancelled = true;
     };
-  }, [failed, params.token, router]);
+  }, [failed, params.token, router, acceptUser, refresh]);
 
   if (failed) {
     return (

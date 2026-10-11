@@ -389,7 +389,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
 
   /**
    * Muted edge-docked rounded square. Expands inwards for recording, with real microphone
-   * history between cancel and stop. Drag release docks to the nearest edge.
+   * history between stop and cancel. Drag release docks to the nearest edge.
    */
   private fun createBubble() {
     val size = VoxConstants.BUBBLE_SIZE_DP.dp
@@ -426,7 +426,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     }
     val actionSize = VoxConstants.BUBBLE_ACTION_DP.dp
     val cancel = TextView(this).apply {
-      text = "✕"; setTextColor(VoxTheme.ink); textSize = 18f; gravity = Gravity.CENTER
+      text = "✕"; setTextColor(VoxTheme.overlayText); textSize = 18f; gravity = Gravity.CENTER
       background = GradientDrawable().apply {
         setColor(VoxConstants.BUBBLE_ACTION_COLOR)
         cornerRadius = VoxConstants.BUBBLE_ACTION_RADIUS_DP.dp.toFloat()
@@ -454,14 +454,14 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       isClickable = true
       isFocusable = false
     }
-    row.addView(cancel); row.addView(bars); row.addView(done)
+    row.addView(bars); row.addView(done); row.addView(cancel)
     row.setPadding(4.dp, 0, 4.dp, 0)
     // Inset rounded controls retain their full 44dp touch targets.
     cancel.background = InsetDrawable(cancel.background, 7.dp)
     done.background = InsetDrawable(done.background, 7.dp)
     val loader = ProgressBar(this, null, android.R.attr.progressBarStyleSmall).apply {
       isIndeterminate = true
-      indeterminateTintList = ColorStateList.valueOf(VoxTheme.accentInk)
+      indeterminateTintList = ColorStateList.valueOf(VoxTheme.overlayWave)
       visibility = View.GONE
       importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
     }
@@ -517,6 +517,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     if (renderKey == lastBubbleRender) return
     lastBubbleRender = renderKey
     val bg = root.background as? GradientDrawable
+    bg?.cornerRadius = (if (expanded()) VoxConstants.BUBBLE_CAPSULE_RADIUS_DP else VoxConstants.BUBBLE_RADIUS_DP).dp.toFloat()
     stopMotion()
     spinner?.visibility = View.GONE
     when (status) {
@@ -529,7 +530,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
         animateBubbleWidth(VoxConstants.BUBBLE_LISTEN_WIDTH_DP.dp)
       }
       DictationStatus.CONNECTING.bridge, DictationStatus.PROCESSING.bridge -> {
-        bg?.setColor(VoxConstants.BUBBLE_MUTED_COLOR)
+        bg?.setColor(VoxConstants.BUBBLE_ACTIVE_COLOR)
         bubbleMark?.visibility = View.GONE
         actionsRow?.visibility = View.GONE
         bubbleGlyph?.visibility = View.GONE
@@ -542,6 +543,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
         actionsRow?.visibility = View.GONE
         bubbleGlyph?.visibility = View.VISIBLE
         bubbleGlyph?.text = "✓"
+        bubbleGlyph?.setTextColor(VoxTheme.overlayText)
         animateBubbleWidth(VoxConstants.BUBBLE_LISTEN_WIDTH_DP.dp)
       }
       DictationStatus.MICROPHONE_PERMISSION_NEEDED.bridge -> {
@@ -550,6 +552,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
         actionsRow?.visibility = View.GONE
         bubbleGlyph?.visibility = View.VISIBLE
         bubbleGlyph?.text = "!"
+        bubbleGlyph?.setTextColor(VoxTheme.danger)
         animateBubbleWidth(VoxConstants.BUBBLE_SIZE_DP.dp)
       }
       else -> {

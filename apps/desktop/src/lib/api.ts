@@ -1,4 +1,9 @@
-import { emptyAnalytics, type Analytics } from '@voxtype/shared/analytics';
+import {
+  emptyPeriod,
+  clientTimezone,
+  type AnalyticsRange,
+  type Analytics,
+} from '@voxtype/shared/analytics';
 import {
   QueryClient,
   useInfiniteQuery,
@@ -31,6 +36,10 @@ const previewUser: AuthUser = {
   name: 'Prajwal Reddy',
   email: 'prajwalreddy.dev@gmail.com',
 };
+// Vite supplies this compile-time flag; it is not a runtime environment binding.
+const browserPreview =
+  // eslint-disable-next-line turbo/no-undeclared-env-vars -- Vite compile-time flag
+  import.meta.env.DEV && new URLSearchParams(location.search).get('preview') === '1';
 const previewSignedOut = new URLSearchParams(location.search).get('auth') === 'login';
 
 export const queryClient = new QueryClient({
@@ -55,9 +64,8 @@ export const api = {
   authUser: () =>
     native
       ? command<AuthUser | null>('get_auth_user')
-      : Promise.resolve(previewSignedOut ? null : previewUser),
-  signInWithGoogle: () =>
-    native ? command<AuthUser>('sign_in_with_google') : Promise.resolve(previewUser),
+      : Promise.resolve(browserPreview && !previewSignedOut ? previewUser : null),
+  signInWithGoogle: () => command<AuthUser>('sign_in_with_google'),
   signOut: () => (native ? command<void>('sign_out') : Promise.resolve()),
   bootstrap: () =>
     native
@@ -80,7 +88,12 @@ export const api = {
             { id: 'f8', label: 'F8' },
           ],
         }),
-  analytics: () => (native ? command<Analytics>('get_analytics') : Promise.resolve(emptyAnalytics)),
+  analytics: (range: AnalyticsRange = '30d', timezone = clientTimezone()) =>
+    native
+      ? command<Analytics>('get_analytics', { range, timezone })
+      : Promise.resolve(emptyPeriod(range, timezone)),
+  exportAnalytics: (range: AnalyticsRange, timezone: string) =>
+    command<boolean>('export_analytics', { range, timezone }),
   history: (cursor: string | null, query: string) =>
     native
       ? command<{ items: HistoryItem[]; nextCursor: string | null }>('get_history', {
@@ -119,14 +132,25 @@ export const useAuthUser = () =>
     staleTime: Infinity,
   });
 export const useBootstrap = () => useQuery({ queryKey: ['bootstrap'], queryFn: api.bootstrap });
-export const useHistory = (query = '') =>
-  useInfiniteQuery({
-    queryKey: ['history', query],
+export const useHistory = (query = '') => {
+  const auth = useAuthUser();
+  return useInfiniteQuery({
+    queryKey: ['history', auth.data?.id, query],
+    enabled: !!auth.data,
     initialPageParam: null as string | null,
     queryFn: ({ pageParam }) => api.history(pageParam, query),
     getNextPageParam: (page) => page.nextCursor ?? undefined,
   });
-export const useAnalytics = () => useQuery({ queryKey: ['analytics'], queryFn: api.analytics });
+};
+export const useAnalytics = (range: AnalyticsRange = '30d') => {
+  const auth = useAuthUser();
+  const timezone = clientTimezone();
+  return useQuery({
+    queryKey: ['analytics', auth.data?.id, range, timezone],
+    queryFn: () => api.analytics(range, timezone),
+    enabled: !!auth.data,
+  });
+};
 export const useAppSession = () =>
   useQuery({
     queryKey: ['app-session'],
@@ -160,7 +184,13 @@ export function useNativeEvents() {
           },
         ],
         ['analytics-changed', () => void client.invalidateQueries({ queryKey: ['analytics'] })],
-        ['history-changed', () => void client.invalidateQueries({ queryKey: ['history'] })],
+        [
+          'history-changed',
+          () => {
+            void client.invalidateQueries({ queryKey: ['history'] });
+            void client.invalidateQueries({ queryKey: ['analytics'] });
+          },
+        ],
         ['app-error', (data: unknown) => toast.error(String(data))],
       ] as const) {
         const unlisten = await listen(event, (e) => handler(e.payload));

@@ -1,6 +1,7 @@
 package com.voxtype.nativebridge
 
 import org.junit.Assert.*
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -62,4 +63,40 @@ class CloudRestoreTest {
       assertTrue(store.dictations("owner").isEmpty())
     }
   }
+  @Test fun searchFiltersTheWholeAccountCacheBeforePaginationAndTreatsWildcardsLiterally() {
+    VoxTypeStore(context,onChanged = {}).use { store ->
+      val rows = JSONArray()
+      for (i in 0..25) rows.put(row("record-$i").put("text", if(i<13) "MATCH $i" else "other $i").put("createdAt",i))
+      rows.put(row("literal").put("text","100%_exact"))
+      store.restore("owner",url,rows)
+      store.restore("other",url,JSONArray().put(row("secret").put("text","MATCH secret")))
+      val first=store.page("owner",null,"match")
+      assertEquals(12,(first["items"] as List<*>).size)
+      val second=store.page("owner",first["nextCursor"] as String,"match")
+      assertEquals(1,(second["items"] as List<*>).size)
+      assertEquals(1,(store.page("owner",null,"%_")["items"] as List<*>).size)
+      assertTrue((store.page("owner",null,"secret")["items"] as List<*>).isEmpty())
+    }
+  }
+
+  @Test fun failedCloudDeleteKeepsPendingTextAndSuccessIsAccountScoped() {
+    NativeSession(context).save("bearer","owner",url)
+    var deletedId=""
+    VoxTypeStore(context,onChanged = {}).use { store ->
+      deletedId=store.save("owner","Pending text","Pending text",1000,null,url)
+      store.restore("other",url,JSONArray().put(row("other-record")))
+    }
+    fun client(code:Int)=okhttp3.OkHttpClient.Builder().addInterceptor { chain ->
+      okhttp3.Response.Builder().request(chain.request()).protocol(okhttp3.Protocol.HTTP_1_1)
+        .code(code).message("test").body("".toResponseBody()).build()
+    }.build()
+    try {
+      kotlinx.coroutines.runBlocking { TranscriptUploads.delete(context,deletedId,client(503)) }
+      fail("Cloud failure must preserve the local record")
+    } catch (_: java.io.IOException) { }
+    VoxTypeStore(context,onChanged = {}).use { assertEquals("Pending text",it.text(deletedId)) }
+    kotlinx.coroutines.runBlocking { TranscriptUploads.delete(context,deletedId,client(204)) }
+    VoxTypeStore(context,onChanged = {}).use { assertNull(it.text(deletedId));assertNotNull(it.text("other-record")) }
+  }
+
 }

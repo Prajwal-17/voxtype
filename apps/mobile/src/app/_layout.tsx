@@ -1,11 +1,12 @@
 import '../global.css';
 
 import * as WebBrowser from 'expo-web-browser';
-import { Slot } from 'expo-router';
+import { Stack } from 'expo-router';
 import { ReducedMotionConfig, ReduceMotion } from 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useEffect } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
+import { AppStateProvider } from '../state/app-state';
 import { Loader } from '../components/primitives';
 import { useFonts } from 'expo-font';
 
@@ -29,7 +30,12 @@ export default function Layout() {
   return (
     <SafeAreaProvider>
       <ReducedMotionConfig mode={ReduceMotion.System} />
-      <Slot />
+      <AppStateProvider>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="account" />
+        </Stack>
+      </AppStateProvider>
     </SafeAreaProvider>
   );
 }

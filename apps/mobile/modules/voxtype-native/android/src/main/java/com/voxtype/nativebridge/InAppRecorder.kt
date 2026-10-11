@@ -20,8 +20,10 @@ object InAppRecorder {
   @Volatile var text = ""; private set
   @Volatile var error = ""; private set
   @Volatile var durationMs = 0L; private set
+  @Volatile var level = 0f; private set
+  private var lastLevelAt = 0L
   val busy: Boolean get() = status == "listening" || status == "processing"
-  fun snapshot() = mapOf("status" to status, "text" to text, "error" to error, "durationMs" to durationMs)
+  fun snapshot() = mapOf("status" to status, "text" to text, "error" to error, "durationMs" to durationMs, "level" to level)
   private fun changed() {
     VoxTypeNativeModule.changed()
     main.post { VoxTypeAccessibilityService.instance?.refreshBubble() }
@@ -35,18 +37,25 @@ object InAppRecorder {
     val apiUrl = requireNotNull(session.apiUrl) { "Sign in again." }
     check(session.token != null) { "Sign in again." }
     val current = ++generation
-    text = ""; error = ""; durationMs = 0L
+    text = ""; error = ""; durationMs = 0L; level = 0f; lastLevelAt = 0L
     val stream = DeepgramSession({ session.token }, { session.apiUrl }, { main.post { stop() } })
     engine = stream
     try {
       status = "listening"
       stream.begin()
-      capture = AudioCapture(context, { stream.audio(it) }, { file, duration ->
+      capture = AudioCapture(context, { bytes ->
+        stream.audio(bytes)
+        val now = android.os.SystemClock.uptimeMillis()
+        if (current == generation && status == "listening" && now-lastLevelAt >= 80L) {
+          level = BubbleAudioLevel.fromPcm(bytes); lastLevelAt = now
+          VoxTypeNativeModule.audioLevel(level)
+        }
+      }, { file, duration ->
         main.post {
           if (current != generation) { file?.delete(); return@post }
           capture = null
           durationMs = duration
-          status = "processing"; changed()
+          status = "processing"; level = 0f; changed()
           stream.finalize { original ->
             stream.close()
             if (current != generation) { file?.delete(); return@finalize }
@@ -78,14 +87,14 @@ object InAppRecorder {
   }
   fun stop() {
     if (status != "listening") return
-    status = "processing"; changed()
+    status = "processing"; level = 0f; changed()
     capture?.stop(); capture = null
   }
   fun cancel() {
     generation++
     capture?.stop(); capture = null
     engine?.abort(); engine?.close(); engine = null
-    status = "idle"; text = ""; error = ""; changed()
+    status = "idle"; text = ""; error = ""; level = 0f; changed()
   }
   private fun cleanup(session: NativeSession, original: String): String {
     if (original.length > 12000) return original

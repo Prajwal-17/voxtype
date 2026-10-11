@@ -13,6 +13,9 @@ import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import expo.modules.kotlin.functions.Queues
 import java.lang.ref.WeakReference
+import java.io.File
+import androidx.core.content.FileProvider
+import kotlinx.coroutines.runBlocking
 
 class VoxTypeNativeModule : Module() {
   private var observedContext: Context? = null
@@ -23,6 +26,10 @@ class VoxTypeNativeModule : Module() {
     fun changed() { mainHandler.post {
       try { active.get()?.sendEvent("onChange", mapOf("changed" to true)) }
       catch (error: Exception) { VoxLog.w("UI bridge unavailable", error) }
+    } }
+    fun audioLevel(level: Float) { mainHandler.post {
+      try { active.get()?.sendEvent("onAudioLevel", mapOf("level" to level)) }
+      catch (error: Exception) { VoxLog.w("audio level bridge unavailable", error) }
     } }
     private fun refreshBubble() {
       mainHandler.post { VoxTypeAccessibilityService.instance?.refreshBubble() }
@@ -49,7 +56,7 @@ class VoxTypeNativeModule : Module() {
 
   override fun definition() = ModuleDefinition {
     Name("VoxTypeNative")
-    Events("onChange")
+    Events("onChange", "onAudioLevel")
     OnCreate {
       active = WeakReference(this@VoxTypeNativeModule)
       observePermissions()
@@ -144,9 +151,25 @@ class VoxTypeNativeModule : Module() {
     AsyncFunction("syncTranscripts") {
       TranscriptUploads.request(requireNotNull(appContext.reactContext))
     }
-    AsyncFunction("getTranscripts") { cursor: String? ->
+    AsyncFunction("getTranscripts") { cursor: String?, query: String ->
       val context = requireNotNull(appContext.reactContext)
-      VoxTypeStore(context).use { it.page(requireNotNull(NativeSession(context).userId), cursor) }
+      VoxTypeStore(context).use { it.page(requireNotNull(NativeSession(context).userId), cursor, query.take(500)) }
+    }
+    AsyncFunction("deleteTranscript") { id: String ->
+      val context = requireNotNull(appContext.reactContext).applicationContext
+      runBlocking { TranscriptUploads.delete(context,id) }
+    }
+    AsyncFunction("shareInsights") { csv: String ->
+      require(csv.toByteArray(Charsets.UTF_8).size <= 8_000_000) { "Export exceeds the file limit" }
+      val context = requireNotNull(appContext.reactContext)
+      val file = File(File(context.cacheDir,"insights").apply { mkdirs() }, "voxtype-insights.csv")
+      file.writeText(csv,Charsets.UTF_8)
+      val uri = FileProvider.getUriForFile(context,"${context.packageName}.voxtype.exports",file)
+      val intent = Intent(Intent.ACTION_SEND).setType("text/csv")
+        .putExtra(Intent.EXTRA_STREAM,uri)
+        .setClipData(android.content.ClipData.newRawUri("Insights",uri))
+        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+      context.startActivity(Intent.createChooser(intent,"Export insights").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
     OnActivityEntersBackground { mainHandler.post { InAppRecorder.stop() } }
     OnActivityEntersForeground { observePermissions(); changed(); refreshBubble() }

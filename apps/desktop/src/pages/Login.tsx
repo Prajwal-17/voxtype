@@ -2,7 +2,7 @@ import { WarningCircleIcon } from '../components/icons';
 import { useEffect, useRef } from 'react';
 import { Button, Logo } from '../components/ui';
 import { Card } from '../components/ui/card';
-import { appName } from '../lib/environment';
+import { native } from '../lib/api';
 
 function GoogleMark() {
   return (
@@ -58,7 +58,7 @@ export function LoginPage({
               tabIndex={-1}
               className="text-heading font-semibold tracking-[-.02em] text-balance outline-none"
             >
-              Sign in to {appName}
+              Sign in
             </h1>
 
             {error && (
@@ -77,10 +77,10 @@ export function LoginPage({
               className="mt-6 w-full bg-surface"
               onClick={onSignIn}
               loading={checking || pending}
-              disabled={checking}
+              disabled={checking || !native}
             >
               {!checking && !pending && <GoogleMark />}
-              {checking ? 'Loading' : pending ? 'Waiting for Google' : 'Sign in with Google'}
+              {checking ? 'Loading' : pending ? 'Waiting for Google' : 'Continue with Google'}
             </Button>
             <span className="sr-only" role="status" aria-live="polite">
               {status}

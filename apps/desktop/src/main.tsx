@@ -22,7 +22,7 @@ document.body.className = overlay
   : 'm-0 min-w-[360px] bg-canvas';
 
 root!.className = overlay ? 'h-full w-full overflow-hidden bg-transparent' : '';
-if (overlay) document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#163c40');
+if (overlay) document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#203d33');
 
 function Root() {
   useNativeEvents();

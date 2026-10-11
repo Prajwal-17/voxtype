@@ -27,3 +27,6 @@ export { WaveformIcon } from '@phosphor-icons/react/dist/csr/Waveform';
 export { XIcon } from '@phosphor-icons/react/dist/csr/X';
 export type { Icon } from '@phosphor-icons/react';
 export { SidebarSimpleIcon } from '@phosphor-icons/react/dist/csr/SidebarSimple';
+
+export { ChartBarIcon } from '@phosphor-icons/react/dist/csr/ChartBar';
+export { DownloadSimpleIcon } from '@phosphor-icons/react/dist/csr/DownloadSimple';

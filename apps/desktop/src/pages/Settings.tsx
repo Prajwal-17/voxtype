@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MicrophoneIcon, ArrowsClockwiseIcon, StopIcon } from '../components/icons';
 import { toast } from 'sonner';
@@ -19,18 +19,88 @@ import {
 } from '../components/ui/select';
 import { Waveform } from '../components/waveform';
 
-export function SettingsPage({ boot, active }: { boot: Bootstrap; active: boolean }) {
+export function SettingsPage({
+  boot,
+  active,
+  onDirtyChange,
+}: {
+  boot: Bootstrap;
+  active: boolean;
+  onDirtyChange: (dirty: boolean) => void;
+}) {
+  const [tab, setTab] = useState<'voice' | 'workflow' | 'desktop'>('voice');
+  const [preferencesDirty, setPreferencesDirty] = useState(false),
+    [shortcutDirty, setShortcutDirty] = useState(false);
+  useEffect(() => {
+    onDirtyChange(preferencesDirty || shortcutDirty);
+  }, [preferencesDirty, shortcutDirty, onDirtyChange]);
+  useEffect(() => {
+    if (!preferencesDirty && !shortcutDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [preferencesDirty, shortcutDirty]);
   return (
     <>
       <PageHeader title="Settings" />
+      <div
+        className="mb-5 flex flex-wrap gap-1 rounded-control bg-subtle p-1"
+        role="tablist"
+        aria-label="Settings categories"
+      >
+        {(
+          [
+            ['voice', 'Voice & language'],
+            ['workflow', 'Workflow'],
+            ['desktop', 'Desktop'],
+          ] as const
+        ).map(([id, label], index) => (
+          <button
+            key={id}
+            role="tab"
+            id={`tab-${id}`}
+            aria-selected={tab === id}
+            aria-controls={`panel-${id}`}
+            tabIndex={tab === id ? 0 : -1}
+            onClick={() => setTab(id)}
+            onKeyDown={(e) => {
+              const tabs = ['voice', 'workflow', 'desktop'] as const;
+              const next =
+                e.key === 'ArrowRight'
+                  ? (index + 1) % 3
+                  : e.key === 'ArrowLeft'
+                    ? (index + 2) % 3
+                    : e.key === 'Home'
+                      ? 0
+                      : e.key === 'End'
+                        ? 2
+                        : -1;
+              if (next >= 0) {
+                e.preventDefault();
+                setTab(tabs[next]!);
+                document.getElementById(`tab-${tabs[next]}`)?.focus();
+              }
+            }}
+            className={`min-h-10 rounded-menu-item px-4 text-ui focus-visible:outline-2 focus-visible:outline-accent ${tab === id ? 'bg-surface font-semibold text-accent' : 'text-muted'}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
       <div className="max-w-3xl">
         <Preferences
           key={JSON.stringify(boot.settings)}
           settings={boot.settings}
+          tab={tab}
+          onDirtyChange={setPreferencesDirty}
           active={active}
           startupAvailable={boot.startupAvailable}
         />
-        <DesktopSetup boot={boot} active={active} />
+        <div hidden={tab !== 'desktop'}>
+          <DesktopSetup boot={boot} active={active} onDirtyChange={setShortcutDirty} />
+        </div>
       </div>
     </>
   );
@@ -53,10 +123,14 @@ function Preferences({
   settings,
   active,
   startupAvailable,
+  tab,
+  onDirtyChange,
 }: {
   settings: Settings;
   active: boolean;
   startupAvailable: boolean;
+  tab: 'voice' | 'workflow' | 'desktop';
+  onDirtyChange: (dirty: boolean) => void;
 }) {
   const [draft, setDraft] = useState(settings);
   const [vocabulary, setVocabulary] = useState(settings.vocabulary.join('\n'));
@@ -74,6 +148,9 @@ function Preferences({
   });
   const value = { ...draft, vocabulary: parseVocabulary(vocabulary) };
   const dirty = JSON.stringify(value) !== JSON.stringify(settings);
+  useEffect(() => {
+    onDirtyChange(dirty);
+  }, [dirty, onDirtyChange]);
   const set = <K extends keyof Settings>(field: K, value: Settings[K]) =>
     setDraft((previous) => ({ ...previous, [field]: value }));
   return (
@@ -88,7 +165,13 @@ function Preferences({
         save.mutate(parsed.data);
       }}
     >
-      <section className="mb-5 rounded-panel border border-line bg-surface p-5 max-md:p-4">
+      <section
+        hidden={tab !== 'voice'}
+        id="panel-voice"
+        role="tabpanel"
+        aria-labelledby="tab-voice"
+        className="mb-5 rounded-panel border border-line bg-surface p-5 max-md:p-4"
+      >
         <SectionHeader title="Voice & language" />
         <FieldRow label="Microphone" htmlFor="microphone">
           <div className="flex shrink-0 items-center gap-1.5 max-md:w-full max-md:max-w-full">
@@ -187,16 +270,14 @@ function Preferences({
           </Select>
         </FieldRow>
       </section>
-      <section className="mb-5 rounded-panel border border-line bg-surface p-5 max-md:p-4">
-        <SectionHeader title="Preferences" />
-        {startupAvailable && (
-          <Toggle
-            label="Launch at login"
-            checked={draft.launchAtLogin}
-            onChange={(v) => set('launchAtLogin', v)}
-            disabled={active}
-          />
-        )}
+      <section
+        hidden={tab !== 'workflow'}
+        id="panel-workflow"
+        role="tabpanel"
+        aria-labelledby="tab-workflow"
+        className="mb-5 rounded-panel border border-line bg-surface p-5 max-md:p-4"
+      >
+        <SectionHeader title="Workflow" />
         <Toggle
           label="Skip long pauses"
           checked={draft.voiceDetection}
@@ -216,7 +297,10 @@ function Preferences({
           disabled={active}
         />
       </section>
-      <section className="mb-5 rounded-panel border border-line bg-surface p-5 max-md:p-4">
+      <section
+        hidden={tab !== 'voice'}
+        className="mb-5 rounded-panel border border-line bg-surface p-5 max-md:p-4"
+      >
         <SectionHeader title="Personal vocabulary" />
         <Label className="sr-only" htmlFor="vocabulary">
           Personal vocabulary
@@ -233,25 +317,68 @@ function Preferences({
           <span>{value.vocabulary.length} / 100 terms</span>
         </div>
       </section>
-      <div className="settings-save-bar sticky bottom-4 z-10 mb-5 flex items-center justify-between gap-3 rounded-panel border border-line bg-surface px-4 py-3 text-caption text-muted shadow-panel">
-        <span>
-          {active ? 'Finish recording to change preferences.' : dirty ? 'Unsaved changes' : ''}
-        </span>
-        <Button
-          variant="primary"
-          type="submit"
-          loading={save.isPending}
-          disabled={!dirty || active || !native}
-        >
-          Save changes
-        </Button>
-      </div>
+      <section
+        hidden={tab !== 'desktop'}
+        id="panel-desktop"
+        role="tabpanel"
+        aria-labelledby="tab-desktop"
+        className="mb-5 rounded-panel border border-line bg-surface p-5"
+      >
+        <Toggle
+          label="Launch at login"
+          checked={draft.launchAtLogin}
+          onChange={(v) => set('launchAtLogin', v)}
+          disabled={active || !startupAvailable}
+        />
+        {!startupAvailable && (
+          <p className="mt-3 text-caption text-muted">Available in the installed app.</p>
+        )}
+      </section>
+      {(dirty || active) && (
+        <div className="settings-save-bar sticky bottom-4 z-10 mb-5 flex items-center justify-between gap-3 rounded-panel border border-line bg-surface px-4 py-3 text-caption text-muted shadow-panel">
+          <span>
+            {active ? 'Finish recording to change preferences.' : dirty ? 'Unsaved changes' : ''}
+          </span>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={save.isPending || active}
+              onClick={() => {
+                setDraft(settings);
+                setVocabulary(settings.vocabulary.join('\n'));
+              }}
+            >
+              Discard
+            </Button>
+            <Button
+              variant="primary"
+              type="submit"
+              loading={save.isPending}
+              disabled={!dirty || active || !native}
+            >
+              Save changes
+            </Button>
+          </div>
+        </div>
+      )}
     </form>
   );
 }
 
-function DesktopSetup({ boot, active }: { boot: Bootstrap; active: boolean }) {
+function DesktopSetup({
+  boot,
+  active,
+  onDirtyChange,
+}: {
+  boot: Bootstrap;
+  active: boolean;
+  onDirtyChange: (dirty: boolean) => void;
+}) {
   const [shortcutId, setShortcutId] = useState(boot.shortcutId);
+  useEffect(() => {
+    onDirtyChange(shortcutId !== boot.shortcutId);
+  }, [shortcutId, boot.shortcutId, onDirtyChange]);
   const [recordingShortcut, setRecordingShortcut] = useState(false);
   const [customLabel, setCustomLabel] = useState<string | null>(null);
   const customOption =

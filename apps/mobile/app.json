@@ -12,7 +12,7 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "monochromeImage": "./assets/monochrome-icon.png",
-        "backgroundColor": "#155E63"
+        "backgroundColor": "#275A49"
       },
       "permissions": ["RECORD_AUDIO", "FOREGROUND_SERVICE", "FOREGROUND_SERVICE_MICROPHONE"]
     },
@@ -33,7 +33,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#dce6e5",
+          "backgroundColor": "#fbfcfa",
           "image": "./assets/splash-icon.png",
           "imageWidth": 96
         }

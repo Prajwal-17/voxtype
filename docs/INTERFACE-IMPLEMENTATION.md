@@ -20,7 +20,7 @@ rendering on a real launcher. Web preview verifies React Native layout, not OS o
 - `cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml` — local transcript page boundaries, account isolation, deleted cursors and search.
 - `pnpm --filter @voxtype/desktop build` and mobile Expo web export.
 - Android `:voxtype-native:compileDebugKotlin` after Expo prebuild.
-- Desktop browser: fixed 228px sidebar, one visible heading, external session isolation,
+- Desktop browser: fixed 174px sidebar, one visible heading, external session isolation,
   12-row transcript fixture and load-more, dropdown alignment.
 - Mobile browser: Home, Settings, Transcripts, 390px phone layout, logo size and overflow.
 
@@ -45,3 +45,21 @@ the module minimum SDK with the app's Android 13 requirement and enabling
 Warnings cover dependency updates, redundant SDK guards, static context references,
 KTX suggestions and touch-listener accessibility checks. They remain visible in the
 report; real-device accessibility and lifecycle checks are still required.
+
+## Refined Still rollout
+
+Shared theme and generated CSS/Kotlin now use light Still surfaces and petrol accents.
+Both apps include dedicated Insights, recorder-first Home, inline transcripts, Settings
+and Account. Desktop protects preference/shortcut drafts and keeps app-owned recording
+visible across pages. Native mobile state lives above Expo Router tabs.
+
+The analytics endpoint now accepts an IANA timezone, defines local calendar ranges,
+returns full-history streaks and an independent compact 14-week grid, and bounds trend
+payloads. Real CSV export uses a native GTK save dialog or Android share chooser.
+Android adds complete-cache search, cloud-aware deletion and a separate live PCM-level
+event. Capsules have fully rounded ends and shared dark colors, with no mic tile or timer.
+
+The existing Android recovery and diagnostic-report work remains part of this branch.
+Repository checks and native CI are recorded with the PR; browser captures verify layout
+and interaction only. Physical Android insertion/permissions and Linux overlay focus,
+scaling/multi-monitor behavior still require the corresponding device/runtime checks.

@@ -1,4 +1,4 @@
-import type { Analytics } from '@voxtype/shared/analytics';
+import { clientTimezone, type AnalyticsRange, type Analytics } from '@voxtype/shared/analytics';
 import * as Crypto from 'expo-crypto';
 import * as WebBrowser from 'expo-web-browser';
 import VoxTypeNative from '../../modules/voxtype-native/src/VoxTypeNativeModule';
@@ -10,11 +10,13 @@ const REDIRECT_URL = 'voxtype://auth/callback';
 export type User = { id: string; name: string; email: string; image: string | null };
 
 export async function currentUser(): Promise<User | null> {
-  const { token } = await VoxTypeNative.getSession();
+  const { token, userId } = await VoxTypeNative.getSession();
   if (!token) return null;
   const response = await fetch(`${API_URL}/v1/me`, {
     headers: { Authorization: `Bearer ${token}` },
   });
+  const current = await VoxTypeNative.getSession();
+  if (current.token !== token || current.userId !== userId) throw new Error('Account changed');
   if (response.status === 401 || response.status === 403) {
     await VoxTypeNative.signOut();
     return null;
@@ -78,12 +80,39 @@ export async function signOut(): Promise<void> {
   await VoxTypeNative.signOut();
 }
 
-export async function getAnalytics(): Promise<Analytics> {
+export async function getAnalytics(
+  range: AnalyticsRange = '30d',
+  timezone = clientTimezone(),
+  signal?: AbortSignal,
+): Promise<Analytics> {
   const { token } = await VoxTypeNative.getSession();
   if (!token) throw new Error('Sign in again');
-  const response = await fetch(`${API_URL}/v1/analytics?range=30d`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const response = await fetch(
+    `${API_URL}/v1/analytics?${new URLSearchParams({ range, timezone }).toString()}`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+      signal,
+    },
+  );
   if (!response.ok) throw new Error('Analytics unavailable');
   return ((await response.json()) as { data: Analytics }).data;
+}
+
+export async function exportInsights(
+  range: AnalyticsRange,
+  timezone = clientTimezone(),
+): Promise<void> {
+  const { token, userId } = await VoxTypeNative.getSession();
+  if (!token) throw new Error('Sign in again');
+  const response = await fetch(
+    `${API_URL}/v1/analytics?${new URLSearchParams({ range, timezone, format: 'csv' }).toString()}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!response.ok) throw new Error('Couldn’t export insights');
+  const csv = await response.text();
+  if (csv.length > 8_000_000) throw new Error('Export exceeds the file limit');
+  const current = await VoxTypeNative.getSession();
+  if (current.userId !== userId || current.token !== token)
+    throw new Error('Account changed. Try again.');
+  await VoxTypeNative.shareInsights(csv);
 }

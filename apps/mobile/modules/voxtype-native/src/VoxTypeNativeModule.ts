@@ -16,8 +16,10 @@ declare class VoxTypeNativeModule extends NativeModule<VoxTypeNativeModuleEvents
   startRecording(): Promise<void>;
   stopRecording(): Promise<void>;
   cancelRecording(): Promise<void>;
-  getTranscripts(cursor: string | null): Promise<TranscriptPage>;
+  getTranscripts(cursor: string | null, query: string): Promise<TranscriptPage>;
   syncTranscripts(): Promise<void>;
+  deleteTranscript(id: string): Promise<void>;
+  shareInsights(csv: string): Promise<void>;
 }
 
 let cached: VoxTypeNativeModule | null | undefined;
@@ -72,7 +74,10 @@ const VoxTypeNative = {
     requireVoxTypeModule().setCleanupEnabled?.(enabled) ??
     requireVoxTypeModule().setPreference('cleanupEnabled', String(enabled)),
   copyTranscript: (id: string) => requireVoxTypeModule().copyTranscript(id),
-  getTranscripts: (cursor: string | null) => requireVoxTypeModule().getTranscripts(cursor),
+  getTranscripts: (cursor: string | null, query = '') =>
+    requireVoxTypeModule().getTranscripts(cursor, query),
+  deleteTranscript: (id: string) => requireVoxTypeModule().deleteTranscript(id),
+  shareInsights: (csv: string) => requireVoxTypeModule().shareInsights(csv),
   syncTranscripts: () => requireVoxTypeModule().syncTranscripts(),
   startRecording: () => requireVoxTypeModule().startRecording(),
   cancelRecording: () => requireVoxTypeModule().cancelRecording(),

@@ -43,9 +43,13 @@ export type Snapshot = {
     text: string;
     error: string;
     durationMs: number;
+    level?: number;
   };
 };
 
-export type VoxTypeNativeModuleEvents = { onChange: (params: { changed: boolean }) => void };
+export type VoxTypeNativeModuleEvents = {
+  onChange: (params: { changed: boolean }) => void;
+  onAudioLevel: (params: { level: number }) => void;
+};
 
 export type TranscriptPage = { items: Dictation[]; nextCursor: string | null };

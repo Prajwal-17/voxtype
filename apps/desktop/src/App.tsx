@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   WaveformIcon,
+  ChartBarIcon,
   FileTextIcon,
   SlidersHorizontalIcon,
   UserCircleIcon,
@@ -24,14 +25,41 @@ import { HomePage } from './pages/Home';
 import { HistoryPage } from './pages/History';
 import { LoginPage } from './pages/Login';
 import { ProfilePage } from './pages/Profile';
+import { InsightsPage } from './pages/Insights';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from './components/ui/alert-dialog';
+import { useRecording } from './lib/api';
 import { SettingsPage } from './pages/Settings';
 const navigation = [
   { id: 'home', icon: WaveformIcon, label: 'Home' },
   { id: 'transcripts', icon: FileTextIcon, label: 'Transcripts' },
+  { id: 'insights', icon: ChartBarIcon, label: 'Insights' },
   { id: 'settings', icon: SlidersHorizontalIcon, label: 'Settings' },
 ] as const;
 export function App() {
-  const [page, setPage] = useState<'home' | 'transcripts' | 'settings' | 'profile'>('home');
+  type Page = 'home' | 'transcripts' | 'insights' | 'settings' | 'profile';
+  const [page, setPage] = useState<Page>('home');
+  const [dirty, setDirty] = useState(false);
+  const [destination, setDestination] = useState<Page | null>(null);
+  const [settingsEpoch, setSettingsEpoch] = useState(0);
+  const [settingsVisited, setSettingsVisited] = useState(false);
+  const navigate = (next: Page) => {
+    if (next === page) return;
+    if (page === 'settings' && dirty) {
+      setDestination(next);
+      return;
+    }
+    if (next === 'settings') setSettingsVisited(true);
+    setPage(next);
+  };
+  const recording = useRecording();
   const auth = useAuthUser();
   const { signIn, signOut } = useAuthActions();
   const boot = useBootstrap();
@@ -49,7 +77,7 @@ export function App() {
   return (
     <SidebarProvider>
       <Sidebar>
-        <SidebarHeader className="px-7 pt-9 pb-10">
+        <SidebarHeader className="px-4 pt-6 pb-6">
           <Logo tone="ink" collapse={false} />
         </SidebarHeader>
         <SidebarContent>
@@ -57,7 +85,11 @@ export function App() {
             <SidebarMenu>
               {navigation.map(({ id, icon: Icon, label }) => (
                 <SidebarMenuItem key={id}>
-                  <SidebarMenuButton isActive={page === id} onClick={() => setPage(id)}>
+                  <SidebarMenuButton
+                    isActive={page === id}
+                    onClick={() => navigate(id)}
+                    aria-label={label}
+                  >
                     <Icon size={20} weight={page === id ? 'fill' : 'regular'} aria-hidden="true" />
                     <span>{label}</span>
                   </SidebarMenuButton>
@@ -67,14 +99,45 @@ export function App() {
           </nav>
         </SidebarContent>
         <SidebarFooter>
-          <SidebarMenuButton isActive={page === 'profile'} onClick={() => setPage('profile')}>
+          {boot.data && (
+            <div className="shortcut-footer mx-2 border-t border-line pt-4 text-caption text-muted">
+              <kbd className="inline-block rounded-[4px] border border-line bg-surface px-2 py-1 text-ink">
+                {boot.data.shortcutLabel}
+              </kbd>
+              <p className="mt-2">Recording shortcut</p>
+            </div>
+          )}
+          <SidebarMenuButton
+            isActive={page === 'profile'}
+            onClick={() => navigate('profile')}
+            aria-label="Account"
+          >
             <UserCircleIcon size={22} aria-hidden="true" />
             <span>{auth.data.name.split(' ')[0]}</span>
           </SidebarMenuButton>
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
-        <div className="workspace-content mx-auto max-w-[1120px] px-10 py-12 max-lg:px-6">
+        {page !== 'home' && !session.external && !session.isTest && isActive(session.phase) && (
+          <div
+            className="mx-5 mt-4 flex flex-wrap items-center gap-3 rounded-control border border-line bg-accent-soft px-4 py-2 text-ui"
+            role="status"
+          >
+            <span className="mr-auto">
+              {session.phase === 'listening' ? 'Recording' : 'Transcribing'}
+            </span>
+            <Button
+              disabled={session.phase !== 'listening'}
+              onClick={() => recording.stop.mutate()}
+            >
+              Finish
+            </Button>
+            <Button variant="ghost" onClick={() => recording.cancel.mutate()}>
+              Cancel
+            </Button>
+          </div>
+        )}
+        <div className="workspace-content mx-auto max-w-[1200px]">
           {boot.isPending ? (
             <Loader />
           ) : boot.isError ? (
@@ -85,11 +148,19 @@ export function App() {
             boot.data && (
               <>
                 <div hidden={page !== 'home'}>
-                  <HomePage visible={page === 'home'} />
+                  <HomePage visible={page === 'home'} onNavigate={navigate} />
                 </div>
-                {page === 'transcripts' && <HistoryPage onRecord={() => setPage('home')} />}
-                {page === 'settings' && (
-                  <SettingsPage boot={boot.data} active={isActive(session.phase)} />
+                {page === 'transcripts' && <HistoryPage onRecord={() => navigate('home')} />}
+                {page === 'insights' && <InsightsPage />}
+                {settingsVisited && (
+                  <div hidden={page !== 'settings'}>
+                    <SettingsPage
+                      key={settingsEpoch}
+                      boot={boot.data}
+                      active={isActive(session.phase)}
+                      onDirtyChange={setDirty}
+                    />
+                  </div>
                 )}
                 {page === 'profile' && (
                   <ProfilePage
@@ -103,6 +174,32 @@ export function App() {
           )}
         </div>
       </SidebarInset>
+      <AlertDialog
+        open={destination !== null}
+        onOpenChange={(open) => {
+          if (!open) setDestination(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Your preference and shortcut drafts will be discarded.
+          </AlertDialogDescription>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep editing</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setSettingsEpoch((n) => n + 1);
+                setDirty(false);
+                if (destination) setPage(destination);
+                setDestination(null);
+              }}
+            >
+              Discard
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </SidebarProvider>
   );
 }

@@ -20,7 +20,7 @@ export function ProfilePage({
 }) {
   return (
     <>
-      <PageHeader title="Profile" />
+      <PageHeader title="Account" />
 
       <Card className="max-w-2xl overflow-hidden">
         <div className="flex items-center gap-4 px-5 py-5 max-sm:items-start">
@@ -38,6 +38,13 @@ export function ProfilePage({
           </div>
         </div>
 
+        <div className="border-t border-line px-5 py-4 text-ui text-muted">
+          <p>Connected with Google</p>
+          <p className="mt-3">
+            Transcripts sync with your account. Device preferences and the newest 10 audio
+            recordings stay on this device.
+          </p>
+        </div>
         <div className="flex items-center justify-between gap-5 border-t border-line bg-raised px-5 py-4 max-sm:flex-col max-sm:items-stretch">
           <Button variant="outline" onClick={onSignOut} loading={signingOut}>
             <SignOutIcon size={16} aria-hidden="true" /> Sign out
