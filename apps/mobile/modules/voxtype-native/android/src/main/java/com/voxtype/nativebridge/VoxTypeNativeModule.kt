@@ -167,8 +167,10 @@ class VoxTypeNativeModule : Module() {
       val uri = FileProvider.getUriForFile(context,"${context.packageName}.voxtype.exports",file)
       val intent = Intent(Intent.ACTION_SEND).setType("text/csv")
         .putExtra(Intent.EXTRA_STREAM,uri)
-        .setClipData(android.content.ClipData.newRawUri("Insights",uri))
-        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        .apply {
+          clipData = android.content.ClipData.newRawUri("Insights",uri)
+          addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
       context.startActivity(Intent.createChooser(intent,"Export insights").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
     OnActivityEntersBackground { mainHandler.post { InAppRecorder.stop() } }
