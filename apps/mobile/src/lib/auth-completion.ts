@@ -11,7 +11,12 @@ export function createAuthCompletion<T>(dependencies: {
     reset() {
       completed = undefined;
     },
-    async complete(state: string | undefined, grant: string | undefined, error?: string) {
+    async complete(
+      this: void,
+      state: string | undefined,
+      grant: string | undefined,
+      error?: string,
+    ) {
       if (!state || state !== (await dependencies.pendingState())) {
         throw new Error('Sign-in response could not be verified. Try again.');
       }
