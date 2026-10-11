@@ -9,11 +9,7 @@ export function TitleBar() {
     void action().catch(() => toast.error('Couldn’t change the window. Try again.'));
   return (
     <header className="fixed inset-x-0 top-0 z-50 flex h-10 select-none items-center border-b border-line bg-navigation text-ink">
-      <div
-        data-tauri-drag-region
-        className="flex h-full flex-1 items-center px-4 text-caption"
-        onDoubleClick={() => run(() => window.toggleMaximize())}
-      >
+      <div data-tauri-drag-region className="flex h-full flex-1 items-center px-4 text-caption">
         VoxType
       </div>
       <button

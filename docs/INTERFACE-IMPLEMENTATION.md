@@ -89,3 +89,11 @@ scaling/multi-monitor behavior still require the corresponding device/runtime ch
 Installed Android OAuth, dictation/keyterm recognition and bubble insertion still
 need device E2E. Browser builds and native unit tests do not establish those results.
 The analytics API must ship with these clients in a separately authorized release.
+
+Follow-up validation in the fresh VM: all 14 TypeScript tests, workspace type checks,
+mobile/desktop ESLint, Prettier, desktop production build and mobile web export pass.
+A Chromium IPC fixture verifies title-bar command routing, the drag region, header
+spacing and the 760px viewport. Android adds persistence/limit and keyterm encoding
+regression tests to the native suite. This VM has neither Cargo nor an Android SDK;
+full Rust/Kotlin/lint verification runs in PR CI. Native title-bar behavior also
+requires an installed desktop runtime. No installed-app E2E result is claimed.
