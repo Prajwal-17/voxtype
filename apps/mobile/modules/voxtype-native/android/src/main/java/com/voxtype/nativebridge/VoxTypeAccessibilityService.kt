@@ -38,6 +38,7 @@ import android.content.res.ColorStateList
 import android.graphics.drawable.InsetDrawable
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -54,7 +55,11 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   private enum class ForegroundMode { NONE, BUBBLE, MICROPHONE }
 
   private val main = Handler(Looper.getMainLooper())
-  private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+  private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main + CoroutineExceptionHandler { _, error ->
+    VoxLog.e("accessibility task failed", error)
+    BubbleHealth.record(this, "service_error:${error.javaClass.simpleName}")
+    main.post { if (connected) recoverRecording() }
+  })
   private lateinit var windows: WindowManager
   private lateinit var store: VoxTypeStore
   private lateinit var session: NativeSession
@@ -67,9 +72,15 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   private var waveform: BubbleWaveformView? = null
   private var spinner: ProgressBar? = null
   private var dismissedForKeyboard = false
-  private var foregroundMode = ForegroundMode.NONE
-  private val bubbleRefresh = Runnable { if (connected) refreshBubble() }
-  var connected = false; private set
+  @Volatile private var foregroundMode = ForegroundMode.NONE
+  val foregroundStatus: String get() = foregroundMode.name.lowercase()
+  @Volatile var foregroundError: String? = null; private set
+  @Volatile var hiddenReason = "disconnected"; private set
+  private var focusFailure = "waiting_for_editor"
+  private val bubbleRefresh = BubbleRefresh(main) {
+    if (!connected) false else { refreshBubbleOnce(); needsBubbleRetry() }
+  }
+  @Volatile var connected = false; private set
   @Volatile private var audioLevel = 0f
   private var placementAnimator: ValueAnimator? = null
   private var dockRight = true
@@ -103,12 +114,16 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     windows = getSystemService(Context.WINDOW_SERVICE) as WindowManager
     store = VoxTypeStore(this)
     session = NativeSession(this)
+    BubbleHealth.record(this, "service_created")
   }
 
   override fun onServiceConnected() {
     super.onServiceConnected()
     connected = true
     VoxLog.d("accessibility connected")
+    runCatching { BubbleHealth.observeAccessibility(this) }
+      .onFailure { VoxLog.w("accessibility observation failed", it) }
+    BubbleHealth.record(this, "service_connected")
     refreshBubble()
     serviceScope.launch(Dispatchers.IO) { runCatching { store.pruneAudio() }.onFailure { VoxLog.w("audio pruning failed", it) } }
     VoxTypeNativeModule.changed()
@@ -122,14 +137,14 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     override fun onFinishInput() {
       super.onFinishInput()
       stopRecording()
-      removeBubble()
+      dismissedForKeyboard = false
+      hideBubble("keyboard_closed")
       requestBubbleRefresh()
     }
   }
 
   private fun requestBubbleRefresh() {
-    main.removeCallbacks(bubbleRefresh)
-    main.postDelayed(bubbleRefresh, VoxConstants.BUBBLE_REFRESH_DELAY_MS)
+    bubbleRefresh.request()
   }
 
   override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -145,11 +160,14 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   }
   override fun onUnbind(intent: android.content.Intent?): Boolean {
     connected = false
-    main.removeCallbacks(bubbleRefresh)
+    bubbleRefresh.cancel()
     VoxLog.d("accessibility unbound")
+    runCatching { BubbleHealth.observeAccessibility(this) }
+      .onFailure { VoxLog.w("accessibility observation failed", it) }
+    BubbleHealth.record(this, "service_unbound")
     VoxTypeNativeModule.changed()
     stopRecording()
-    removeBubble()
+    hideBubble("disconnected")
     stopForeground(STOP_FOREGROUND_REMOVE)
     foregroundMode = ForegroundMode.NONE
     return super.onUnbind(intent)
@@ -157,13 +175,16 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   override fun onDestroy() {
     connected = false
     VoxLog.d("accessibility destroyed")
+    BubbleHealth.record(this, "service_destroyed")
+    bubbleRefresh.cancel()
     main.removeCallbacksAndMessages(null)
     lifecycleGeneration++; recordingUserId = null
-    capture?.stop(); engine?.close(); removeBubble(); instance = null
+    capture?.stop(); engine?.close(); hideBubble("disconnected"); instance = null
     stopForeground(STOP_FOREGROUND_REMOVE)
     foregroundMode = ForegroundMode.NONE
     releaseTarget()
     serviceScope.cancel()
+    store.close()
     super.onDestroy()
   }
 
@@ -173,17 +194,20 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   }
 
   private fun safeFocus(): AccessibilityNodeInfo? {
-    if (!keyboardVisible()) return null
+    focusFailure = "waiting_for_editor"
+    if (!keyboardVisible()) { focusFailure = "keyboard_closed"; return null }
     val node = try { focus() } catch (e: Exception) { VoxLog.w("focus unavailable", e); null } ?: return null
     var owned = true
     try {
       val info = inputMethod?.currentInputEditorInfo ?: return null
+      // Editor metadata can still belong to the previous app during a window transition.
+      if (info.packageName == null || info.packageName != node.packageName?.toString()) return null
       val ok = FocusGuard.isEditableTextField(
         node, packageName,
         info.packageName, info.inputType,
         FocusGuard.editorNoPersonalizedLearning(info.imeOptions),
       )
-      if (!ok) return null
+      if (!ok) { focusFailure = "unsupported_field"; return null }
       owned = false
       return node
     } catch (e: Exception) {
@@ -227,27 +251,50 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   private fun expanded(): Boolean = status in listOf("listening", "processing", "connecting", "saved")
 
   fun refreshBubble() {
+    refreshBubbleOnce()
+    if (needsBubbleRetry()) requestBubbleRefresh()
+  }
+
+  private fun needsBubbleRetry(): Boolean = connected &&
+    (foregroundError != null || hiddenReason in listOf("waiting_for_editor", "overlay_error", "state_error"))
+
+  private fun refreshBubbleOnce() {
     try {
       refreshBubbleState()
     } catch (error: Exception) {
       VoxLog.w("bubble refresh failed", error)
-      removeBubble()
+      hideBubble("state_error")
     }
   }
 
+  private fun bubbleReason(reason: String) {
+    if (hiddenReason == reason) return
+    hiddenReason = reason
+    BubbleHealth.record(this, "bubble:$reason")
+    VoxTypeNativeModule.changed()
+  }
+
+  private fun hideBubble(reason: String) { removeBubble(); bubbleReason(reason) }
+
   private fun refreshBubbleState() {
     updateBubbleForeground()
-    if (!connected) { removeBubble(); return }
+    if (!connected) { hideBubble("disconnected"); return }
     // Revalidate the target on both accessibility events and delayed editor callbacks.
     if (status == DictationStatus.LISTENING.bridge) {
       val current = safeFocus()
       val same = isSameAsTarget(current)
       current?.recycle()
-      if (!same || !store.bubbleEnabled) { stopRecording(); removeBubble(); return }
+      if (!same || !store.bubbleEnabled) { stopRecording(); hideBubble(focusFailure); return }
     }
     if (!keyboardVisible()) dismissedForKeyboard = false
-    if (dismissedForKeyboard) { removeBubble(); return }
-    if (session.token == null || InAppRecorder.busy || !store.bubbleEnabled || ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED || !hasValidFocus()) { removeBubble(); return }
+    if (dismissedForKeyboard) { hideBubble("dismissed"); return }
+    if (!store.bubbleEnabled) { bubbleRefresh.cancel(); hideBubble("disabled"); return }
+    if (session.token == null) { bubbleRefresh.cancel(); hideBubble("sign_in_required"); return }
+    if (InAppRecorder.busy) { hideBubble("in_app_recording"); return }
+    if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+      hideBubble("microphone_permission"); return
+    }
+    if (!hasValidFocus()) { hideBubble(focusFailure); return }
     if (bubble == null) {
       createBubble()
       speechStream().warm()
@@ -255,6 +302,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     if (bubble == null) return
     updateBubbleContent()
     if (!dragging && safeBounds() != lastSafeBounds) placeBubble(animate = true)
+    if (bubble != null) bubbleReason("visible")
   }
 
   private val Int.dp: Int get() = (this * resources.displayMetrics.density).toInt()
@@ -296,7 +344,12 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     val root = bubble ?: return
     val params = bubbleParams ?: return
     try { windows.updateViewLayout(root, params) }
-    catch (e: Exception) { VoxLog.w("bubble layout failed", e) }
+    catch (e: Exception) {
+      VoxLog.w("bubble layout failed", e)
+      // A stale reference otherwise prevents createBubble from ever running again.
+      hideBubble("overlay_error")
+      requestBubbleRefresh()
+    }
   }
 
   private fun placeBubble(width: Int? = null, animate: Boolean = true) {
@@ -451,6 +504,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     } catch (e: Exception) {
       VoxLog.e("add bubble failed", e)
       bubble = null; bubbleParams = null
+      bubbleReason("overlay_error")
     }
   }
 
@@ -672,7 +726,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       // Dismiss this keyboard session, preserving the user's enabled preference.
       dismissedForKeyboard = true
       if (status == DictationStatus.LISTENING.bridge) stopRecording()
-      removeBubble()
+      hideBubble("dismissed")
       try { VoxTypeNativeModule.changed() } catch (e: Exception) { VoxLog.w("notify change failed", e) }
       return
     }
@@ -755,7 +809,12 @@ class VoxTypeAccessibilityService : AccessibilityService() {
           recordingDuration = duration
           releaseMicrophoneForeground()
           setStatus(DictationStatus.PROCESSING)
-          stream.finalize { finishDictation(it, recordingApiUrl) }
+          try { stream.finalize { finishDictation(it, recordingApiUrl) } }
+          catch (error: Exception) {
+            VoxLog.e("speech finalization failed", error)
+            BubbleHealth.record(this, "finalization_error:${error.javaClass.simpleName}")
+            recoverRecording()
+          }
         }
       }, {
         main.post {
@@ -808,6 +867,8 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       if (Build.VERSION.SDK_INT >= 29) startForeground(VoxConstants.NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
       else startForeground(VoxConstants.NOTIFICATION_ID, notification)
       foregroundMode = ForegroundMode.MICROPHONE
+      foregroundError = null
+      BubbleHealth.record(this, "foreground:microphone")
     } catch (e: Exception) {
       VoxLog.e("foreground notification failed", e)
       throw e
@@ -816,7 +877,8 @@ class VoxTypeAccessibilityService : AccessibilityService() {
 
   private fun releaseMicrophoneForeground() {
     // stopForeground clears the microphone type before returning to idle specialUse.
-    stopForeground(STOP_FOREGROUND_REMOVE)
+    try { stopForeground(STOP_FOREGROUND_REMOVE) }
+    catch (error: Exception) { VoxLog.w("release microphone foreground failed", error) }
     foregroundMode = ForegroundMode.NONE
     updateBubbleForeground()
   }
@@ -829,6 +891,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     if (!enabled) {
       if (foregroundMode != ForegroundMode.NONE) stopForeground(STOP_FOREGROUND_REMOVE)
       foregroundMode = ForegroundMode.NONE
+      foregroundError = null
       return
     }
     if (foregroundMode == ForegroundMode.BUBBLE) return
@@ -853,10 +916,33 @@ class VoxTypeAccessibilityService : AccessibilityService() {
         startForeground(VoxConstants.NOTIFICATION_ID, builder.build(), ServiceInfo.FOREGROUND_SERVICE_TYPE_NONE)
       }
       foregroundMode = ForegroundMode.BUBBLE
+      foregroundError = null
+      BubbleHealth.record(this, "foreground:bubble")
+      VoxTypeNativeModule.changed()
     } catch (error: Exception) {
       // OEM background restrictions must not crash and disconnect accessibility.
       VoxLog.w("bubble foreground notification unavailable", error)
+      val reason = error.javaClass.simpleName
+      if (foregroundError != reason) {
+        foregroundError = reason
+        BubbleHealth.record(this, "foreground_error:$reason")
+        VoxTypeNativeModule.changed()
+      }
     }
+  }
+
+  private fun recoverRecording() {
+    lifecycleGeneration++
+    recordingUserId = null
+    recordingFile = null
+    discardNext = false
+    try { capture?.stop() } catch (error: Exception) { VoxLog.w("capture recovery failed", error) }
+    capture = null
+    try { engine?.close() } catch (error: Exception) { VoxLog.w("speech recovery failed", error) }
+    engine = null
+    releaseTarget()
+    releaseMicrophoneForeground()
+    setStatus(DictationStatus.IDLE)
   }
 
   private fun finishDictation(original: String, apiUrl: String) {
@@ -866,16 +952,25 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     val duration = recordingDuration
     recordingFile = null; recordingUserId = null
     serviceScope.launch(Dispatchers.IO) {
-      val cleaned = if (store.cleanupEnabled) cleanup(original) else original
+      val cleaned = try { if (store.cleanupEnabled) cleanup(original) else original }
+        catch (error: Exception) { VoxLog.w("cleanup preference unavailable", error); original }
       val id = try {
         store.save(userId, cleaned, original, duration, audio, apiUrl)
       } catch (e: Exception) {
         VoxLog.e("dictation save failed", e)
+        BubbleHealth.record(this@VoxTypeAccessibilityService, "save_error:${e.javaClass.simpleName}")
+        withContext(Dispatchers.Main) {
+          if (generation == lifecycleGeneration) {
+            recoverRecording()
+            android.widget.Toast.makeText(this@VoxTypeAccessibilityService, "Couldn’t save this recording", android.widget.Toast.LENGTH_LONG).show()
+          }
+        }
         return@launch
       }
       withContext(Dispatchers.Main) {
         if (generation != lifecycleGeneration) return@withContext
-        val delivered = if (cleaned.isNotBlank()) insertIntoTarget(cleaned) else false
+        val delivered = try { cleaned.isNotBlank() && insertIntoTarget(cleaned) }
+          catch (error: Exception) { VoxLog.w("target insertion failed", error); false }
         if (delivered) {
           try { store.setDelivery(id, "pasted") } catch (e: Exception) { VoxLog.w("setDelivery failed", e) }
         }

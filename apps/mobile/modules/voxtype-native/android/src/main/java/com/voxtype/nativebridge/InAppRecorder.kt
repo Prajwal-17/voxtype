@@ -22,7 +22,10 @@ object InAppRecorder {
   @Volatile var durationMs = 0L; private set
   val busy: Boolean get() = status == "listening" || status == "processing"
   fun snapshot() = mapOf("status" to status, "text" to text, "error" to error, "durationMs" to durationMs)
-  private fun changed() { VoxTypeNativeModule.changed() }
+  private fun changed() {
+    VoxTypeNativeModule.changed()
+    main.post { VoxTypeAccessibilityService.instance?.refreshBubble() }
+  }
 
   fun start(context: Context) {
     check(!busy) { "A recording is already running." }

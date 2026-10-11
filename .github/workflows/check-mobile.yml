@@ -1,0 +1,60 @@
+name: Check mobile
+
+on:
+  pull_request:
+    paths:
+      - 'apps/mobile/**'
+      - 'packages/shared/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'tests/mobile-bubble-health.test.ts'
+      - '.github/workflows/check-mobile.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Check mobile UI and diagnostic reports
+        run: |
+          pnpm --filter @voxtype/mobile check-types
+          pnpm --filter @voxtype/mobile lint
+          pnpm exec tsx --test tests/mobile-bubble-health.test.ts
+      - name: Generate Android project
+        run: pnpm --dir apps/mobile exec expo prebuild --platform android --clean --no-install
+      - name: Check native lifecycle and lint
+        working-directory: apps/mobile/android
+        run: |
+          ./gradlew --no-daemon :voxtype-native:testDebugUnitTest :voxtype-native:lintDebug \
+            -x :react-native-worklets:lintAnalyzeDebug \
+            -x :expo-modules-core:lintAnalyzeDebug
+      - name: Upload native check reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-check-reports
+          path: |
+            apps/mobile/modules/voxtype-native/android/build/reports/
+            apps/mobile/modules/voxtype-native/android/build/test-results/
+          if-no-files-found: ignore

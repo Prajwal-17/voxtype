@@ -2,7 +2,9 @@ package com.voxtype.nativebridge
 
 import android.Manifest
 import android.content.Intent
+import android.content.Context
 import android.content.pm.PackageManager
+import android.database.ContentObserver
 import android.provider.Settings
 import android.os.Handler
 import android.os.Looper
@@ -13,6 +15,8 @@ import expo.modules.kotlin.functions.Queues
 import java.lang.ref.WeakReference
 
 class VoxTypeNativeModule : Module() {
+  private var observedContext: Context? = null
+  private var permissionObserver: ContentObserver? = null
   companion object {
     private var active = WeakReference<VoxTypeNativeModule>(null)
     private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
@@ -25,18 +29,36 @@ class VoxTypeNativeModule : Module() {
     }
   }
 
+  private fun observePermissions() {
+    if (permissionObserver != null) return
+    val context = appContext.reactContext?.applicationContext ?: return
+    val observer = object : ContentObserver(mainHandler) {
+      override fun onChange(selfChange: Boolean) {
+        runCatching { BubbleHealth.observeAccessibility(context) }
+          .onFailure { VoxLog.w("accessibility observation failed", it) }
+        changed()
+      }
+    }
+    try {
+      context.contentResolver.registerContentObserver(
+        Settings.Secure.getUriFor(Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES), false, observer)
+    } catch (error: Exception) { VoxLog.w("accessibility observer unavailable", error); return }
+    observedContext = context
+    permissionObserver = observer
+  }
+
   override fun definition() = ModuleDefinition {
     Name("VoxTypeNative")
     Events("onChange")
     OnCreate {
       active = WeakReference(this@VoxTypeNativeModule)
+      observePermissions()
     }
 
     AsyncFunction("getSnapshot") {
       val context = requireNotNull(appContext.reactContext)
       VoxTypeStore(context).use { store ->
-        val enabled = Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
-          ?.contains("${context.packageName}/${VoxTypeAccessibilityService::class.java.name}", true) == true
+        val enabled = BubbleHealth.observeAccessibility(context)
         mapOf(
           "accessibilityEnabled" to enabled,
           "accessibilityConnected" to (VoxTypeAccessibilityService.instance?.connected == true),
@@ -48,6 +70,7 @@ class VoxTypeNativeModule : Module() {
           "syncError" to TranscriptUploads.error,
           "status" to (VoxTypeAccessibilityService.instance?.status ?: DictationStatus.IDLE.bridge),
           "inApp" to InAppRecorder.snapshot(),
+          "bubbleHealth" to BubbleHealth.snapshot(context),
         )
       }
     }
@@ -126,8 +149,12 @@ class VoxTypeNativeModule : Module() {
       VoxTypeStore(context).use { it.page(requireNotNull(NativeSession(context).userId), cursor) }
     }
     OnActivityEntersBackground { mainHandler.post { InAppRecorder.stop() } }
-    OnActivityEntersForeground { refreshBubble() }
+    OnActivityEntersForeground { observePermissions(); changed(); refreshBubble() }
     OnDestroy {
+      runCatching { permissionObserver?.let { observedContext?.contentResolver?.unregisterContentObserver(it) } }
+        .onFailure { VoxLog.w("accessibility observer cleanup failed", it) }
+      permissionObserver = null
+      observedContext = null
       if (active.get() === this@VoxTypeNativeModule) active.clear()
       mainHandler.post { InAppRecorder.cancel() }
     }

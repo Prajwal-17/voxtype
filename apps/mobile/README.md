@@ -42,6 +42,35 @@ Android owns accessibility permission and service binding. This does not silentl
 permission or bypass a user force-stop. The recurring shutdown still needs testing on the
 affected phone, including its battery restrictions.
 
+Bubble recovery retries transient editor, overlay, and idle foreground failures five times
+over a short window (250 ms through 4 seconds), then waits for another event. Disabling the
+bubble, signing out, or disconnecting accessibility cancels pending recovery. Recovery never
+enables accessibility or starts the microphone on its own. The Settings screen reports enabled
+access separately from a reconnecting service.
+
+### Diagnose a disappearing bubble
+
+On iQOO/Funtouch OS, allow VoxType in Autostart and background power consumption management.
+The **App background settings** action opens Android's app details; use Settings search for
+Autostart or background power consumption if those controls are elsewhere on your OS version.
+These controls help background availability but cannot guarantee that Android will retain access.
+
+When the bubble disappears, check the actual Android accessibility switch before toggling it.
+Use **Copy bubble diagnostics** in VoxType Settings before re-enabling accessibility. The report
+contains the installed app/device versions, permission and connection state, foreground errors,
+battery restriction signals, the last recorded process exit, and up to 20 local service events.
+It excludes transcripts, audio, account identifiers, and credentials. Events record when VoxType
+observed a change; the last process exit is historical evidence, not a diagnosis of why access
+was disabled. Manufacturer-specific battery/autostart restrictions may not appear in Android's
+standard restriction APIs.
+
+Test Android 14 on the affected phone: leave VoxType enabled for at least 15 minutes, finish and
+cancel dictations, lock/unlock, rotate, reboot and unlock, and switch between normal text fields.
+Compare enabled-but-disconnected with a genuinely OFF switch. Do not force-stop or uninstall the
+app during this comparison. Install APK updates over the existing app using the same package and
+signing identity; an uninstall resets its grants. If the switch turns OFF again, retain a diagnostic
+report and capture `VoxType`, `AndroidRuntime`, and accessibility system logs before re-enabling it.
+
 The Deepgram socket remains open for seven minutes after the last completed dictation, with the idle deadline reset after each take; active recording never expires at the idle deadline. Idle KeepAlive text frames are sent every four seconds; a dropped socket gets a fresh short-lived token on reconnect. Connection setup is bounded to 20 seconds. Failed or unconfirmed sessions retire their socket so late results cannot enter another take. The microphone is released between dictations. DeepSeek cleanup is optional and falls back to the original transcript.
 
 All transcripts stay in local SQLite. The newest 10 WAV files stay in private storage; each new saved recording deletes older audio and clears its file reference without removing transcripts. Version 2 upgrades the existing database without deleting history and replaces the old 5/10/15 preference with the fixed limit of 10.
@@ -95,6 +124,12 @@ From the generated Android directory, run:
   -x :react-native-worklets:lintAnalyzeDebug \
   -x :expo-modules-core:lintAnalyzeDebug
 ```
+
+Lifecycle coverage includes SDK 33, 34 (Android 14), and 35. Recovery tests check late editor
+readiness, event bursts, bounded retry budgets, cancellation, foreground failures, and microphone
+release. Health tests check component matching, observed disablement, and bounded local reporting.
+The TypeScript tests also check reconnecting labels and exclusion of dictated text from copied
+reports. These checks do not simulate Funtouch OS's process management.
 
 The exclusions avoid the existing upstream Kotlin lint crash; they do not skip VoxType
 source analysis. Seven JVM tests cover edge selection, expansion anchoring, keyboard

@@ -24,6 +24,7 @@ import { nativeTheme as theme } from '@voxtype/shared';
 import { emptyAnalytics, money, moneyRange, type Analytics } from '@voxtype/shared/analytics';
 import { Action, Card, Loader, Setting, Text } from '../components/primitives';
 import { currentUser, getAnalytics, signIn, signOut, type User } from '../lib/mobile-api';
+import { accessibilityLabel, bubbleDiagnostics } from '../lib/bubble-health';
 import Native, {
   isVoxTypeNativeAvailable,
 } from '../../modules/voxtype-native/src/VoxTypeNativeModule';
@@ -433,7 +434,11 @@ export default function Home() {
                         </Text>
                         <PermissionRow
                           label="Accessibility"
-                          granted={snapshot.accessibilityEnabled && snapshot.accessibilityConnected}
+                          granted={snapshot.accessibilityEnabled}
+                          stateText={accessibilityLabel(
+                            snapshot.accessibilityEnabled,
+                            snapshot.accessibilityConnected,
+                          )}
                           disabled={busy || preview}
                           onPress={() =>
                             void run(async () => {
@@ -447,6 +452,18 @@ export default function Home() {
                             check accessibility and the app’s battery settings.
                           </Text>
                         )}
+                        {!snapshot.accessibilityEnabled && (
+                          <Text style={[ui.muted, { color: c.danger }]}>
+                            Accessibility is off. Enable VoxType in Android Settings to restore the
+                            bubble.
+                          </Text>
+                        )}
+                        {snapshot.bubbleHealth?.foregroundError && (
+                          <Text style={[ui.muted, { color: c.danger }]}>
+                            Background protection is unavailable. Check the app’s background
+                            settings.
+                          </Text>
+                        )}
                         <PermissionRow
                           label="Microphone"
                           granted={snapshot.microphoneGranted}
@@ -454,6 +471,33 @@ export default function Home() {
                           onPress={() =>
                             void run(async () => {
                               await microphone();
+                            })
+                          }
+                        />
+                        <Text style={[ui.muted, { marginVertical: 12 }]}>
+                          On iQOO or vivo, allow Autostart and background power usage for VoxType.
+                          Battery settings can affect whether the service stays available.
+                        </Text>
+                        <Action
+                          label="App background settings"
+                          secondary
+                          disabled={busy || preview}
+                          onPress={() =>
+                            void run(async () => {
+                              await Linking.openSettings();
+                            })
+                          }
+                        />
+                        <Action
+                          label="Copy bubble diagnostics"
+                          secondary
+                          disabled={busy || preview}
+                          onPress={() =>
+                            void run(async () => {
+                              const latest = await Native.getSnapshot();
+                              await Clipboard.setStringAsync(bubbleDiagnostics(latest));
+                              setSnapshot(latest);
+                              setMessage('Bubble diagnostics copied.');
                             })
                           }
                         />
@@ -593,17 +637,19 @@ function PermissionRow({
   granted,
   disabled,
   onPress,
+  stateText,
 }: {
   label: string;
   granted: boolean;
   disabled: boolean;
   onPress: () => void;
+  stateText?: string;
 }) {
   return (
     <View style={s.row}>
       <Text>{label}</Text>
       {granted ? (
-        <Text style={{ color: c.primary, fontWeight: '500' }}>Enabled</Text>
+        <Text style={{ color: c.primary, fontWeight: '500' }}>{stateText ?? 'Enabled'}</Text>
       ) : (
         <Action label="Allow" secondary disabled={disabled} onPress={onPress} />
       )}

@@ -8,6 +8,7 @@ object VoxConstants {
   const val BUBBLE_CHANNEL_ID = "voxtype_bubble"
   const val BUBBLE_CHANNEL_NAME = "VoxType voice bubble"
   const val BUBBLE_REFRESH_DELAY_MS = 250L
+  const val BUBBLE_REFRESH_ATTEMPTS = 5
 
   const val SOCKET_KEEP_ALIVE_MS = 420_000L
   const val MAINTENANCE_INTERVAL_MS = 4_000L
