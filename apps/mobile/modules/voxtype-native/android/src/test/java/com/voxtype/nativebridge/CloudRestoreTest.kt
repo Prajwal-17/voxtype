@@ -80,7 +80,7 @@ class CloudRestoreTest {
   }
 
   @Test fun failedCloudDeleteKeepsPendingTextAndSuccessIsAccountScoped() {
-    NativeSession(context).save("bearer","owner",url)
+    var account = Triple("owner",url,"bearer")
     var deletedId=""
     VoxTypeStore(context,onChanged = {}).use { store ->
       deletedId=store.save("owner","Pending text","Pending text",1000,null,url)
@@ -91,11 +91,22 @@ class CloudRestoreTest {
         .code(code).message("test").body("".toResponseBody()).build()
     }.build()
     try {
-      kotlinx.coroutines.runBlocking { TranscriptUploads.delete(context,deletedId,client(503)) }
+      kotlinx.coroutines.runBlocking { TranscriptUploads.delete(context,deletedId,{ account },client(503)) }
       fail("Cloud failure must preserve the local record")
     } catch (_: java.io.IOException) { }
     VoxTypeStore(context,onChanged = {}).use { assertEquals("Pending text",it.text(deletedId)) }
-    kotlinx.coroutines.runBlocking { TranscriptUploads.delete(context,deletedId,client(204)) }
+    val changedAccount = okhttp3.OkHttpClient.Builder().addInterceptor { chain ->
+      account = Triple("other",url,"other-bearer")
+      okhttp3.Response.Builder().request(chain.request()).protocol(okhttp3.Protocol.HTTP_1_1)
+        .code(204).message("test").body("".toResponseBody()).build()
+    }.build()
+    try {
+      kotlinx.coroutines.runBlocking { TranscriptUploads.delete(context,deletedId,{ account },changedAccount) }
+      fail("An account switch must not remove the original account’s cache")
+    } catch (_: java.io.IOException) { }
+    VoxTypeStore(context,onChanged = {}).use { assertEquals("Pending text",it.text(deletedId)) }
+    account = Triple("owner",url,"bearer")
+    kotlinx.coroutines.runBlocking { TranscriptUploads.delete(context,deletedId,{ account },client(204)) }
     VoxTypeStore(context,onChanged = {}).use { assertNull(it.text(deletedId));assertNotNull(it.text("other-record")) }
   }
 
