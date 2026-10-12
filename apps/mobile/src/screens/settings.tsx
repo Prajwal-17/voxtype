@@ -155,6 +155,30 @@ export default function SettingsScreen() {
         </Card>
       )}
       <Action label="Account →" secondary onPress={() => router.push('/account')} />
+      {snapshot?.appHealth && (
+        <Card style={{ gap: 12 }}>
+          <Text style={ui.muted}>
+            {snapshot.appHealth.appName} · {snapshot.appHealth.appVersion}
+          </Text>
+          {snapshot.appHealth.lastExit && (
+            <Text style={ui.muted}>
+              Previous Android exit: {snapshot.appHealth.lastExit.reason.replaceAll('_', ' ')}
+            </Text>
+          )}
+          <Action
+            label="Copy app diagnostics"
+            secondary
+            disabled={!app.available || app.busy}
+            onPress={() =>
+              void app.run(async () => {
+                const latest = await Native.getSnapshot();
+                await Clipboard.setStringAsync(JSON.stringify(latest.appHealth, null, 2));
+                app.notify('Diagnostics copied');
+              })
+            }
+          />
+        </Card>
+      )}
     </Screen>
   );
 }

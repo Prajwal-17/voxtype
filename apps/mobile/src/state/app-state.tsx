@@ -104,7 +104,9 @@ function useAppStateValue() {
       applyUser(next);
       if (next) {
         await refresh();
-        void Native.syncTranscripts();
+        void Native.syncTranscripts().catch(() => {
+          if (!disposed) notify('Cloud sync unavailable. Try again.', 'error');
+        });
       }
     };
     void checkAccount()

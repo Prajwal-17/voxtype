@@ -1,17 +1,36 @@
 import '../global.css';
 
 import * as WebBrowser from 'expo-web-browser';
-import { Stack } from 'expo-router';
+import { Stack, type ErrorBoundaryProps } from 'expo-router';
+import { View } from 'react-native';
 import { ReducedMotionConfig, ReduceMotion } from 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useEffect } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
 import { AppStateProvider } from '../state/app-state';
-import { Loader } from '../components/primitives';
+import { Action, Loader, Text } from '../components/primitives';
+import { nativeTheme } from '@voxtype/shared';
 import { useFonts } from 'expo-font';
 
 WebBrowser.maybeCompleteAuthSession();
 void SplashScreen.preventAutoHideAsync();
+
+export function ErrorBoundary({ retry }: ErrorBoundaryProps) {
+  return (
+    <View
+      style={{
+        flex: 1,
+        justifyContent: 'center',
+        padding: 32,
+        gap: 16,
+        backgroundColor: nativeTheme.colors.background,
+      }}
+    >
+      <Text>This screen couldn’t load.</Text>
+      <Action label="Try again" onPress={() => void retry()} />
+    </View>
+  );
+}
 
 export default function Layout() {
   // Expo's asset bundler requires a static require for local fonts.

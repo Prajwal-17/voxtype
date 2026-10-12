@@ -23,14 +23,24 @@ class TranscriptSyncJob : JobService() {
   override fun onStopJob(params: JobParameters): Boolean { task?.cancel(); return true }
   companion object {
     private const val JOB_ID = 7342
-    fun schedule(context: Context) {
-      val scheduler = context.getSystemService(JobScheduler::class.java)
-      if (scheduler.getPendingJob(JOB_ID) != null) return
-      scheduler.schedule(JobInfo.Builder(JOB_ID, ComponentName(context, TranscriptSyncJob::class.java))
-        .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
-        .setPersisted(true)
-        .setBackoffCriteria(30_000, JobInfo.BACKOFF_POLICY_EXPONENTIAL)
-        .build())
+    fun schedule(context: Context): Boolean {
+      // This also runs during sign-in/resume. A denied retry job must never prevent
+      // session setup or the immediate foreground sync (which does not need a job).
+      return try {
+        val scheduler = context.getSystemService(JobScheduler::class.java) ?: return false
+        if (scheduler.getPendingJob(JOB_ID) != null) return true
+        val result = scheduler.schedule(JobInfo.Builder(JOB_ID, ComponentName(context, TranscriptSyncJob::class.java))
+          .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
+          .setPersisted(true)
+          .setBackoffCriteria(30_000, JobInfo.BACKOFF_POLICY_EXPONENTIAL)
+          .build())
+        if (result != JobScheduler.RESULT_SUCCESS) VoxLog.w("cloud retry scheduling rejected")
+        result == JobScheduler.RESULT_SUCCESS
+      } catch (error: Exception) {
+        VoxLog.w("cloud retry scheduling unavailable; foreground sync can continue", error)
+        AppHealth.recordIssue(context, "sync_scheduler", error)
+        false
+      }
     }
   }
 }

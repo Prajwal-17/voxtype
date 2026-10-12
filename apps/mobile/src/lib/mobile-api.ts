@@ -4,9 +4,10 @@ import * as WebBrowser from 'expo-web-browser';
 import VoxTypeNative from '../../modules/voxtype-native/src/VoxTypeNativeModule';
 import { createAuthCompletion } from './auth-completion';
 import { resolveApiUrl } from './environment';
+import { mobileAuthVariant } from './auth-variant';
+import { parseAnalyticsResponse } from './analytics-response';
 
 export const API_URL = resolveApiUrl(process.env.EXPO_PUBLIC_API_URL, __DEV__);
-const REDIRECT_URL = 'voxtype://auth/callback';
 
 export type User = { id: string; name: string; email: string; image: string | null };
 
@@ -31,9 +32,11 @@ export async function signIn(): Promise<User> {
   const state = Crypto.randomUUID();
   authCompletion.reset();
   await VoxTypeNative.setAuthState(state);
+  const snapshot = await VoxTypeNative.getSnapshot();
+  const { variant, callbackUrl } = mobileAuthVariant(snapshot.appHealth?.packageName);
   const result = await WebBrowser.openAuthSessionAsync(
-    `${API_URL}/api/mobile-auth/start?state=${encodeURIComponent(state)}`,
-    REDIRECT_URL,
+    `${API_URL}/api/mobile-auth/start?${new URLSearchParams({ state, variant }).toString()}`,
+    callbackUrl,
   );
   if (result.type !== 'success') {
     const pending = authCompletion.resultFor(state);
@@ -42,7 +45,7 @@ export async function signIn(): Promise<User> {
   }
   const callback = new URL(result.url);
   if (
-    `${callback.protocol}//${callback.host}${callback.pathname}` !== REDIRECT_URL ||
+    `${callback.protocol}//${callback.host}${callback.pathname}` !== callbackUrl ||
     callback.searchParams.get('state') !== state
   ) {
     throw new Error('Sign-in response could not be verified. Try again.');
@@ -115,7 +118,7 @@ export async function getAnalytics(
     },
   );
   if (!response.ok) throw new Error('Analytics unavailable');
-  return ((await response.json()) as { data: Analytics }).data;
+  return parseAnalyticsResponse(await response.json());
 }
 
 export async function exportInsights(

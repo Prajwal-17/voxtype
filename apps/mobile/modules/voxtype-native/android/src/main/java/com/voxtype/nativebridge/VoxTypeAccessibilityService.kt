@@ -61,6 +61,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   private val main = Handler(Looper.getMainLooper())
   private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main + CoroutineExceptionHandler { _, error ->
     VoxLog.e("accessibility task failed", error)
+    AppHealth.recordIssue(this, "accessibility_task", error)
     BubbleHealth.record(this, "service_error:${error.javaClass.simpleName}")
     main.post { if (connected) recoverRecording() }
   })
@@ -880,7 +881,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       manager.createNotificationChannel(NotificationChannel(VoxConstants.CHANNEL_ID, VoxConstants.CHANNEL_NAME, NotificationManager.IMPORTANCE_LOW))
       val notification = Notification.Builder(this, VoxConstants.CHANNEL_ID)
         .setSmallIcon(R.drawable.voxtype_notification)
-        .setContentTitle("VoxType is listening")
+        .setContentTitle("${applicationInfo.loadLabel(packageManager)} is listening")
         .setContentText("Tap the bubble to stop and insert text")
         .setOngoing(true).build()
       if (Build.VERSION.SDK_INT >= 29) startForeground(VoxConstants.NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
@@ -920,7 +921,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
         VoxConstants.BUBBLE_CHANNEL_ID, VoxConstants.BUBBLE_CHANNEL_NAME, NotificationManager.IMPORTANCE_LOW))
       val builder = Notification.Builder(this, VoxConstants.BUBBLE_CHANNEL_ID)
         .setSmallIcon(R.drawable.voxtype_notification)
-        .setContentTitle("VoxType voice bubble is ready")
+        .setContentTitle("${applicationInfo.loadLabel(packageManager)} voice bubble is ready")
         .setContentText("Open a text field to dictate. Manage the bubble in VoxType.")
         .setOnlyAlertOnce(true)
         .setOngoing(true)

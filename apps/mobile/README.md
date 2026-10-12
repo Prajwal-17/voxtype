@@ -7,7 +7,7 @@ The app keeps the active keyboard. Its accessibility service shows a small muted
 - Requires Android 13+ (API 33). This is a local Expo module, so the native service needs a development client or installed app; Expo Go cannot run it.
 - Development builds default to the local API at `http://localhost:8787`; release builds default to the production VoxType Worker. `EXPO_PUBLIC_API_URL` overrides either default and contains no provider secret.
 - The Worker needs `DEEPGRAM_API_KEY` and `DEEPSEEK_API_KEY` as Wrangler secrets, plus its existing Google and Better Auth secrets. The Deepgram key must support `/v1/auth/grant`.
-- Google sign-in uses a fixed Worker OAuth callback followed by `voxtype://auth/callback` with a one-time grant. The signed bearer session is encrypted with Android Keystore. Google OAuth redirect URIs still point to the Worker's `/api/auth/callback/google`.
+- Google sign-in uses a fixed Worker OAuth callback followed by `voxtype://auth/callback` (regular app) or `voxtype-dev://auth/callback` (Dev) with a one-time grant. The signed bearer session is encrypted with Android Keystore. Google OAuth redirect URIs still point to the Worker's `/api/auth/callback/google`.
 
 ## Local development
 
@@ -29,6 +29,46 @@ ADB forwarding lets the app reach the local API; the Google callback returns thr
 and register that localhost callback with Google.
 The Worker and D1 data run entirely on this machine. Google sign-in, Deepgram, and optional
 DeepSeek cleanup still use their external providers.
+
+## Standalone development APK
+
+Run **Android Development Build** in GitHub Actions, select `master` (or a commit), and
+provide the HTTPS API origin to test against. It builds a bundled APK that opens directly
+on the phone without a Metro server. Gradle uses release compilation for that standalone
+bundle; `APP_VARIANT=development` gives it a separate **VoxType Dev** app identity,
+`com.voxtype.dictation.mobile.dev`, and a version suffix containing the source commit.
+It does not publish a release or deploy the API.
+
+Download the artifact named `VoxType-Dev-<version>-<run>-<commit>.apk`. The APK uses
+`upload-artifact@v7` with `archive: false`, so that individual artifact downloads directly
+as an APK. The separate native check reports remain a ZIP. The run summary lists the
+source commit and APK checksum.
+
+**Check mobile** reuses the same build and native checks on mobile changes to `master`
+or a pull request, producing a Dev APK against `https://voxtype-dev-tunnel.prajwal.sh`
+in one Android job. That development tunnel and local API must be running during phone
+testing. Use the manual workflow when testing a different API origin. These phone APKs
+include ARM64 and ARMv7; x86 emulator builds are outside this workflow.
+
+VoxType Dev has its own session, history cache, microphone and accessibility permissions.
+Enable **VoxType Dev voice bubble** in Android accessibility settings. If the regular app's
+bubble is also enabled, turn that bubble off to avoid running two copies. Dev uses its own
+`voxtype-dev://auth/callback`, so sign-in returns to Dev even when VoxType is also installed.
+Pull the updated master code and restart your local API (`pnpm dev:api`) before signing
+in with this Dev APK. The server accepts only the two fixed app variants; regular clients
+keep their existing callback. No Google OAuth client setting needs to change.
+
+Settings → **Copy app diagnostics** includes app/package/version, phone/Android version,
+the previous process-exit reason (when Android exposes it), and the latest handled native
+issue type. It excludes tokens, transcripts, audio and crash traces. For an exact crash
+stack, collect `adb logcat -b crash -d` after the close.
+
+The PR #5 UI expects the extended analytics API (`streaks` and activity data). Pairing that
+APK with the older API causes its metric renderer to throw on `data.streaks.current`.
+Master includes the restored PR #5 UI and analytics API. Run that updated API with these
+clients. Analytics responses are validated before rendering, and screen errors offer a
+retry instead of reading missing streak/activity fields. The phone's actual crash still
+requires its log or exit diagnostics for confirmation.
 
 ## Bubble availability
 

@@ -79,6 +79,7 @@ class VoxTypeNativeModule : Module() {
           "status" to (VoxTypeAccessibilityService.instance?.status ?: DictationStatus.IDLE.bridge),
           "inApp" to InAppRecorder.snapshot(),
           "bubbleHealth" to BubbleHealth.snapshot(context),
+          "appHealth" to AppHealth.snapshot(context),
         )
       }
     }
@@ -100,7 +101,8 @@ class VoxTypeNativeModule : Module() {
     }
     AsyncFunction("getAuthState") {
       val prefs = requireNotNull(appContext.reactContext).getSharedPreferences("voxtype_oauth", 0)
-      if (System.currentTimeMillis() - prefs.getLong("created", 0) < 600_000) prefs.getString("state", null) else null
+      val age = System.currentTimeMillis() - prefs.getLong("created", 0)
+      if (age >= 0 && age < 600_000) prefs.getString("state", null) else null
     }
     AsyncFunction("setVocabulary") { terms: List<String> ->
       VoxTypeStore(requireNotNull(appContext.reactContext)).use { it.vocabulary = terms }
@@ -125,6 +127,7 @@ class VoxTypeNativeModule : Module() {
       val context = requireNotNull(appContext.reactContext)
       mainHandler.post { InAppRecorder.cancel() }
       NativeSession(context).clear()
+      context.getSharedPreferences("voxtype_oauth", 0).edit().clear().apply()
       mainHandler.post { VoxTypeAccessibilityService.instance?.onSignOut() }
     }
 

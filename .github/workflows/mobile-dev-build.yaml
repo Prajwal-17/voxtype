@@ -1,6 +1,18 @@
 name: Android Development Build
-run-name: ${{ inputs.commit_title || github.workflow }}
+run-name: ${{ inputs.commit_title || 'VoxType Dev standalone APK' }}
+
 on:
+  workflow_call:
+    inputs:
+      branch:
+        required: true
+        type: string
+      api_url:
+        required: true
+        type: string
+      commit_title:
+        required: false
+        type: string
   workflow_dispatch:
     inputs:
       commit_title:
@@ -10,14 +22,16 @@ on:
       branch:
         description: Branch or commit to build
         required: true
-        default: fix/android-bubble-recovery
+        default: master
         type: string
       api_url:
-        description: HTTPS API URL (required; no implicit production backend)
+        description: HTTPS API origin for this standalone test build
         required: true
         type: string
+
 permissions:
   contents: read
+
 jobs:
   android:
     runs-on: ubuntu-latest
@@ -25,6 +39,7 @@ jobs:
     env:
       CI: '1'
       EXPO_NO_TELEMETRY: '1'
+      APP_VARIANT: development
       EXPO_PUBLIC_API_URL: ${{ inputs.api_url }}
     steps:
       - uses: actions/checkout@v4
@@ -43,26 +58,74 @@ jobs:
       - uses: android-actions/setup-android@v3
         with:
           packages: platform-tools
-      - name: Validate backend URL
-        run: node -e 'const u = new URL(process.env.EXPO_PUBLIC_API_URL); if (u.protocol !== "https:" || u.username || u.password || u.search || u.hash || u.pathname !== "/") throw new Error("Use an HTTPS API origin");'
+      - name: Validate backend and record source
+        run: |
+          node -e 'const u = new URL(process.env.EXPO_PUBLIC_API_URL); if (u.protocol !== "https:" || u.username || u.password || u.search || u.hash || u.pathname !== "/") throw new Error("Use an HTTPS API origin");'
+          echo "VOXTYPE_BUILD_COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
       - run: pnpm install --frozen-lockfile
       - name: Check mobile source
         run: |
           pnpm --filter @voxtype/mobile lint
           pnpm --filter @voxtype/mobile check-types
-          pnpm exec tsx --test tests/mobile-*.test.ts
-      - name: Generate Android project
+          pnpm --filter @voxtype/api types
+          pnpm --filter @voxtype/api lint
+          pnpm exec tsc -p tests/tsconfig.json
+          pnpm exec tsx --test tests/*.test.ts
+      - name: Generate VoxType Dev Android project
         run: pnpm --dir apps/mobile exec expo prebuild --platform android --clean --no-install
-      - name: Build standalone test APK and validate native code
+      # Bundle JS so this internal development variant works without Metro.
+      # The distinct app identity comes from APP_VARIANT, not assembleRelease.
+      - name: Build standalone Dev APK and validate native code
         working-directory: apps/mobile/android
         run: >-
           ./gradlew --no-daemon --max-workers=2 --no-parallel
           '-Dorg.gradle.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=1536m -Dfile.encoding=UTF-8'
-          :app:assembleRelease :voxtype-native:testDebugUnitTest :voxtype-native:lintDebug
+          :voxtype-native:testDebugUnitTest :voxtype-native:lintDebug :app:assembleRelease
+          -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
           -x :react-native-worklets:lintAnalyzeDebug -x :expo-modules-core:lintAnalyzeDebug
-      - uses: actions/upload-artifact@v4
+      - name: Name and verify APK
+        id: apk
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          version="$(node --print "require('./apps/mobile/app.json').expo.version")"
+          short_sha="${VOXTYPE_BUILD_COMMIT:0:7}"
+          apk="artifacts/VoxType-Dev-$version-$BUILD_NUMBER-$short_sha.apk"
+          mkdir -p artifacts
+          cp apps/mobile/android/app/build/outputs/apk/release/app-release.apk "$apk"
+          tools=("$ANDROID_HOME"/build-tools/*/aapt)
+          badging="$("${tools[-1]}" dump badging "$apk")"
+          [[ "$badging" == *"package: name='com.voxtype.dictation.mobile.dev'"* ]]
+          [[ "$badging" == *"application-label:'VoxType Dev'"* ]]
+          echo "path=$apk" >> "$GITHUB_OUTPUT"
+          {
+            echo '### VoxType Dev'
+            echo 'Standalone internal test APK: install and open directly; no Metro server needed.'
+            echo "Source: $VOXTYPE_BUILD_COMMIT"
+            echo "API: $EXPO_PUBLIC_API_URL"
+            echo "APK: $apk"
+            echo 'Package: com.voxtype.dictation.mobile.dev (separate from VoxType).'
+            sha256sum "$apk"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload APK directly
+        id: upload
+        uses: actions/upload-artifact@v7
         with:
-          name: VoxType-Dev-${{ github.run_number }}
-          path: apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+          path: ${{ steps.apk.outputs.path }}
+          archive: false
           if-no-files-found: error
+          retention-days: 7
+      - name: Link APK
+        env:
+          APK_URL: ${{ steps.upload.outputs.artifact-url }}
+        run: echo "[Download the Dev APK]($APK_URL)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload native check reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-dev-check-reports
+          path: |
+            apps/mobile/modules/voxtype-native/android/build/reports/
+            apps/mobile/modules/voxtype-native/android/build/test-results/
+          if-no-files-found: ignore
           retention-days: 7

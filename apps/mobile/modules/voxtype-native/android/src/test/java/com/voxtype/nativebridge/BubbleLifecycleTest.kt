@@ -42,7 +42,7 @@ class BubbleLifecycleTest {
       enable(service)
       val notification = shadowOf(service).lastForegroundNotification
       assertNotNull(notification)
-      assertEquals("VoxType voice bubble is ready", notification.extras.getString(Notification.EXTRA_TITLE))
+      assertEquals("${service.applicationInfo.loadLabel(service.packageManager)} voice bubble is ready", notification.extras.getString(Notification.EXTRA_TITLE))
       assertNull(field(service, "capture"))
       assertEquals(if (android.os.Build.VERSION.SDK_INT >= 34) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
         else ServiceInfo.FOREGROUND_SERVICE_TYPE_NONE, service.foregroundServiceType)
@@ -61,7 +61,7 @@ class BubbleLifecycleTest {
       invoke(service, "showMicrophoneNotification")
       assertTrue(service.foregroundServiceType and ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE != 0)
       invoke(service, "releaseMicrophoneForeground")
-      assertEquals("VoxType voice bubble is ready",
+      assertEquals("${service.applicationInfo.loadLabel(service.packageManager)} voice bubble is ready",
         shadowOf(service).lastForegroundNotification.extras.getString(Notification.EXTRA_TITLE))
       assertEquals(0, service.foregroundServiceType and ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
     } finally { controller.destroy() }
@@ -127,7 +127,7 @@ class BubbleLifecycleTest {
       // Android can bind the same service again; its ready notification must return.
       invoke(service, "onServiceConnected")
       assertTrue(service.connected)
-      assertEquals("VoxType voice bubble is ready",
+      assertEquals("${service.applicationInfo.loadLabel(service.packageManager)} voice bubble is ready",
         shadowOf(service).lastForegroundNotification.extras.getString(Notification.EXTRA_TITLE))
     } finally { controller.destroy() }
   }

@@ -141,9 +141,11 @@ export async function startMobileSignIn(
   executionContext: BackgroundContext,
   headers: Headers,
   state: string,
+  variant: 'production' | 'development' = 'production',
 ): Promise<Response> {
   const callbackUrl = new URL('/api/mobile-auth/callback', env.AUTH_URL || env.API_URL);
   callbackUrl.searchParams.set('state', state);
+  callbackUrl.searchParams.set('variant', variant);
   const response = await createAuthService(env, executionContext).api.signInSocial({
     headers,
     body: {
@@ -173,8 +175,11 @@ export async function finishMobileSignIn(
   headers: Headers,
   state: string,
   oauthError?: string,
+  variant: 'production' | 'development' = 'production',
 ): Promise<string> {
-  const callbackUrl = new URL('voxtype://auth/callback');
+  const callbackUrl = new URL(
+    variant === 'development' ? 'voxtype-dev://auth/callback' : 'voxtype://auth/callback',
+  );
   callbackUrl.searchParams.set('state', state);
   if (oauthError) {
     callbackUrl.searchParams.set(

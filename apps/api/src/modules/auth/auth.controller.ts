@@ -61,6 +61,7 @@ export async function startMobileAuth(context: Context<ApiEnv>) {
     context.executionCtx,
     context.req.raw.headers,
     parsed.data.state,
+    parsed.data.variant,
   );
 }
 
@@ -73,6 +74,7 @@ export async function finishMobileAuth(context: Context<ApiEnv>) {
     context.req.raw.headers,
     parsed.data.state,
     parsed.data.error,
+    parsed.data.variant,
   );
   return context.redirect(url);
 }

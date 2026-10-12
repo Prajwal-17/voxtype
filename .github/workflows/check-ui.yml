@@ -1,6 +1,8 @@
 name: Check desktop and analytics
 
 on:
+  push:
+    branches: [master]
   pull_request:
     paths:
       - 'apps/desktop/**'

@@ -21,6 +21,16 @@ export type Snapshot = {
   syncing: boolean;
   syncError: string;
   audioLimit: 10;
+  appHealth?: {
+    appName: string | null;
+    packageName: string;
+    appVersion: string | null;
+    manufacturer: string;
+    model: string;
+    androidVersion: string;
+    lastNativeIssue: { stage: string; exception: string; timestamp: number } | null;
+    lastExit: { reason: string; code: number; timestamp: number } | null;
+  };
   // Optional so the JS UI can still run on older installed native builds.
   bubbleHealth?: {
     device: {
