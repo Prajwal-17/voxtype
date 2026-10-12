@@ -11,14 +11,17 @@ pnpm db:migrate:local
 pnpm dev
 ```
 
-Local: `http://localhost:8788`, reports `environment: development`, uses
+Local: `http://localhost:8787`, reports `environment: development`, uses
 Wrangler's local D1 state. The API and inspector ports are configured in
-`wrangler.jsonc` as `8788` and `9230` to coexist with other local Workers.
+`wrangler.jsonc` as `8787` and `9230` to coexist with other local Workers.
 
 `.dev.vars`: `BETTER_AUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `DEEPGRAM_API_KEY`, `DEEPSEEK_API_KEY`
 
-Add `http://localhost:8788/api/auth/callback/google` to the Google OAuth client's
-authorized redirect URIs for local sign-in.
+The local API stays at `http://localhost:8787`; `AUTH_URL` sets the public base URL used for OAuth
+callbacks. The default dev tunnel is `https://voxtype-dev-tunnel.prajwal.sh`, so add
+`https://voxtype-dev-tunnel.prajwal.sh/api/auth/callback/google` to the Google OAuth client's
+authorized redirect URIs. For same-machine local OAuth, set `AUTH_URL` to `http://localhost:8787`
+and register `http://localhost:8787/api/auth/callback/google` instead.
 
 ## Deploy
 
@@ -27,8 +30,8 @@ Dev is local-only — no cloud worker or D1.
 The default Wrangler target is `voxtype-api-local`, with workers.dev and preview URLs disabled,
 an explicitly local D1 binding, and no real cloud database ID. `pnpm dev` uses `wrangler dev --local`
 to disable remote bindings. Local secrets remain in the ignored `.dev.vars` file. Desktop and
-mobile development builds both use `http://localhost:8788` by default; Android uses
-`adb reverse tcp:8788 tcp:8788` to reach it. Google and speech providers still require network access.
+mobile development builds both use `http://localhost:8787` by default; Android uses
+`adb reverse tcp:8787 tcp:8787` to reach it. Google and speech providers still require network access.
 
 Cloud deployment and migrations must explicitly select `env.production` through the scripts below.
 
@@ -60,7 +63,9 @@ secrets with `wrangler secret put ...`; never place them in Expo configuration.
 
 ## Endpoints
 
-All `/v1/*` require auth, except `GET /health`.
+All `/v1/*` routes require auth. `GET /health` is public.
+`GET /health` checks D1 with a lightweight query and returns `200` when the API and database are
+available, or `503` when the database cannot be reached.
 
 | Method   | Path                                                                                                              |
 | -------- | ----------------------------------------------------------------------------------------------------------------- |

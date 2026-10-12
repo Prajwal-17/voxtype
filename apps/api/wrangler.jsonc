@@ -8,13 +8,14 @@
   "compatibility_date": "2026-09-27",
   "compatibility_flags": ["nodejs_compat"],
   "dev": {
-    // Keep VoxType separate from other local Workers using Wrangler's default ports.
-    "port": 8788,
+    // Use Wrangler's default local port for VoxType.
+    "port": 8787,
     "inspector_port": 9230,
   },
   "vars": {
     "ALLOWED_EMAIL": "prajwalreddy.dev@gmail.com",
-    "API_URL": "http://localhost:8788",
+    "API_URL": "http://localhost:8787",
+    "AUTH_URL": "https://voxtype-dev-tunnel.prajwal.sh",
     "CLIENT_ORIGINS": "http://localhost:1420,http://localhost:5173,tauri://localhost",
   },
   "secrets": {
@@ -47,6 +48,7 @@
       "vars": {
         "ALLOWED_EMAIL": "prajwalreddy.dev@gmail.com",
         "API_URL": "https://voxtype-api-production.prajwalreddy-dev.workers.dev",
+        "AUTH_URL": "https://voxtype-api-production.prajwalreddy-dev.workers.dev",
         "CLIENT_ORIGINS": "tauri://localhost",
       },
       "secrets": {

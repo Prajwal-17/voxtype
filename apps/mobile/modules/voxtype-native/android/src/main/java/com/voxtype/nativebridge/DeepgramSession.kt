@@ -9,6 +9,7 @@ import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import okio.ByteString.Companion.toByteString
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.util.TreeMap
@@ -19,7 +20,8 @@ class DeepgramSession(private val token: () -> String?,
                       private val onLost: () -> Unit,
                       private val client: WebSocket.Factory = HttpClients.streaming,
                       private val tokenClient: OkHttpClient = HttpClients.default,
-                      private val listenUrl: String = VoxConstants.DEEPGRAM_WS_URL) {
+                      private val listenUrl: String = VoxConstants.DEEPGRAM_WS_URL,
+                      private val vocabulary: () -> List<String> = { emptyList() }) {
   private val main = Handler(Looper.getMainLooper())
   // Serialize microphone packets with opening, finalizing, and resetting the socket.
   private val audioLock = Any()
@@ -171,7 +173,9 @@ class DeepgramSession(private val token: () -> String?,
           if (closed || generation != connectGeneration) return@post
           if (code == 401 || code == 403) keepUntil = 0
           if (!successful || jwt.isNullOrBlank()) { lost(); return@post }
-          val ws = Request.Builder().url(listenUrl).header("Authorization", "Bearer $jwt").build()
+          val promptedUrl = listenUrl.replaceFirst("wss://", "https://").replaceFirst("ws://", "http://")
+            .toHttpUrl().newBuilder().apply { vocabulary().forEach { addQueryParameter("keyterm", it) } }.build()
+          val ws = Request.Builder().url(promptedUrl).header("Authorization", "Bearer $jwt").build()
           socket = client.newWebSocket(ws, listener)
         }
       } catch (e: Exception) {

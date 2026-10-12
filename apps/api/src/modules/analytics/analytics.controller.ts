@@ -12,16 +12,28 @@ analyticsController.get('/', async (context) => {
       {
         error: {
           code: 'validation_error',
-          message: 'Use range=7d, range=30d, or range=all.',
+          message: 'Use a supported range and IANA timezone.',
         },
       },
       400,
     );
   }
 
+  if (parsed.data.format === 'csv') {
+    const csv = await createAnalyticsService(context.env.DB).csv(
+      context.get('session').user.id,
+      parsed.data.range,
+      parsed.data.timezone,
+    );
+    return context.body(csv, 200, {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': 'attachment; filename=voxtype-insights.csv',
+    });
+  }
   const data = await createAnalyticsService(context.env.DB).get(
     context.get('session').user.id,
     parsed.data.range,
+    parsed.data.timezone,
   );
   return context.json({ data });
 });

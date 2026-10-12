@@ -1,6 +1,7 @@
 package com.voxtype.nativebridge
 
 import org.junit.Assert.*
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -18,6 +19,23 @@ class CloudRestoreTest {
   @Before fun reset() { context.deleteDatabase("voxtype.db") }
   private fun row(id: String) = JSONObject().put("id", id).put("text", "Cloud transcript")
     .put("createdAt", 1000).put("updatedAt", 1000).put("durationMs", 3000).put("words", 2)
+
+  @Test fun dictionaryPersistsAndRejectsOversizedEditsWithoutLosingSavedTerms() {
+    VoxTypeStore(context, onChanged = {}).use { store ->
+      assertTrue(store.vocabulary.isEmpty())
+      store.vocabulary = listOf(" VoxType ", "", "VoxType", "C++", "नमस्ते")
+      assertEquals(listOf("VoxType", "C++", "नमस्ते"), store.vocabulary)
+      for (invalid in listOf(List(101) { "term$it" }, listOf("x".repeat(101)))) {
+        try { store.vocabulary = invalid; fail("Invalid dictionary must fail") }
+        catch (_: IllegalArgumentException) { }
+      }
+    }
+    VoxTypeStore(context, onChanged = {}).use {
+      assertEquals(listOf("VoxType", "C++", "नमस्ते"), it.vocabulary)
+      it.vocabulary = emptyList()
+      assertTrue(it.vocabulary.isEmpty())
+    }
+  }
 
   @Test fun freshInstallRestoresHistoryWithoutReuploadingIt() {
     VoxTypeStore(context, onChanged = {}).use { store ->
@@ -62,4 +80,51 @@ class CloudRestoreTest {
       assertTrue(store.dictations("owner").isEmpty())
     }
   }
+  @Test fun searchFiltersTheWholeAccountCacheBeforePaginationAndTreatsWildcardsLiterally() {
+    VoxTypeStore(context,onChanged = {}).use { store ->
+      val rows = JSONArray()
+      for (i in 0..25) rows.put(row("record-$i").put("text", if(i<13) "MATCH $i" else "other $i").put("createdAt",i))
+      rows.put(row("literal").put("text","100%_exact"))
+      store.restore("owner",url,rows)
+      store.restore("other",url,JSONArray().put(row("secret").put("text","MATCH secret")))
+      val first=store.page("owner",null,"match")
+      assertEquals(12,(first["items"] as List<*>).size)
+      val second=store.page("owner",first["nextCursor"] as String,"match")
+      assertEquals(1,(second["items"] as List<*>).size)
+      assertEquals(1,(store.page("owner",null,"%_")["items"] as List<*>).size)
+      assertTrue((store.page("owner",null,"secret")["items"] as List<*>).isEmpty())
+    }
+  }
+
+  @Test fun failedCloudDeleteKeepsPendingTextAndSuccessIsAccountScoped() {
+    var account = Triple("owner",url,"bearer")
+    var deletedId=""
+    VoxTypeStore(context,onChanged = {}).use { store ->
+      deletedId=store.save("owner","Pending text","Pending text",1000,null,url)
+      store.restore("other",url,JSONArray().put(row("other-record")))
+    }
+    fun client(code:Int)=okhttp3.OkHttpClient.Builder().addInterceptor { chain ->
+      okhttp3.Response.Builder().request(chain.request()).protocol(okhttp3.Protocol.HTTP_1_1)
+        .code(code).message("test").body("".toResponseBody()).build()
+    }.build()
+    try {
+      kotlinx.coroutines.runBlocking { TranscriptUploads.delete(context,deletedId,{ account },client(503)) }
+      fail("Cloud failure must preserve the local record")
+    } catch (_: java.io.IOException) { }
+    VoxTypeStore(context,onChanged = {}).use { assertEquals("Pending text",it.text(deletedId)) }
+    val changedAccount = okhttp3.OkHttpClient.Builder().addInterceptor { chain ->
+      account = Triple("other",url,"other-bearer")
+      okhttp3.Response.Builder().request(chain.request()).protocol(okhttp3.Protocol.HTTP_1_1)
+        .code(204).message("test").body("".toResponseBody()).build()
+    }.build()
+    try {
+      kotlinx.coroutines.runBlocking { TranscriptUploads.delete(context,deletedId,{ account },changedAccount) }
+      fail("An account switch must not remove the original account’s cache")
+    } catch (_: java.io.IOException) { }
+    VoxTypeStore(context,onChanged = {}).use { assertEquals("Pending text",it.text(deletedId)) }
+    account = Triple("owner",url,"bearer")
+    kotlinx.coroutines.runBlocking { TranscriptUploads.delete(context,deletedId,{ account },client(204)) }
+    VoxTypeStore(context,onChanged = {}).use { assertNull(it.text(deletedId));assertNotNull(it.text("other-record")) }
+  }
+
 }

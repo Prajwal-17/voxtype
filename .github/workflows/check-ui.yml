@@ -1,0 +1,54 @@
+name: Check desktop and analytics
+
+on:
+  pull_request:
+    paths:
+      - 'apps/desktop/**'
+      - 'apps/api/**'
+      - 'packages/**'
+      - 'tests/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/check-ui.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ui-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev libssl-dev libdbus-1-dev patchelf xdg-utils xvfb xclip
+      - run: pnpm install --frozen-lockfile
+      - name: Generate Worker types
+        run: pnpm --filter @voxtype/api exec wrangler types
+      - name: Check workspace and native desktop
+        run: pnpm check
+      - name: Test analytics and native desktop
+        run: pnpm test
+      - name: Test native clipboard without helper windows
+        run: xvfb-run -a cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml clipboard_round_trip_without_extra_windows -- --ignored --test-threads=1
+      - name: Build desktop UI and mobile web
+        run: |
+          pnpm --filter @voxtype/desktop build
+          pnpm --filter @voxtype/mobile exec expo export --platform web --output-dir dist-web

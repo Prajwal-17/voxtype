@@ -3,7 +3,8 @@ import { View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { nativeTheme as theme } from '@voxtype/shared';
 import { Action, Text, Loader } from '@/components/primitives';
-import { exchangeGrant } from '@/lib/mobile-api';
+import { useAppState } from '@/state/app-state';
+import { completeAuth } from '@/lib/mobile-api';
 
 const c = theme.colors;
 
@@ -13,34 +14,28 @@ function firstParam(value: string | string[] | undefined): string | undefined {
   return undefined;
 }
 
-/**
- * Cold-start fallback for the OAuth redirect `voxtype://auth/callback`.
- * The normal path is `WebBrowser.openAuthSessionAsync()` resolving in
- * `signIn()` (see `src/lib/mobile-api.ts`) after
- * `WebBrowser.maybeCompleteAuthSession()` in `_layout.tsx`.
- * If Android delivers the redirect as a fresh deep link instead, the
- * browser promise is lost but the single-use grant is in this route's
- * params — consume it here so sign-in still completes instead of showing
- * expo-router's "Unmatched Route" page. Home reloads the stored session
- * when the app becomes active again.
- */
+/** Warm and cold redirects share state validation and single-use grant completion. */
 export default function AuthCallback() {
   const router = useRouter();
+  const { acceptUser, refresh } = useAppState();
   const params = useLocalSearchParams();
-  const [failed, setFailed] = useState(() => {
-    const error = firstParam(params.error);
-    const token = firstParam(params.token);
-    return Boolean(error) || !token;
-  });
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     if (failed) return;
-    const grant = firstParam(params.token);
-    if (!grant) return;
+
     let cancelled = false;
-    void exchangeGrant(grant).then(
-      () => {
-        if (!cancelled) router.replace('/');
+    void completeAuth(
+      firstParam(params.state),
+      firstParam(params.token),
+      firstParam(params.error),
+    ).then(
+      (user) => {
+        if (!cancelled) {
+          acceptUser(user);
+          void refresh();
+          router.replace('/');
+        }
       },
       () => {
         if (!cancelled) setFailed(true);
@@ -49,7 +44,7 @@ export default function AuthCallback() {
     return () => {
       cancelled = true;
     };
-  }, [failed, params.token, router]);
+  }, [failed, params.state, params.token, params.error, router, acceptUser, refresh]);
 
   if (failed) {
     return (

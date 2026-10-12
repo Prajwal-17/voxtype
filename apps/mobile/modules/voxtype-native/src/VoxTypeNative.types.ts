@@ -17,9 +17,26 @@ export type Snapshot = {
   microphoneGranted: boolean;
   bubbleEnabled: boolean;
   cleanupEnabled: boolean;
+  vocabulary?: string[];
   syncing: boolean;
   syncError: string;
   audioLimit: 10;
+  // Optional so the JS UI can still run on older installed native builds.
+  bubbleHealth?: {
+    device: {
+      manufacturer: string;
+      model: string;
+      androidVersion: string;
+      appVersion: string | null;
+    };
+    foregroundMode: 'none' | 'bubble' | 'microphone';
+    foregroundError: string | null;
+    hiddenReason: string;
+    batteryOptimizationsIgnored: boolean | null;
+    backgroundRestricted: boolean | null;
+    lastExit: { reason: string; code: number; timestamp: number } | null;
+    events: { event: string; timestamp: number }[];
+  };
   status:
     'idle' | 'connecting' | 'listening' | 'processing' | 'saved' | 'microphone_permission_needed';
   inApp: {
@@ -27,9 +44,13 @@ export type Snapshot = {
     text: string;
     error: string;
     durationMs: number;
+    level?: number;
   };
 };
 
-export type VoxTypeNativeModuleEvents = { onChange: (params: { changed: boolean }) => void };
+export type VoxTypeNativeModuleEvents = {
+  onChange: (params: { changed: boolean }) => void;
+  onAudioLevel: (params: { level: number }) => void;
+};
 
 export type TranscriptPage = { items: Dictation[]; nextCursor: string | null };

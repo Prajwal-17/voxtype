@@ -67,6 +67,7 @@ class BubbleRenderingTest {
       val density = service.resources.displayMetrics.density
       assertTrue("Waveform has room between controls", wave.measuredWidth / density >= 100)
       assertEquals(34, (wave.measuredHeight / density).toInt())
+      assertTrue("Expanded surface has fully rounded ends", (root.background as GradientDrawable).cornerRadius >= height / 2f)
       status(service, "processing")
       assertEquals("No shrinking while processing", width, root.layoutParams.width)
       assertEquals(View.VISIBLE, (field(service, "spinner") as ProgressBar).visibility)

@@ -25,14 +25,14 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
     ? session.message
     : finishing
       ? session.phase === 'cleaning'
-        ? 'Cleaning up dictation'
-        : 'Finishing transcription'
+        ? 'Cleaning'
+        : 'Transcribing'
       : active
         ? session.speechActive
           ? 'Speech detected'
           : 'Listening'
         : done
-          ? 'Transcript ready'
+          ? 'Saved'
           : 'Not recording';
   const recover = () => {
     void api
@@ -44,7 +44,7 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
   return (
     <div
       className={cn(
-        'relative isolate grid h-10 grid-cols-[32px_minmax(0,1fr)_32px] items-center gap-1 rounded-full bg-overlay p-1 text-overlay-text shadow-floating scheme-dark',
+        'relative isolate grid h-[52px] grid-cols-[36px_minmax(0,1fr)_36px] items-center gap-2 rounded-full bg-overlay px-3 py-[7px] text-overlay-text shadow-floating scheme-dark',
         'before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border before:border-overlay-line before:opacity-80',
         preview
           ? 'mx-auto mt-2 w-[272px]'
@@ -67,8 +67,51 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
           DEV
         </span>
       )}
+      <div
+        className={cn(
+          'relative flex h-full min-w-0 items-center justify-center overflow-hidden text-overlay-text',
+          failed && 'text-overlay-danger',
+        )}
+      >
+        {finishing ? (
+          <>
+            <CircleNotchIcon
+              size={16}
+              className="animate-spin motion-reduce:animate-none"
+              data-signal="loading"
+              aria-hidden="true"
+            />
+          </>
+        ) : failed ? (
+          <>
+            <WarningCircleIcon size={16} aria-hidden="true" />
+            <span className="ml-2 text-caption">Open app to recover</span>
+          </>
+        ) : done ? (
+          <>
+            <FileTextIcon size={16} aria-hidden="true" />
+            <span className="ml-2 text-caption">Saved</span>
+          </>
+        ) : (
+          <Waveform level={session.level} active={session.phase === 'listening'} overlay />
+        )}
+      </div>
       <button
-        className="inline-flex size-8 items-center justify-center rounded-full border-0 bg-overlay-raised p-0 text-overlay-text transition-[transform,background-color] duration-150 ease-out enabled:active:scale-[.97] enabled:hover:bg-overlay-line enabled:hover:text-white focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-overlay-text disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100"
+        className="order-first inline-flex size-9 items-center justify-center rounded-full border-0 bg-overlay-text p-0 text-overlay transition-[transform,background-color] duration-150 ease-out enabled:active:scale-[.97] enabled:hover:bg-inverse-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-overlay-text disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100"
+        title={failed || done ? 'Open transcript' : 'Finish dictation'}
+        aria-label={failed || done ? 'Open VoxType to recover transcript' : 'Finish dictation'}
+        disabled={!!preview || finishing || stop.isPending || (!active && !failed && !done)}
+        onClick={() => (failed || done ? recover() : stop.mutate())}
+      >
+        {failed || done ? (
+          <ArrowUpRightIcon size={16} aria-hidden="true" />
+        ) : (
+          <StopIcon size={14} weight="fill" aria-hidden="true" />
+        )}
+      </button>
+
+      <button
+        className="inline-flex size-9 items-center justify-center rounded-full border-0 bg-overlay-raised p-0 text-overlay-text transition-[transform,background-color] duration-150 ease-out enabled:active:scale-[.97] enabled:hover:bg-overlay-line enabled:hover:text-white focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-overlay-text disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100"
         title={active ? 'Cancel dictation' : 'Dismiss overlay'}
         aria-label={active ? 'Cancel dictation' : 'Dismiss overlay'}
         disabled={!!preview || cancel.isPending}
@@ -82,41 +125,7 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
                 )
         }
       >
-        <XIcon size={16} aria-hidden="true" />
-      </button>
-      <div
-        className={cn(
-          'relative flex h-full min-w-0 items-center justify-center overflow-hidden text-overlay-text',
-          failed && 'text-overlay-danger',
-        )}
-      >
-        {finishing ? (
-          <CircleNotchIcon
-            size={20}
-            className="animate-spin motion-reduce:animate-none"
-            data-signal="loading"
-            aria-hidden="true"
-          />
-        ) : failed ? (
-          <WarningCircleIcon size={16} aria-hidden="true" />
-        ) : done ? (
-          <FileTextIcon size={16} aria-hidden="true" />
-        ) : (
-          <Waveform level={session.level} active={session.phase === 'listening'} overlay />
-        )}
-      </div>
-      <button
-        className="inline-flex size-8 items-center justify-center rounded-full border-0 bg-overlay-text p-0 text-overlay transition-[transform,background-color] duration-150 ease-out enabled:active:scale-[.97] enabled:hover:bg-inverse-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-overlay-text disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100"
-        title={failed || done ? 'Open transcript' : 'Finish dictation'}
-        aria-label={failed || done ? 'Open VoxType to recover transcript' : 'Finish dictation'}
-        disabled={!!preview || finishing || stop.isPending || (!active && !failed && !done)}
-        onClick={() => (failed || done ? recover() : stop.mutate())}
-      >
-        {failed || done ? (
-          <ArrowUpRightIcon size={16} aria-hidden="true" />
-        ) : (
-          <StopIcon size={14} weight="fill" aria-hidden="true" />
-        )}
+        <XIcon size={18} weight="bold" aria-hidden="true" />
       </button>
 
       <span className="sr-only" role={failed ? 'alert' : 'status'}>

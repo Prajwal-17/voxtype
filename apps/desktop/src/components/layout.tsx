@@ -18,7 +18,7 @@ export function PageHeader({
   }, []);
 
   return (
-    <div className="mb-7 flex items-end justify-between gap-5 max-md:flex-wrap max-md:items-start max-md:gap-3">
+    <div className="mb-6 flex items-end justify-between gap-5 max-md:flex-wrap max-md:items-start max-md:gap-3">
       <div>
         <h1
           ref={headingRef}
@@ -37,7 +37,7 @@ export function PageHeader({
 // Section header — replaces [&_h2]: / [&_p]: soup.
 export function SectionHeader({ title, description }: { title: string; description?: string }) {
   return (
-    <div className="mb-5">
+    <div className="mb-4">
       <h2 className="text-title font-semibold tracking-[-.015em]">{title}</h2>
       {description && <p className="mt-1 text-ui text-muted">{description}</p>}
     </div>

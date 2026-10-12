@@ -79,6 +79,35 @@ object TranscriptUploads {
     }
   }
 
+  /** Serialize delete with restore/upload so a queued PUT cannot resurrect the record. */
+  suspend fun delete(context: Context, id: String, client: OkHttpClient = HttpClients.uploads) {
+    val session = NativeSession(context)
+    delete(context, id, {
+      val bearer = session.token
+      val userId = session.userId
+      val apiUrl = session.apiUrl
+      if (bearer != null && userId != null && apiUrl != null) Triple(userId, apiUrl, bearer) else null
+    }, client)
+  }
+
+  /** Transport/store boundary; tests supply credentials without an Android Keystore. */
+  internal suspend fun delete(
+    context: Context,
+    id: String,
+    currentAccount: () -> Triple<String, String, String>?,
+    client: OkHttpClient,
+  ) = lock.withLock {
+    require(id.length in 1..200 && id.matches(Regex("[A-Za-z0-9-]+"))) { "Invalid transcript ID" }
+    val account = requireNotNull(currentAccount()) { "Sign in again" }
+    val (userId, apiUrl, bearer) = account
+    val request = Request.Builder().url("$apiUrl/v1/dictations/$id").header("Authorization", "Bearer $bearer").delete().build()
+    client.newCall(request).execute().use { response ->
+      if (!response.isSuccessful && response.code != 404) throw java.io.IOException("Couldn’t delete cloud transcript. Check your connection.")
+    }
+    if (currentAccount() != account) throw java.io.IOException("Account changed. Try again.")
+    VoxTypeStore(context).use { it.delete(userId,id,apiUrl) }
+  }
+
   internal fun sendPending(
     store: VoxTypeStore,
     userId: String,

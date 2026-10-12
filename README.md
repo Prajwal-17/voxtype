@@ -13,7 +13,7 @@ Node 24+, pnpm 10, Rust stable, Ubuntu desktop libs:
 ```sh
 sudo apt-get install -y build-essential pkg-config libwebkit2gtk-4.1-dev \
   libayatana-appindicator3-dev librsvg2-dev libssl-dev libdbus-1-dev \
-  pulseaudio-utils wl-clipboard ydotool ydotoold xdotool xclip gnome-keyring
+  pulseaudio-utils ydotool ydotoold xdotool gnome-keyring
 ```
 
 ## Run
@@ -26,7 +26,7 @@ pnpm dev:api
 pnpm dev:web    # browser preview only, no mic
 ```
 
-Android development also uses the local API. Run `adb reverse tcp:8788 tcp:8788` for an
+Android development also uses the local API. Run `adb reverse tcp:8787 tcp:8787` for an
 emulator or USB-connected phone, then `pnpm --filter @voxtype/mobile start` with a native
 development build. See the [mobile setup](apps/mobile/README.md#local-development).
 
@@ -48,7 +48,7 @@ Development is intentionally isolated as a second application:
 | ---------------- | ----------------------- | --------------------------- |
 | App name         | VoxType                 | VoxType Dev                 |
 | Tauri identifier | `com.voxtype.dictation` | `com.voxtype.dictation.dev` |
-| API              | `VOXTYPE_API_URL`       | `http://localhost:8788`     |
+| API              | `VOXTYPE_API_URL`       | `http://localhost:8787`     |
 | Keyring service  | `com.voxtype.dictation` | `com.voxtype.dictation.dev` |
 | Local store      | `voxtype.json`          | `voxtype-dev.json`          |
 | Global shortcut  | Right Alt               | Ctrl Shift Space            |
@@ -72,12 +72,15 @@ migrations, local development, and deployment. Set `DEEPGRAM_API_KEY` and `DEEPS
 the Worker. Desktop and mobile use authenticated `/v1/speech/token` and `/v1/speech/cleanup`
 endpoints; neither app stores provider keys. The desktop keyring holds only the VoxType account session.
 
-Every transcript stays in local history until explicitly deleted. Each device retains its newest
-10 audio recordings and deletes older audio automatically. Saving a new transcript sends its text
-and metadata plus any previously unsent transcripts, using stable dictation IDs and a `desktop` or
-`mobile` source tag. Failed sends stay local until the next new transcript. There are no scheduled,
-startup, or sign-in uploads. History is read from the device, with no transcript downloads. Audio
-files never go to the Worker.
+Transcripts sync with the signed-in account across desktop and Android. Each device keeps a
+local account cache and retains its newest 10 audio recordings. Sign-in restores account
+history; failed uploads are retried in the background. Cloud deletion must succeed before a
+transcript is removed locally. Device preferences and retained audio files stay local; audio
+is sent to the speech provider for transcription, not stored in the account API.
+
+The refined Still interface includes Home, Transcripts, Insights and Settings, with separate
+Account access. Insights uses local calendar dates, full-history streaks, a compact activity
+grid and native CSV export. Deploy the updated analytics API alongside the revamped clients.
 
 After pulling database changes, apply the local API migrations before running development:
 

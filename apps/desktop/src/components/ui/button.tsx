@@ -28,7 +28,7 @@ const buttonVariants = cva(
           'min-h-10 px-3.5 py-2 text-[length:var(--text-ui)] leading-[var(--text-ui--line-height)]',
         md: 'min-h-10 px-3.5 py-2 text-[length:var(--text-ui)] leading-[var(--text-ui--line-height)]',
         lg: 'min-h-11 px-5 py-2.5 text-[length:var(--text-body)] leading-[var(--text-body--line-height)]',
-        icon: 'size-10 p-0 [&_svg]:size-4',
+        icon: 'size-10 p-0 [&_svg]:size-5',
         'icon-sm': 'size-10 p-0 [&_svg]:size-3.5',
       },
     },

@@ -56,7 +56,17 @@ app.get('/', (c) =>
     environment: apiEnvironment(c.env.API_URL),
   }),
 );
-app.get('/health', (c) => c.json({ status: 'ok', environment: apiEnvironment(c.env.API_URL) }));
+app.get('/health', async (c) => {
+  try {
+    await c.env.DB.prepare('SELECT 1').first();
+    return c.json({ status: 'ok', database: 'ok', environment: apiEnvironment(c.env.API_URL) });
+  } catch {
+    return c.json(
+      { status: 'error', database: 'unavailable', environment: apiEnvironment(c.env.API_URL) },
+      503,
+    );
+  }
+});
 
 app.get('/api/desktop-auth/start', startDesktopAuth);
 app.get('/api/desktop-auth/callback', finishDesktopAuth);

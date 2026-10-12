@@ -16,7 +16,7 @@ import org.robolectric.annotation.Config
 import java.time.Duration
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [33, 35])
+@Config(sdk = [33, 34, 35])
 class BubbleLifecycleTest {
   private fun invoke(service: VoxTypeAccessibilityService, name: String) {
     service.javaClass.getDeclaredMethod(name).apply { isAccessible = true }.invoke(service)
@@ -75,10 +75,12 @@ class BubbleLifecycleTest {
       enable(service)
       assertTrue(service.connected)
       assertEquals("NONE", field(service, "foregroundMode").toString())
+      assertEquals("SecurityException", service.foregroundError)
       assertNull(field(service, "capture"))
       shadowOf(service).setThrowInStartForeground(null)
       invoke(service, "updateBubbleForeground")
       assertEquals("BUBBLE", field(service, "foregroundMode").toString())
+      assertNull(service.foregroundError)
     } finally { controller.destroy() }
   }
 
@@ -127,6 +129,84 @@ class BubbleLifecycleTest {
       assertTrue(service.connected)
       assertEquals("VoxType voice bubble is ready",
         shadowOf(service).lastForegroundNotification.extras.getString(Notification.EXTRA_TITLE))
+    } finally { controller.destroy() }
+  }
+
+  @Test fun aFailedIdleForegroundStartRetriesWithoutAnotherWindowEvent() {
+    val controller = Robolectric.buildService(VoxTypeAccessibilityService::class.java).create()
+    val service = controller.get()
+    try {
+      shadowOf(service).setThrowInStartForeground(SecurityException("Background restriction"))
+      enable(service)
+      service.refreshBubble()
+      shadowOf(service).setThrowInStartForeground(null)
+      shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(VoxConstants.BUBBLE_REFRESH_DELAY_MS))
+      assertEquals("bubble", service.foregroundStatus)
+      assertNull(service.foregroundError)
+      assertNull(field(service, "capture"))
+    } finally { controller.destroy() }
+  }
+
+  @Test fun unbindCancelsRecoveryWithoutChangingTheSystemAccessibilitySetting() {
+    val controller = Robolectric.buildService(VoxTypeAccessibilityService::class.java).create()
+    val service = controller.get()
+    val component = android.content.ComponentName(service, VoxTypeAccessibilityService::class.java).flattenToString()
+    android.provider.Settings.Secure.putString(service.contentResolver,
+      android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, component)
+    try {
+      shadowOf(service).setThrowInStartForeground(SecurityException("Background restriction"))
+      enable(service)
+      service.refreshBubble()
+      service.onUnbind(Intent())
+      shadowOf(service).setThrowInStartForeground(null)
+      shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(10))
+      assertEquals("none", service.foregroundStatus)
+      assertFalse(service.connected)
+      assertTrue(BubbleHealth.observeAccessibility(service))
+    } finally { controller.destroy() }
+  }
+
+  @Test fun recordingRecoveryReleasesMicrophoneAndReturnsToIdle() {
+    val controller = Robolectric.buildService(VoxTypeAccessibilityService::class.java).create()
+    val service = controller.get()
+    try {
+      enable(service)
+      invoke(service, "showMicrophoneNotification")
+      set(service, "status", "processing")
+      set(service, "discardNext", true)
+      invoke(service, "recoverRecording")
+      assertEquals("idle", service.status)
+      assertEquals("bubble", service.foregroundStatus)
+      assertNull(field(service, "capture"))
+      assertNull(field(service, "target"))
+      assertEquals(false, field(service, "discardNext"))
+    } finally { controller.destroy() }
+  }
+
+  @Test fun aDetachedOverlayIsClearedSoItCanBeCreatedAgain() {
+    val controller = Robolectric.buildService(VoxTypeAccessibilityService::class.java).create()
+    val service = controller.get()
+    try {
+      invoke(service, "createBubble")
+      val root = field(service, "bubble") as android.view.View
+      val windows = service.getSystemService(android.view.WindowManager::class.java)
+      windows.removeView(root)
+      // Robolectric does not reject layout updates for detached views as Android does.
+      val detached = java.lang.reflect.Proxy.newProxyInstance(
+        android.view.WindowManager::class.java.classLoader,
+        arrayOf(android.view.WindowManager::class.java),
+      ) { _, method, args ->
+        if (method.name == "updateViewLayout") throw IllegalArgumentException("View is not attached")
+        method.invoke(windows, *(args ?: emptyArray()))
+      }
+      set(service, "windows", detached)
+      invoke(service, "updateBubbleLayout")
+      assertNull(field(service, "bubble"))
+      assertEquals("overlay_error", service.hiddenReason)
+      set(service, "windows", windows)
+      invoke(service, "createBubble")
+      assertNotNull(field(service, "bubble"))
+      assertNotSame(root, field(service, "bubble"))
     } finally { controller.destroy() }
   }
 }

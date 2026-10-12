@@ -9,13 +9,14 @@ import { normalizeEmail, parseCommaSeparated } from './auth.utils';
 
 export function createAuthService(env: Env, executionContext?: BackgroundContext) {
   const allowedEmail = normalizeEmail(env.ALLOWED_EMAIL);
+  const authUrl = env.AUTH_URL || env.API_URL;
 
   return betterAuth({
     appName: apiEnvironment(env.API_URL) === 'development' ? 'VoxType Dev' : 'VoxType',
-    baseURL: env.API_URL,
+    baseURL: authUrl,
     secret: env.BETTER_AUTH_SECRET,
     database: createAuthRepository(env.DB),
-    trustedOrigins: [env.API_URL, ...parseCommaSeparated(env.CLIENT_ORIGINS)],
+    trustedOrigins: [authUrl, env.API_URL, ...parseCommaSeparated(env.CLIENT_ORIGINS)],
     user: {
       changeEmail: { enabled: false },
       deleteUser: { enabled: false },
@@ -74,7 +75,7 @@ export async function startDesktopSignIn(
   headers: Headers,
   callback: DesktopAuthCallback,
 ): Promise<Response> {
-  const callbackUrl = new URL('/api/desktop-auth/callback', env.API_URL);
+  const callbackUrl = new URL('/api/desktop-auth/callback', env.AUTH_URL || env.API_URL);
   callbackUrl.searchParams.set('port', String(callback.port));
   callbackUrl.searchParams.set('state', callback.state);
 
@@ -141,7 +142,7 @@ export async function startMobileSignIn(
   headers: Headers,
   state: string,
 ): Promise<Response> {
-  const callbackUrl = new URL('/api/mobile-auth/callback', env.API_URL);
+  const callbackUrl = new URL('/api/mobile-auth/callback', env.AUTH_URL || env.API_URL);
   callbackUrl.searchParams.set('state', state);
   const response = await createAuthService(env, executionContext).api.signInSocial({
     headers,

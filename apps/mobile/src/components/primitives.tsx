@@ -52,7 +52,16 @@ export function Action({
       ]}
     >
       {icon}
-      <Text style={{ fontWeight: '600', color: secondary ? c.primary : c.onPrimary }}>{label}</Text>
+      <Text
+        style={{
+          fontWeight: '600',
+          color: secondary ? c.primary : c.onPrimary,
+          flexShrink: 1,
+          textAlign: 'center',
+        }}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -77,7 +86,7 @@ export function Setting({
 }) {
   return (
     <View style={styles.setting}>
-      <Text>{label}</Text>
+      <Text style={{ flexShrink: 1 }}>{label}</Text>
       <Switch
         accessibilityLabel={label}
         value={value}

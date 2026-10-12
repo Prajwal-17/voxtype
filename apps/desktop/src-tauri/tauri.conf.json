@@ -21,14 +21,15 @@
         "minWidth": 760,
         "minHeight": 600,
         "center": true,
-        "backgroundColor": "#dce6e5"
+        "backgroundColor": "#dce6e5",
+        "decorations": false
       },
       {
         "label": "overlay",
         "title": "VoxType dictation",
         "url": "index.html?window=overlay",
         "width": 288,
-        "height": 56,
+        "height": 68,
         "decorations": false,
         "transparent": true,
         "shadow": false,
@@ -52,15 +53,7 @@
     "shortDescription": "Personal voice dictation",
     "linux": {
       "deb": {
-        "depends": [
-          "pulseaudio-utils",
-          "wl-clipboard",
-          "ydotool",
-          "ydotoold",
-          "xdotool",
-          "gnome-keyring",
-          "xclip"
-        ]
+        "depends": ["pulseaudio-utils", "ydotool", "ydotoold", "xdotool", "gnome-keyring"]
       }
     }
   }

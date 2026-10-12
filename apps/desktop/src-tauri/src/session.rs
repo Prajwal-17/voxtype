@@ -178,7 +178,7 @@ pub async fn start(app: AppHandle, test: bool, external: bool) -> Result<(), Str
                         if let Some(w) = app.get_webview_window("overlay") {
                             let _ = w.hide();
                         }
-                        match desktop::copy(&snapshot.text).await {
+                        match desktop::copy(&app, &snapshot.text).await {
                             Ok(()) => {
                                 snapshot.delivery = "copied".into();
                                 snapshot.message = "Copied to your clipboard.".into();

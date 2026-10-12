@@ -15,7 +15,7 @@ test('mobile development always defaults to the local API', () => {
 
 test('explicit mobile API overrides work in both builds without trailing slashes', () => {
   for (const development of [true, false]) {
-    assert.equal(resolveApiUrl(' http://10.0.2.2:8788/// ', development), 'http://10.0.2.2:8788');
+    assert.equal(resolveApiUrl(' http://10.0.2.2:8787/// ', development), 'http://10.0.2.2:8787');
     assert.equal(
       resolveApiUrl('https://api.example.test/', development),
       'https://api.example.test',

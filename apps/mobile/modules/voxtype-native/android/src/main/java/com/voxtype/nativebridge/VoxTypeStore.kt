@@ -11,7 +11,7 @@ import java.util.UUID
 import org.json.JSONObject
 import org.json.JSONArray
 
-/** Transcripts stay local; unsent rows are tried when the next transcript is generated. */
+/** Account-scoped offline cache; synchronization restores cloud rows and retries pending uploads. */
 class VoxTypeStore(
   private val context: Context,
   private val readSql: (String) -> String = { name -> context.assets.open(name).bufferedReader().use { it.readText() } },
@@ -54,6 +54,18 @@ class VoxTypeStore(
   var cleanupEnabled: Boolean
     get() = setting(KEY_CLEANUP, "0") == "1"
     set(value) = putSetting(KEY_CLEANUP, if (value) "1" else "0")
+  var vocabulary: List<String>
+    get() {
+      val entries = JSONArray(setting("vocabulary", "[]"))
+      return List(entries.length()) { entries.getString(it) }
+    }
+    set(value) {
+      val terms = value.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+      require(terms.size <= 100 && terms.all { it.length <= 100 }) {
+        "Use at most 100 dictionary terms, each 1–100 characters."
+      }
+      putSetting("vocabulary", JSONArray(terms).toString())
+    }
   fun save(userId: String, text: String, original: String, duration: Long, audio: File?, apiUrl: String?): String {
     val id = UUID.randomUUID().toString()
     val now = System.currentTimeMillis()
@@ -107,19 +119,19 @@ class VoxTypeStore(
     } finally { db.endTransaction() }
   }
 
-  fun page(userId: String, cursor: String?): Map<String, Any?> {
+  fun page(userId: String, cursor: String?, query: String = ""): Map<String, Any?> {
     val parts = cursor?.split(":", limit = 2)
     val time = parts?.firstOrNull()?.toLongOrNull() ?: Long.MAX_VALUE
     val id = parts?.getOrNull(1) ?: ""
-    val items = dictations(userId, time, id)
+    val items = dictations(userId, time, id, query)
     val more = items.size > 12
     val page = items.take(12)
     val last = page.lastOrNull()
     return mapOf("items" to page, "nextCursor" to if (more && last != null) "${last["createdAt"]}:${last["id"]}" else null)
   }
-  fun dictations(userId: String, before: Long = Long.MAX_VALUE, beforeId: String = ""): List<Map<String, Any?>> {
+  fun dictations(userId: String, before: Long = Long.MAX_VALUE, beforeId: String = "", query: String = ""): List<Map<String, Any?>> {
     val result = mutableListOf<Map<String, Any?>>()
-    readableDatabase.rawQuery("SELECT id,user_id,text,original_text,created_at,updated_at,duration_ms,word_count,delivery,audio_file FROM dictations WHERE user_id = ? AND (created_at < ? OR (created_at = ? AND id < ?)) ORDER BY created_at DESC, id DESC LIMIT 13", arrayOf(userId, before.toString(), before.toString(), beforeId)).use { cursor ->
+    readableDatabase.rawQuery("SELECT id,user_id,text,original_text,created_at,updated_at,duration_ms,word_count,delivery,audio_file FROM dictations WHERE user_id = ? AND instr(lower(text),lower(?)) > 0 AND (created_at < ? OR (created_at = ? AND id < ?)) ORDER BY created_at DESC, id DESC LIMIT 13", arrayOf(userId, query.trim(), before.toString(), before.toString(), beforeId)).use { cursor ->
       while (cursor.moveToNext()) result += mapOf(
         "id" to cursor.getString(0), "userId" to cursor.getString(1), "text" to cursor.getString(2),
         "originalText" to cursor.getString(3), "createdAt" to cursor.getLong(4), "updatedAt" to cursor.getLong(5),
@@ -128,6 +140,12 @@ class VoxTypeStore(
       )
     }
     return result
+  }
+
+  /** Called only after cloud deletion succeeds, under the synchronization lock. */
+  fun delete(userId: String, id: String, apiUrl: String) {
+    writableDatabase.delete("dictations", "id = ? AND user_id = ? AND (upload_api_url = ? OR upload_api_url IS NULL)", arrayOf(id,userId,apiUrl))
+    onChanged()
   }
 
   fun text(id: String): String? = readableDatabase.rawQuery("SELECT text FROM dictations WHERE id = ?", arrayOf(id)).use {

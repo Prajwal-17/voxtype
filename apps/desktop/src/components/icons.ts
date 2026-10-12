@@ -1,4 +1,8 @@
 // One desktop icon family. Direct imports keep development compilation focused.
+export { IconContext } from '@phosphor-icons/react/dist/lib/context';
+export { HouseIcon } from '@phosphor-icons/react/dist/csr/House';
+export { MinusIcon } from '@phosphor-icons/react/dist/csr/Minus';
+export { SquareIcon } from '@phosphor-icons/react/dist/csr/Square';
 export { ArrowRightIcon } from '@phosphor-icons/react/dist/csr/ArrowRight';
 export { ArrowUpRightIcon } from '@phosphor-icons/react/dist/csr/ArrowUpRight';
 export { ArrowsClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowsClockwise';
@@ -27,3 +31,6 @@ export { WaveformIcon } from '@phosphor-icons/react/dist/csr/Waveform';
 export { XIcon } from '@phosphor-icons/react/dist/csr/X';
 export type { Icon } from '@phosphor-icons/react';
 export { SidebarSimpleIcon } from '@phosphor-icons/react/dist/csr/SidebarSimple';
+
+export { ChartBarIcon } from '@phosphor-icons/react/dist/csr/ChartBar';
+export { DownloadSimpleIcon } from '@phosphor-icons/react/dist/csr/DownloadSimple';

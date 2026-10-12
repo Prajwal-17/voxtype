@@ -10,7 +10,7 @@ import kotlin.math.sin
 
 /** Rolling microphone history, rendered in one lightweight native view. */
 class BubbleWaveformView(context: Context, private val level: () -> Float) : View(context) {
-  private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = VoxTheme.accentInk }
+  private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = VoxTheme.overlayWave }
   private val samples = FloatArray(17)
   private val display = FloatArray(17)
   private var listening = false
@@ -27,7 +27,7 @@ class BubbleWaveformView(context: Context, private val level: () -> Float) : Vie
         samples[samples.lastIndex] = current
         sampledAt = now
       }
-      val blend = ((now - frameAt).coerceAtMost(64) / 80f).coerceIn(0.05f, 1f)
+      val blend = ((now - frameAt).coerceAtMost(64) / 35f).coerceIn(0.05f, 1f)
       samples.indices.forEach { i ->
         val target = if (animated) samples[i] else current
         display[i] = if (animated) display[i] + (target - display[i]) * blend else target
@@ -66,7 +66,7 @@ class BubbleWaveformView(context: Context, private val level: () -> Float) : Vie
     val barWidth = minOf(3.5f * resources.displayMetrics.density, step * 0.6f)
     display.forEachIndexed { i, value ->
       val envelope = 0.55f + 0.45f * sin(i.toFloat() / samples.lastIndex * Math.PI).toFloat()
-      val amplitude = value * envelope
+      val amplitude = BubbleAudioLevel.displayGain(value) * envelope
       val barHeight = maxOf(2f * resources.displayMetrics.density, height * (0.14f + amplitude * 0.86f))
       val x = step * (i + 0.5f)
       paint.alpha = 255

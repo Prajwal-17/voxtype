@@ -1,4 +1,4 @@
-import { useState, useDeferredValue } from 'react';
+import { useState, useDeferredValue, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CopyIcon, TrashSimpleIcon } from '../components/icons';
 import { PageHeader } from '../components/layout';
@@ -6,19 +6,33 @@ import { Loader } from '../components/loader';
 import { Button, IconButton } from '../components/ui';
 import { Card } from '../components/ui/card';
 import { Input } from '../components/ui/input';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+} from '../components/ui/alert-dialog';
 import { api, useHistory, useCopy } from '../lib/api';
-import { duration } from '../lib/types';
+import { duration, type HistoryItem } from '../lib/types';
 export function HistoryPage({ onRecord }: { onRecord: () => void }) {
-  const [search, setSearch] = useState('');
-  const query = useDeferredValue(search);
-  const history = useHistory(query);
-  const client = useQueryClient();
-  const copy = useCopy();
+  const [search, setSearch] = useState(''),
+    [deleting, setDeleting] = useState<HistoryItem | null>(null);
+  const query = useDeferredValue(search),
+    history = useHistory(query),
+    client = useQueryClient(),
+    copy = useCopy();
+  const deleteTrigger = useRef<HTMLButtonElement | null>(null);
   const remove = useMutation({
     mutationFn: api.deleteHistory,
-    onSuccess: () => void client.invalidateQueries({ queryKey: ['history'] }),
+    onSuccess: () => {
+      setDeleting(null);
+      void client.invalidateQueries({ queryKey: ['history'] });
+      void client.invalidateQueries({ queryKey: ['analytics'] });
+    },
   });
-  const items = history.data?.pages.flatMap((page) => page.items) ?? [];
+  const items = history.data?.pages.flatMap((p) => p.items) ?? [];
   return (
     <>
       <PageHeader title="Transcripts" />
@@ -27,28 +41,30 @@ export function HistoryPage({ onRecord }: { onRecord: () => void }) {
         placeholder="Search transcripts"
         aria-label="Search transcripts"
         value={search}
-        onChange={(event) => setSearch(event.target.value)}
+        onChange={(e) => setSearch(e.target.value)}
         className="mb-5 max-w-sm"
       />
-      <Card className="overflow-hidden border-0 shadow-none">
+      <Card className="overflow-hidden shadow-none">
         {history.isPending ? (
           <Loader />
-        ) : history.isError ? (
-          <div className="p-8" role="alert">
+        ) : history.isError && !items.length ? (
+          <div className="p-6" role="alert">
             Couldn’t load transcripts. <Button onClick={() => void history.refetch()}>Retry</Button>
           </div>
         ) : !items.length ? (
-          <div className="py-16 text-center">
-            <p className="mb-5 text-muted">{search ? 'No matches' : 'No transcripts yet'}</p>
+          <div className="py-12 text-center">
+            <p className="mb-4 text-ui text-muted">
+              {search ? 'No matches' : 'No transcripts yet'}
+            </p>
             <Button onClick={search ? () => setSearch('') : onRecord}>
-              {search ? 'Clear search' : 'Record'}
+              {search ? 'Clear search' : 'Start recording'}
             </Button>
           </div>
         ) : (
           <div className="divide-y divide-line">
             {items.map((item) => (
-              <article key={item.id} className="px-6 py-5">
-                <div className="flex items-center justify-between gap-3 text-caption text-muted tabular-nums">
+              <article key={item.id} className="px-5 py-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-caption text-muted">
                   <time dateTime={new Date(item.createdAt).toISOString()}>
                     {new Date(item.createdAt).toLocaleString(undefined, {
                       month: 'short',
@@ -58,29 +74,30 @@ export function HistoryPage({ onRecord }: { onRecord: () => void }) {
                     })}
                   </time>
                   <span>
-                    {duration(item.durationMs)} · {item.words} words
+                    {item.words} words · {duration(item.durationMs)}
                   </span>
                 </div>
-                <details className="group mt-3">
-                  <summary className="cursor-pointer list-none whitespace-pre-wrap text-body [overflow-wrap:anywhere]">
-                    <span className="line-clamp-2 group-open:hidden">
-                      {item.text || 'Empty transcript'}
-                    </span>
-                  </summary>
-                  <p className="mt-3 whitespace-pre-wrap text-body [overflow-wrap:anywhere]">
-                    {item.text}
-                  </p>
-                </details>
-                <div className="mt-2 flex justify-end gap-1">
-                  <IconButton label="Copy transcript" onClick={() => copy.mutate(item.text)}>
-                    <CopyIcon size={16} aria-hidden="true" />
+                <p className="mt-3 select-text whitespace-pre-wrap text-body leading-relaxed [overflow-wrap:anywhere]">
+                  {item.text || 'Empty transcript'}
+                </p>
+                <div className="mt-3 flex justify-end gap-2">
+                  <IconButton
+                    label="Copy transcript"
+                    disabled={copy.isPending}
+                    onClick={() => copy.mutate(item.text)}
+                  >
+                    <CopyIcon size={20} />
                   </IconButton>
                   <IconButton
                     label="Delete transcript"
                     disabled={remove.isPending}
-                    onClick={() => remove.mutate(item.id)}
+                    onClick={(e) => {
+                      deleteTrigger.current = e.currentTarget;
+                      remove.reset();
+                      setDeleting(item);
+                    }}
                   >
-                    <TrashSimpleIcon size={16} aria-hidden="true" />
+                    <TrashSimpleIcon size={20} />
                   </IconButton>
                 </div>
               </article>
@@ -88,16 +105,59 @@ export function HistoryPage({ onRecord }: { onRecord: () => void }) {
           </div>
         )}
       </Card>
-      {history.hasNextPage && (
+      {history.isFetchNextPageError && (
+        <p role="alert" className="mt-4 text-ui text-danger">
+          Couldn’t load more transcripts.
+        </p>
+      )}
+      {(history.hasNextPage || history.isFetchNextPageError) && (
         <Button
-          className="mx-auto mt-5 flex"
+          className="mx-auto mt-4 flex"
           variant="outline"
           loading={history.isFetchingNextPage}
           onClick={() => void history.fetchNextPage()}
         >
-          Load more
+          {history.isFetchNextPageError ? 'Retry' : 'Load more'}
         </Button>
       )}
+      <AlertDialog
+        open={!!deleting}
+        onOpenChange={(open) => {
+          if (!open && !remove.isPending) setDeleting(null);
+        }}
+      >
+        <AlertDialogContent
+          onCloseAutoFocus={(e) => {
+            e.preventDefault();
+            if (deleteTrigger.current?.isConnected) deleteTrigger.current.focus();
+            else document.querySelector<HTMLInputElement>('input[type="search"]')?.focus();
+          }}
+        >
+          <AlertDialogTitle>Delete this transcript?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This removes the transcript from your account and this device’s cache. Other devices
+            update after sync.
+          </AlertDialogDescription>
+          <p className="line-clamp-2 text-ui text-muted">{deleting?.text}</p>
+          {remove.isError && (
+            <p role="alert" className="text-ui text-danger">
+              Deletion failed. The transcript is still available. Check your connection and retry.
+            </p>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={remove.isPending}>Keep transcript</AlertDialogCancel>
+            <Button
+              variant="danger"
+              loading={remove.isPending}
+              onClick={() => {
+                if (deleting) remove.mutate(deleting.id);
+              }}
+            >
+              Delete transcript
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

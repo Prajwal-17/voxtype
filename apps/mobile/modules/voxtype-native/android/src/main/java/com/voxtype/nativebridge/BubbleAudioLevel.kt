@@ -1,9 +1,14 @@
 package com.voxtype.nativebridge
 
+import kotlin.math.pow
 import kotlin.math.sqrt
 import kotlin.math.log10
 
 object BubbleAudioLevel {
+  /** Display gain only: preserve silence and make low microphone levels legible. */
+  fun displayGain(level: Float): Float = if (!level.isFinite()) 0f
+    else level.coerceIn(0f, 1f).toDouble().pow(0.7).toFloat().times(1.25f).coerceIn(0f, 1f)
+
   /** RMS of actual signed, little-endian 16-bit PCM; silence remains zero. */
   fun fromPcm(bytes: ByteArray): Float {
     val samples = bytes.size / 2

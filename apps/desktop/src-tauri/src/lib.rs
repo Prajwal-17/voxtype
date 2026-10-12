@@ -191,11 +191,19 @@ fn get_history(
     )
 }
 #[tauri::command]
-async fn get_analytics(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+async fn get_analytics(
+    app: tauri::AppHandle,
+    range: Option<String>,
+    timezone: Option<String>,
+) -> Result<serde_json::Value, String> {
     require_authenticated(&app)?;
     let (_, bearer, client) = auth::upload_session().await?.ok_or("Sign in again.")?;
     let response = client
-        .get(format!("{}/v1/analytics?range=30d", auth::api_url()))
+        .get(format!("{}/v1/analytics", auth::api_url()))
+        .query(&[
+            ("range", range.as_deref().unwrap_or("30d")),
+            ("timezone", timezone.as_deref().unwrap_or("UTC")),
+        ])
         .bearer_auth(bearer)
         .send()
         .await
@@ -205,6 +213,74 @@ async fn get_analytics(app: tauri::AppHandle) -> Result<serde_json::Value, Strin
     }
     let body: serde_json::Value = speech::read_json(response, 256_000).await?;
     Ok(body["data"].clone())
+}
+#[tauri::command]
+async fn export_analytics(
+    app: tauri::AppHandle,
+    range: String,
+    timezone: String,
+) -> Result<bool, String> {
+    require_authenticated(&app)?;
+    let (user, bearer, client) = auth::upload_session().await?.ok_or("Sign in again.")?;
+    let response = client
+        .get(format!("{}/v1/analytics", auth::api_url()))
+        .query(&[
+            ("range", range.as_str()),
+            ("timezone", timezone.as_str()),
+            ("format", "csv"),
+        ])
+        .bearer_auth(bearer)
+        .send()
+        .await
+        .map_err(|_| "Couldn’t export insights.")?;
+    if !response.status().is_success() {
+        return Err("Couldn’t export insights.".into());
+    }
+    let mut response = response;
+    let mut csv = Vec::new();
+    while let Some(chunk) = response.chunk().await.map_err(|_| "Export interrupted.")? {
+        if csv.len() + chunk.len() > 8_000_000 {
+            return Err("Export exceeds the file limit.".into());
+        }
+        csv.extend_from_slice(&chunk);
+    }
+    let (current, _, _) = auth::upload_session().await?.ok_or("Sign in again.")?;
+    if current.id != user.id {
+        return Err("Account changed. Try again.".into());
+    }
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    app.run_on_main_thread(move || {
+        use gtk::prelude::*;
+        let dialog = gtk::FileChooserNative::new(
+            Some("Export insights"),
+            None::<&gtk::Window>,
+            gtk::FileChooserAction::Save,
+            Some("Save"),
+            Some("Cancel"),
+        );
+        dialog.set_current_name("voxtype-insights.csv");
+        dialog.set_do_overwrite_confirmation(true);
+        let path = if dialog.run() == gtk::ResponseType::Accept {
+            dialog.filename()
+        } else {
+            None
+        };
+        dialog.destroy();
+        let _ = sender.send(path);
+    })
+    .map_err(|_| "Couldn’t open the save dialog.")?;
+    let Some(path) = receiver.await.map_err(|_| "Save dialog closed.")? else {
+        return Ok(false);
+    };
+    let (current, _, _) = auth::upload_session().await?.ok_or("Sign in again.")?;
+    if current.id != user.id {
+        return Err("Account changed. Try again.".into());
+    }
+    tokio::task::spawn_blocking(move || std::fs::write(path, csv))
+        .await
+        .map_err(|_| "Couldn’t save CSV.")?
+        .map_err(|_| "Couldn’t save CSV. Choose a writable folder.")?;
+    Ok(true)
 }
 #[tauri::command]
 async fn delete_history(app: tauri::AppHandle, id: Option<String>) -> Result<(), String> {
@@ -269,8 +345,8 @@ async fn configure_shortcut(app: tauri::AppHandle, shortcut_id: String) -> Resul
     Ok(())
 }
 #[tauri::command]
-async fn copy_text(text: String) -> Result<(), String> {
-    desktop::copy(&text).await
+async fn copy_text(app: tauri::AppHandle, text: String) -> Result<(), String> {
+    desktop::copy(&app, &text).await
 }
 #[tauri::command]
 async fn start_dictation(app: tauri::AppHandle, test: bool) -> Result<String, String> {
@@ -379,6 +455,7 @@ pub fn run() {
             update_settings,
             get_history,
             get_analytics,
+            export_analytics,
             delete_history,
             get_microphones,
             get_diagnostics,

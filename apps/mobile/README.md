@@ -1,35 +1,39 @@
 # VoxType for Android
 
-The app keeps the active keyboard. Its accessibility service shows a small muted bubble near an editable field. The muted, translucent bubble docks to the nearest screen edge after dragging. It remembers its edge and relative height, stays above the keyboard, and expands inward while recording. Dropping it on the ✕ close mark stops recording and turns it off. A tap immediately starts a microphone foreground session and saves a private WAV file. While credentials and the socket connect, a bounded queue holds up to 32 seconds of 16 kHz PCM; the queue is sent in order before live audio. Finish works during connection setup, flushing recorded audio before `Finalize`. Cancel drops the queue and retires its socket. While listening the bubble expands to ✕ cancel and ■ stop controls with a rolling waveform driven by microphone PCM, a short width transition, press feedback and gentle docking haptics. System reduced-motion settings disable animated movement. Finishing sends Deepgram `Finalize`; the finished transcript is inserted through Android 13's accessibility input connection if the same safe field still has focus. A transcript stays in local SQLite when insertion cannot be verified, with Copy and Paste recovery in the app. Password and sensitive fields are excluded.
+The app keeps the active keyboard. Its accessibility service shows a small muted bubble near an editable field. The muted bubble docks to the nearest screen edge after dragging. It remembers its edge and relative height, stays above the keyboard, and expands inward while recording. Dropping it on the ✕ close mark stops recording and turns it off. A tap immediately starts a microphone foreground session and saves a private WAV file. While credentials and the socket connect, a bounded queue holds up to 32 seconds of 16 kHz PCM; the queue is sent in order before live audio. Finish works during connection setup, flushing recorded audio before `Finalize`. Cancel drops the queue and retires its socket. While listening the bubble expands to ✕ cancel and ■ stop controls with a rolling waveform driven by microphone PCM, a short width transition, press feedback and gentle docking haptics. System reduced-motion settings disable animated movement. Finishing sends Deepgram `Finalize`; the finished transcript is inserted through Android 13's accessibility input connection if the same safe field still has focus. A transcript stays in local SQLite when insertion cannot be verified, with Copy and Paste recovery in the app. Password and sensitive fields are excluded.
 
 ## Configuration
 
 - Requires Android 13+ (API 33). This is a local Expo module, so the native service needs a development client or installed app; Expo Go cannot run it.
-- Development builds default to the local API at `http://localhost:8788`; release builds default to the production VoxType Worker. `EXPO_PUBLIC_API_URL` overrides either default and contains no provider secret.
+- Development builds default to the local API at `http://localhost:8787`; release builds default to the production VoxType Worker. `EXPO_PUBLIC_API_URL` overrides either default and contains no provider secret.
 - The Worker needs `DEEPGRAM_API_KEY` and `DEEPSEEK_API_KEY` as Wrangler secrets, plus its existing Google and Better Auth secrets. The Deepgram key must support `/v1/auth/grant`.
 - Google sign-in uses a fixed Worker OAuth callback followed by `voxtype://auth/callback` with a one-time grant. The signed bearer session is encrypted with Android Keystore. Google OAuth redirect URIs still point to the Worker's `/api/auth/callback/google`.
 
 ## Local development
 
-Configure `apps/api/.dev.vars`, add `http://localhost:8788/api/auth/callback/google` to the Google OAuth client's authorized redirect URIs, and run:
+Configure `apps/api/.dev.vars`, add the dev tunnel callback
+`https://voxtype-dev-tunnel.prajwal.sh/api/auth/callback/google` to the Google OAuth client's
+authorized redirect URIs, and run:
 
 ```sh
 pnpm --filter @voxtype/api db:migrate:local
 pnpm dev:api
 # In another terminal, with an emulator or USB-connected Android phone:
-adb reverse tcp:8788 tcp:8788
+adb reverse tcp:8787 tcp:8787
 pnpm --filter @voxtype/mobile start
 ```
 
 Install a native development build; Expo Go cannot load the accessibility service.
-ADB forwarding lets both the app and the Google callback use the same localhost URL.
+ADB forwarding lets the app reach the local API; the Google callback returns through the configured
+`AUTH_URL` tunnel. Set `AUTH_URL` to `http://localhost:8787` instead for same-machine local OAuth,
+and register that localhost callback with Google.
 The Worker and D1 data run entirely on this machine. Google sign-in, Deepgram, and optional
 DeepSeek cleanup still use their external providers.
 
 ## Bubble availability
 
 The idle bubble is a 48dp rounded square with a centered vector voice mark. Its 224dp recording
-surface keeps the same 14dp corners; the inset controls retain 44dp touch targets.
+surface uses fully rounded ends and an opaque dark petrol background; the inset controls retain 44dp touch targets.
 
 While signed in with the voice bubble enabled, the system-bound accessibility service keeps a
 quiet **VoxType voice bubble is ready** foreground notification between dictations. The idle
@@ -41,6 +45,35 @@ window/focus events that arrive before Android supplies the editor information.
 Android owns accessibility permission and service binding. This does not silently grant revoked
 permission or bypass a user force-stop. The recurring shutdown still needs testing on the
 affected phone, including its battery restrictions.
+
+Bubble recovery retries transient editor, overlay, and idle foreground failures five times
+over a short window (250 ms through 4 seconds), then waits for another event. Disabling the
+bubble, signing out, or disconnecting accessibility cancels pending recovery. Recovery never
+enables accessibility or starts the microphone on its own. The Settings screen reports enabled
+access separately from a reconnecting service.
+
+### Diagnose a disappearing bubble
+
+On iQOO/Funtouch OS, allow VoxType in Autostart and background power consumption management.
+The **App background settings** action opens Android's app details; use Settings search for
+Autostart or background power consumption if those controls are elsewhere on your OS version.
+These controls help background availability but cannot guarantee that Android will retain access.
+
+When the bubble disappears, check the actual Android accessibility switch before toggling it.
+Use **Copy bubble diagnostics** in VoxType Settings before re-enabling accessibility. The report
+contains the installed app/device versions, permission and connection state, foreground errors,
+battery restriction signals, the last recorded process exit, and up to 20 local service events.
+It excludes transcripts, audio, account identifiers, and credentials. Events record when VoxType
+observed a change; the last process exit is historical evidence, not a diagnosis of why access
+was disabled. Manufacturer-specific battery/autostart restrictions may not appear in Android's
+standard restriction APIs.
+
+Test Android 14 on the affected phone: leave VoxType enabled for at least 15 minutes, finish and
+cancel dictations, lock/unlock, rotate, reboot and unlock, and switch between normal text fields.
+Compare enabled-but-disconnected with a genuinely OFF switch. Do not force-stop or uninstall the
+app during this comparison. Install APK updates over the existing app using the same package and
+signing identity; an uninstall resets its grants. If the switch turns OFF again, retain a diagnostic
+report and capture `VoxType`, `AndroidRuntime`, and accessibility system logs before re-enabling it.
 
 The Deepgram socket remains open for seven minutes after the last completed dictation, with the idle deadline reset after each take; active recording never expires at the idle deadline. Idle KeepAlive text frames are sent every four seconds; a dropped socket gets a fresh short-lived token on reconnect. Connection setup is bounded to 20 seconds. Failed or unconfirmed sessions retire their socket so late results cannot enter another take. The microphone is released between dictations. DeepSeek cleanup is optional and falls back to the original transcript.
 
@@ -96,6 +129,12 @@ From the generated Android directory, run:
   -x :expo-modules-core:lintAnalyzeDebug
 ```
 
+Lifecycle coverage includes SDK 33, 34 (Android 14), and 35. Recovery tests check late editor
+readiness, event bursts, bounded retry budgets, cancellation, foreground failures, and microphone
+release. Health tests check component matching, observed disablement, and bounded local reporting.
+The TypeScript tests also check reconnecting labels and exclusion of dictated text from copied
+reports. These checks do not simulate Funtouch OS's process management.
+
 The exclusions avoid the existing upstream Kotlin lint crash; they do not skip VoxType
 source analysis. Seven JVM tests cover edge selection, expansion anchoring, keyboard
 and rotation bounds, tiny windows, PCM silence, amplitude and signed sample decoding.
@@ -131,3 +170,25 @@ have the API migrations and current Worker code before new transcript uploads ca
 Accessibility status distinguishes enabled permission from a connected service. Event/bridge
 errors are caught and lifecycle transitions logged. Actual permission revocation on a particular
 phone still needs device logs; a browser cannot verify or fix that OS-level behavior.
+
+## Refined Still interface
+
+Expo Router provides Home, Transcripts, Insights and Settings tabs, with Account
+outside the tab bar. Auth/session state lives above the routes, so navigating during
+recording retains the take. A compact Finish/Cancel banner remains on secondary screens.
+Mona Sans, shared Still colors, safe areas and system text scaling apply throughout.
+
+Home puts Dictation first. Transcripts use a virtualized list with inline expansion,
+complete-account-cache search before 12-row paging, copy and confirmed cloud deletion.
+Deletion is serialized with restore/upload and removes local data only after cloud success;
+connection failures preserve pending text. Search treats SQL wildcards literally.
+
+Insights uses the same range/timezone analytics contract as desktop, a compact 98-day
+calendar and bounded trend data. Full-size previous/next controls and the calendar's
+adjustable accessibility summary expose exact daily values. Export CSV downloads actual
+daily account data and opens Android's share chooser through a restricted cache FileProvider.
+No additional permissions are requested. Ship the API update alongside the clients.
+
+In-app PCM levels emit a separate event at most every 80ms. Only the focused waveform
+view subscribes; levels do not refresh transcripts or analytics. Floating recording
+surfaces use the shared dark capsule, with no mic tile or elapsed-time text.

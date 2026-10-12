@@ -22,7 +22,7 @@ pub(crate) fn api_url() -> String {
     option_env!("VOXTYPE_API_URL")
         .unwrap_or_else(|| {
             if environment::is_development() {
-                "http://localhost:8788"
+                "http://localhost:8787"
             } else {
                 unreachable!("production builds require VOXTYPE_API_URL")
             }

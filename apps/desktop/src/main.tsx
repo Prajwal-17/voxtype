@@ -1,3 +1,5 @@
+import { IconContext } from './components/icons';
+import { TitleBar } from './components/title-bar';
 import '@fontsource-variable/mona-sans';
 import { TooltipProvider } from './components/ui/tooltip';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -21,15 +23,26 @@ document.body.className = overlay
   ? 'm-0 h-full min-w-0 overflow-hidden bg-transparent'
   : 'm-0 min-w-[360px] bg-canvas';
 
-root!.className = overlay ? 'h-full w-full overflow-hidden bg-transparent' : '';
-if (overlay) document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#163c40');
+root!.className = overlay ? 'h-full w-full overflow-hidden bg-transparent' : 'h-full';
+if (overlay) document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#203d33');
 
 function Root() {
   useNativeEvents();
   return (
     <MotionConfig reducedMotion="user">
       <TooltipProvider delayDuration={500} skipDelayDuration={300}>
-        {overlay ? <VoiceOverlay /> : <App />}
+        {overlay ? (
+          <VoiceOverlay />
+        ) : (
+          <IconContext.Provider value={{ weight: 'bold', size: 20 }}>
+            <div className="desktop-shell">
+              <TitleBar />
+              <div className="desktop-body">
+                <App />
+              </div>
+            </div>
+          </IconContext.Provider>
+        )}
         {!overlay && (
           <Toaster
             position="bottom-right"

@@ -1,0 +1,68 @@
+name: Android Development Build
+run-name: ${{ inputs.commit_title || github.workflow }}
+on:
+  workflow_dispatch:
+    inputs:
+      commit_title:
+        description: Optional run title
+        required: false
+        type: string
+      branch:
+        description: Branch or commit to build
+        required: true
+        default: fix/android-bubble-recovery
+        type: string
+      api_url:
+        description: HTTPS API URL (required; no implicit production backend)
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      CI: '1'
+      EXPO_NO_TELEMETRY: '1'
+      EXPO_PUBLIC_API_URL: ${{ inputs.api_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Validate backend URL
+        run: node -e 'const u = new URL(process.env.EXPO_PUBLIC_API_URL); if (u.protocol !== "https:" || u.username || u.password || u.search || u.hash || u.pathname !== "/") throw new Error("Use an HTTPS API origin");'
+      - run: pnpm install --frozen-lockfile
+      - name: Check mobile source
+        run: |
+          pnpm --filter @voxtype/mobile lint
+          pnpm --filter @voxtype/mobile check-types
+          pnpm exec tsx --test tests/mobile-*.test.ts
+      - name: Generate Android project
+        run: pnpm --dir apps/mobile exec expo prebuild --platform android --clean --no-install
+      - name: Build standalone test APK and validate native code
+        working-directory: apps/mobile/android
+        run: >-
+          ./gradlew --no-daemon --max-workers=2 --no-parallel
+          '-Dorg.gradle.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=1536m -Dfile.encoding=UTF-8'
+          :app:assembleRelease :voxtype-native:testDebugUnitTest :voxtype-native:lintDebug
+          -x :react-native-worklets:lintAnalyzeDebug -x :expo-modules-core:lintAnalyzeDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VoxType-Dev-${{ github.run_number }}
+          path: apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 7

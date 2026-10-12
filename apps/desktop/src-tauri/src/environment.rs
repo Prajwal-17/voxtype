@@ -56,8 +56,8 @@ pub fn audio_client_name() -> &'static str {
 
 pub fn overlay_height() -> i32 {
     if is_development() {
-        64
+        76
     } else {
-        56
+        68
     }
 }

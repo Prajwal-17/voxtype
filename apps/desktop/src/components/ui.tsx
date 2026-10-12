@@ -136,11 +136,11 @@ export function Logo({
       aria-label={appName}
       className={cn('relative flex items-center gap-2.5', className)}
     >
-      <img src="/voxtype.svg" alt="" width={32} height={32} className="size-8 shrink-0" />
+      <img src="/voxtype.svg" alt="" width={28} height={28} className="size-7 shrink-0" />
       <span
         aria-hidden="true"
         className={cn(
-          'font-sans text-subheading font-semibold tracking-[-.03em]',
+          'font-sans text-[17px] font-semibold tracking-[-.03em]',
           tone === 'inverse' ? 'text-inverse' : 'text-ink',
           collapse && 'max-lg:hidden',
         )}
@@ -151,7 +151,7 @@ export function Logo({
         <span
           aria-hidden="true"
           className={cn(
-            'rounded-menu-item bg-warning-soft px-1.5 py-0.5 text-[0.625rem] font-semibold leading-none tracking-[.04em] text-warning',
+            'absolute -top-2.5 right-0 rounded-[4px] bg-warning-soft px-1 py-0.5 text-[8px] font-semibold leading-none tracking-[.04em] text-warning',
             collapse &&
               'max-lg:absolute max-lg:-right-2 max-lg:-bottom-1 max-lg:border max-lg:border-navigation',
           )}

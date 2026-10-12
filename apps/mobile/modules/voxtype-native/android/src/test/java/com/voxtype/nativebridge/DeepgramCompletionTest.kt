@@ -45,6 +45,19 @@ class DeepgramCompletionTest {
   private fun session(factory: Factory) = DeepgramSession({ "test" }, { "https://example.test" }, {}, factory,
     OkHttpClient.Builder().addInterceptor { response(it.request()) }.build())
 
+  @Test fun dictionaryTermsAreEncodedAsSeparateKeytermParameters() {
+    val factory = Factory()
+    val terms = listOf("C++", "A&B", "नमस्ते", "two words")
+    val stream = DeepgramSession({ "test" }, { "https://example.test" }, {}, factory,
+      OkHttpClient.Builder().addInterceptor { response(it.request()) }.build(), vocabulary = { terms })
+    try {
+      stream.begin()
+      val (socket, _) = opened(factory)
+      assertEquals(terms, socket.request().url.queryParameterValues("keyterm"))
+      assertEquals("nova-3", socket.request().url.queryParameter("model"))
+    } finally { stream.close() }
+  }
+
   @Test fun editorWarmupConnectsWithoutSendingAudioAndIsReusedOnBegin() {
     val factory = Factory(); val stream = session(factory)
     try {

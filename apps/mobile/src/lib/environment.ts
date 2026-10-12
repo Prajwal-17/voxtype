@@ -1,4 +1,4 @@
-export const LOCAL_API_URL = 'http://localhost:8788';
+export const LOCAL_API_URL = 'http://localhost:8787';
 export const PRODUCTION_API_URL = 'https://voxtype-api-production.prajwalreddy-dev.workers.dev';
 
 export function resolveApiUrl(configured: unknown, development: boolean): string {
