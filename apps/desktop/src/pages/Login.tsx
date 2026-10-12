@@ -47,7 +47,7 @@ export function LoginPage({
   const status = checking ? 'Loading' : pending ? 'Signing in' : '';
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-canvas px-5 py-10 text-ink selection:bg-accent-soft selection:text-accent-ink">
+    <main className="flex h-full overflow-y-auto items-center justify-center bg-canvas px-5 py-10 text-ink selection:bg-accent-soft selection:text-accent-ink">
       <div className="w-full max-w-[420px]">
         <Logo tone="ink" collapse={false} className="justify-center" />
 

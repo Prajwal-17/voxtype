@@ -345,8 +345,8 @@ async fn configure_shortcut(app: tauri::AppHandle, shortcut_id: String) -> Resul
     Ok(())
 }
 #[tauri::command]
-async fn copy_text(text: String) -> Result<(), String> {
-    desktop::copy(&text).await
+async fn copy_text(app: tauri::AppHandle, text: String) -> Result<(), String> {
+    desktop::copy(&app, &text).await
 }
 #[tauri::command]
 async fn start_dictation(app: tauri::AppHandle, test: bool) -> Result<String, String> {

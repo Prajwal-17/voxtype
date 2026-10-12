@@ -4,8 +4,8 @@ use crate::{
     model::{Diagnostic, Microphone, ShortcutOption},
 };
 use gio::prelude::*;
-use std::{process::Stdio, time::Duration};
-use tokio::{io::AsyncWriteExt, process::Command, time::timeout};
+use std::time::Duration;
+use tokio::{process::Command, time::timeout};
 
 const MEDIA_KEYS: &str = "org.gnome.settings-daemon.plugins.media-keys";
 const CUSTOM_KEY: &str = "org.gnome.settings-daemon.plugins.media-keys.custom-keybinding";
@@ -245,36 +245,29 @@ pub async fn focused_window() -> Option<String> {
     Some(String::from_utf8_lossy(&out.stdout).trim().to_owned())
 }
 
-pub async fn copy(text: &str) -> Result<(), String> {
-    let mut cmd = if wayland() {
-        let mut c = Command::new("wl-copy");
-        c.args(["--type", "text/plain;charset=utf-8"]);
-        c
-    } else {
-        let mut c = Command::new("xclip");
-        c.args(["-selection", "clipboard"]);
-        c
-    };
-    let mut child = cmd
-        .stdin(Stdio::piped())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .kill_on_drop(true)
-        .spawn()
-        .map_err(|_| "Clipboard helper missing. Install wl-clipboard (Wayland) or xclip (X11).")?;
-    let mut stdin = child.stdin.take().ok_or("Cannot open the clipboard.")?;
-    timeout(Duration::from_secs(3), async {
-        stdin.write_all(text.as_bytes()).await?;
-        drop(stdin);
-        child.wait().await
+/// Use the application's existing GTK display; clipboard helpers can briefly map
+/// a Wayland surface, steal focus and flicker the dock on compositors without data control.
+pub async fn copy(app: &tauri::AppHandle, text: &str) -> Result<(), String> {
+    let text = text.to_owned();
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    app.run_on_main_thread(move || {
+        let _ = sender.send(set_clipboard(&text));
     })
-    .await
-    .map_err(|_| "The clipboard did not respond.")?
-    .map_err(|_| "Could not copy the transcript.")?
-    .success()
-    .then_some(())
-    .ok_or_else(|| "Could not copy the transcript. It remains available in VoxType.".into())
+    .map_err(|_| "Could not reach the desktop clipboard.".to_string())?;
+    receiver.await.map_err(|_| {
+        "Could not copy the transcript. It remains available in VoxType.".to_string()
+    })?
 }
+
+fn set_clipboard(text: &str) -> Result<(), String> {
+    let display = gtk::gdk::Display::default().ok_or("Desktop display is unavailable.")?;
+    let clipboard = gtk::Clipboard::default(&display).ok_or("Desktop clipboard is unavailable.")?;
+    clipboard.set_text(text);
+    // GTK keeps serving text through the app's event loop, including when the
+    // main window is hidden to the tray. No helper process or focus change.
+    Ok(())
+}
+
 #[derive(Debug, PartialEq)]
 pub enum KeySyntax {
     Raw,
@@ -349,16 +342,6 @@ pub async fn diagnostics(shortcut_registered: bool, shortcut: &str) -> Vec<Diagn
             "Native audio capture is available",
         ),
         (
-            if wayland() { "wl-copy" } else { "xclip" },
-            if wayland() {
-                vec!["--version"]
-            } else {
-                vec!["-version"]
-            },
-            "Clipboard",
-            "Clipboard helper installed",
-        ),
-        (
             if wayland() { "ydotool" } else { "xdotool" },
             if wayland() {
                 vec!["key", "--help"]
@@ -407,4 +390,72 @@ pub async fn diagnostics(shortcut_registered: bool, shortcut: &str) -> Vec<Diagn
         },
     });
     checks
+}
+
+#[cfg(test)]
+mod clipboard_tests {
+    use super::set_clipboard;
+    use gtk::prelude::*;
+    use std::{
+        process::Command,
+        time::{Duration, Instant},
+    };
+
+    // CI runs this explicitly under Xvfb. Ordinary headless unit tests skip it.
+    #[test]
+    #[ignore = "requires an X11 display and xclip; run with xvfb-run"]
+    fn clipboard_round_trip_without_extra_windows() {
+        gtk::init().expect("GTK display");
+        let window = gtk::Window::new(gtk::WindowType::Toplevel);
+        window.set_title("VoxType clipboard test");
+        window.show_all();
+        let context = glib::MainContext::default();
+        while context.pending() {
+            context.iteration(false);
+        }
+        let visible_windows = || {
+            gtk::Window::list_toplevels()
+                .iter()
+                .filter(|window| window.is_visible())
+                .count()
+        };
+        let before = visible_windows();
+        for text in [
+            "First transcript",
+            "नमस्ते — C++\nSecond line 🟢",
+            "Replacement",
+        ] {
+            set_clipboard(text).expect("copy");
+            let mut reader = Command::new("xclip")
+                .args(["-selection", "clipboard", "-out"])
+                .stdout(std::process::Stdio::piped())
+                .spawn()
+                .expect("external clipboard reader");
+            let deadline = Instant::now() + Duration::from_secs(5);
+            loop {
+                while context.pending() {
+                    context.iteration(false);
+                }
+                if reader.try_wait().expect("reader status").is_some() {
+                    break;
+                }
+                if Instant::now() > deadline {
+                    let _ = reader.kill();
+                    let _ = reader.wait();
+                    panic!("external clipboard reader timed out");
+                }
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            let output = reader.wait_with_output().expect("clipboard output");
+            assert!(output.status.success());
+            assert_eq!(String::from_utf8(output.stdout).unwrap(), text);
+            assert_eq!(
+                visible_windows(),
+                before,
+                "copy must not map a helper window"
+            );
+            assert!(window.is_visible(), "copy must not hide the app");
+        }
+        window.close();
+    }
 }

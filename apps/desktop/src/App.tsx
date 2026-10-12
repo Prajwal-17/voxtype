@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  WaveformIcon,
+  HouseIcon,
   ChartBarIcon,
   FileTextIcon,
   SlidersHorizontalIcon,
@@ -38,7 +38,7 @@ import {
 import { useRecording } from './lib/api';
 import { SettingsPage } from './pages/Settings';
 const navigation = [
-  { id: 'home', icon: WaveformIcon, label: 'Home' },
+  { id: 'home', icon: HouseIcon, label: 'Home' },
   { id: 'transcripts', icon: FileTextIcon, label: 'Transcripts' },
   { id: 'insights', icon: ChartBarIcon, label: 'Insights' },
   { id: 'settings', icon: SlidersHorizontalIcon, label: 'Settings' },
@@ -77,7 +77,7 @@ export function App() {
   return (
     <SidebarProvider>
       <Sidebar>
-        <SidebarHeader className="px-4 pt-6 pb-6">
+        <SidebarHeader className="px-5 py-7">
           <Logo tone="ink" collapse={false} />
         </SidebarHeader>
         <SidebarContent>
@@ -90,7 +90,7 @@ export function App() {
                     onClick={() => navigate(id)}
                     aria-label={label}
                   >
-                    <Icon size={20} weight={page === id ? 'fill' : 'regular'} aria-hidden="true" />
+                    <Icon size={22} weight="bold" aria-hidden="true" />
                     <span>{label}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

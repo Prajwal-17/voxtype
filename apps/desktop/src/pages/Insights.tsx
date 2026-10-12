@@ -45,23 +45,22 @@ export function InsightsPage() {
                 <b className="text-ink">{data.summary.activeDays}</b> active days
               </span>
               <span>
-                <b className="text-ink">{data.streaks.longest} days</b> longest streak
+                <b className="text-ink">
+                  {data.streaks.longest} {data.streaks.longest === 1 ? 'day' : 'days'}
+                </b>{' '}
+                longest streak
               </span>
             </div>
-            <div className="insights-panels">
-              <ActivityCalendar key={data.activity.start} data={data} />
-              <TrendChart data={data} />
+            <ActivityCalendar key={data.activity.start} data={data} />
+            <div className="insights-panels mt-5">
+              <TrendChart data={data} mode="words" />
+              <TrendChart data={data} mode="speed" />
             </div>
-            <div className="mt-4 flex items-start justify-between gap-5">
-              <details className="max-w-xl text-caption text-muted">
-                <summary className="cursor-pointer text-accent">Definitions</summary>
-                <p className="mt-2">
-                  Speed is words divided by recorded minutes. Average session is recorded minutes
-                  divided by dictations. Streaks use full account history, ending today or
-                  yesterday. Canceled recordings and microphone tests are excluded. Dates use{' '}
-                  {data.timezone}. Pending uploads appear after sync.
-                </p>
-              </details>
+            <div className="mt-5 flex flex-wrap items-start justify-between gap-5">
+              <p className="max-w-xl text-caption leading-relaxed text-muted">
+                Speed is words per recorded minute. Streaks use full account history. Dates use{' '}
+                {data.timezone}; pending uploads appear after sync.
+              </p>
               <Button
                 variant="ghost"
                 disabled={!native || !data.summary.dictations}

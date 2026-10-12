@@ -13,7 +13,7 @@ Node 24+, pnpm 10, Rust stable, Ubuntu desktop libs:
 ```sh
 sudo apt-get install -y build-essential pkg-config libwebkit2gtk-4.1-dev \
   libayatana-appindicator3-dev librsvg2-dev libssl-dev libdbus-1-dev \
-  pulseaudio-utils wl-clipboard ydotool ydotoold xdotool xclip gnome-keyring
+  pulseaudio-utils ydotool ydotoold xdotool gnome-keyring
 ```
 
 ## Run

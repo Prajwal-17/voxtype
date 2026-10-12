@@ -99,81 +99,113 @@ export function ActivityCalendar({ data }: { data: Analytics }) {
       </p>
       {days.length ? (
         <>
-          <div className="mt-4 flex">
-            <div className="w-8 pt-5 text-[11px] leading-[30px] text-muted" aria-hidden="true">
-              <div>Mon</div>
-              <div>Wed</div>
-              <div>Fri</div>
-              <div>Sun</div>
-            </div>
-            <div>
-              <div className="mb-2 flex h-4 w-[207px] text-[11px] text-muted" aria-hidden="true">
-                {Array.from({ length: 14 }, (_, week) => {
-                  const d = days[week * 7];
-                  const prev = days[(week - 1) * 7];
-                  return (
-                    <span key={week} className="w-[15px] shrink-0 whitespace-nowrap">
-                      {d && (!prev || d.date.slice(0, 7) !== prev.date.slice(0, 7))
-                        ? new Date(`${d.date}T12:00Z`).toLocaleDateString(undefined, {
-                            month: 'short',
-                            timeZone: 'UTC',
-                          })
-                        : ''}
-                    </span>
-                  );
-                })}
+          <div className="mt-5 flex flex-wrap items-start gap-x-10 gap-y-5">
+            <div className="w-[239px] shrink-0">
+              <div className="flex">
+                <div className="w-8 pt-5 text-[11px] leading-[30px] text-muted" aria-hidden="true">
+                  <div>Mon</div>
+                  <div>Wed</div>
+                  <div>Fri</div>
+                  <div>Sun</div>
+                </div>
+                <div>
+                  <div
+                    className="mb-2 flex h-4 w-[207px] text-[11px] text-muted"
+                    aria-hidden="true"
+                  >
+                    {Array.from({ length: 14 }, (_, week) => {
+                      const d = days[week * 7];
+                      const prev = days[(week - 1) * 7];
+                      return (
+                        <span key={week} className="w-[15px] shrink-0 whitespace-nowrap">
+                          {d && (!prev || d.date.slice(0, 7) !== prev.date.slice(0, 7))
+                            ? new Date(`${d.date}T12:00Z`).toLocaleDateString(undefined, {
+                                month: 'short',
+                                timeZone: 'UTC',
+                              })
+                            : ''}
+                        </span>
+                      );
+                    })}
+                  </div>
+                  <div
+                    className="activity-grid"
+                    role="group"
+                    aria-label="Daily words; arrow keys select a day"
+                  >
+                    {days.map((d, index) => (
+                      <button
+                        key={d.date}
+                        ref={(node) => {
+                          buttons.current[index] = node;
+                        }}
+                        className="activity-cell"
+                        style={{
+                          background: colors[activityLevel(d.words)],
+                          opacity: d.date > data.period.end ? 0.35 : 1,
+                        }}
+                        disabled={d.date > data.period.end}
+                        tabIndex={index === selected ? 0 : -1}
+                        aria-pressed={index === selected}
+                        aria-label={activityDescription(d)}
+                        title={activityDescription(d)}
+                        onClick={() => choose(index)}
+                        onKeyDown={(e) => {
+                          const move = { ArrowLeft: -7, ArrowRight: 7, ArrowUp: -1, ArrowDown: 1 }[
+                            e.key
+                          ];
+                          if (move !== undefined) {
+                            e.preventDefault();
+                            choose(index + move, true);
+                          } else if (e.key === 'Home' || e.key === 'End') {
+                            e.preventDefault();
+                            choose(e.key === 'Home' ? 0 : initial, true);
+                          }
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
               </div>
+              <div className="mt-4 flex items-center gap-1 text-[11px] text-muted">
+                <span className="mr-auto">Words / day</span>Less{' '}
+                {colors.map((c) => (
+                  <span key={c} className="size-2.5 rounded-[2px]" style={{ background: c }} />
+                ))}{' '}
+                More
+              </div>
+            </div>
+            {day && (
               <div
-                className="activity-grid"
-                role="group"
-                aria-label="Daily words; arrow keys select a day"
+                className="min-w-[180px] flex-1 rounded-control bg-subtle p-5"
+                role="status"
+                aria-label={activityDescription(day)}
               >
-                {days.map((d, index) => (
-                  <button
-                    key={d.date}
-                    ref={(node) => {
-                      buttons.current[index] = node;
-                    }}
-                    className="activity-cell"
-                    style={{
-                      background: colors[activityLevel(d.words)],
-                      opacity: d.date > data.period.end ? 0.35 : 1,
-                    }}
-                    disabled={d.date > data.period.end}
-                    tabIndex={index === selected ? 0 : -1}
-                    aria-pressed={index === selected}
-                    aria-label={activityDescription(d)}
-                    title={activityDescription(d)}
-                    onClick={() => choose(index)}
-                    onKeyDown={(e) => {
-                      const move = { ArrowLeft: -7, ArrowRight: 7, ArrowUp: -1, ArrowDown: 1 }[
-                        e.key
-                      ];
-                      if (move !== undefined) {
-                        e.preventDefault();
-                        choose(index + move, true);
-                      } else if (e.key === 'Home' || e.key === 'End') {
-                        e.preventDefault();
-                        choose(e.key === 'Home' ? 0 : initial, true);
-                      }
-                    }}
-                  />
-                ))}
+                <h3 className="text-ui font-medium">
+                  {new Date(`${day.date}T12:00Z`).toLocaleDateString(undefined, {
+                    month: 'long',
+                    day: 'numeric',
+                    timeZone: 'UTC',
+                  })}
+                </h3>
+                <dl className="mt-4 grid grid-cols-3 gap-4">
+                  <div>
+                    <dt className="text-caption text-muted">Words</dt>
+                    <dd className="mt-1 text-title font-semibold">{day.words.toLocaleString()}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-caption text-muted">Dictations</dt>
+                    <dd className="mt-1 text-title font-semibold">{day.dictations}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-caption text-muted">Minutes</dt>
+                    <dd className="mt-1 text-title font-semibold">{minutes(day.durationMs)}</dd>
+                  </div>
+                </dl>
+                <p className="mt-4 text-caption text-muted">Select a day to see its activity.</p>
               </div>
-            </div>
+            )}
           </div>
-          <div className="mt-4 flex items-center gap-1 text-[11px] text-muted">
-            <span className="mr-auto">Words / day</span>Less{' '}
-            {colors.map((c) => (
-              <span key={c} className="size-2.5 rounded-[2px]" style={{ background: c }} />
-            ))}{' '}
-            More
-          </div>
-          {day && (
-            <p className="mt-4 border-t border-line pt-3 text-caption" role="status">
-              {activityDescription(day)}
-            </p>
-          )}
         </>
       ) : (
         <p className="mt-5 text-ui text-muted">No activity yet</p>
@@ -181,28 +213,18 @@ export function ActivityCalendar({ data }: { data: Analytics }) {
     </section>
   );
 }
-export function TrendChart({ data }: { data: Analytics }) {
-  const [mode, setMode] = useState<'words' | 'speed'>('words');
+export function TrendChart({ data, mode }: { data: Analytics; mode: 'words' | 'speed' }) {
   const rows = data.trend.days,
     values = rows.map((d) => (mode === 'words' ? d.words : d.wordsPerMinute)),
     axisMax = Math.max(0, ...values),
     max = Math.max(1, axisMax);
   return (
-    <section className="rounded-panel border border-line bg-surface p-5">
+    <section
+      className="rounded-panel border border-line bg-surface p-5"
+      aria-label={mode === 'words' ? 'Word trend' : 'Speed trend'}
+    >
       <div className="flex items-center justify-between">
         <h2 className="text-title font-semibold">{mode === 'words' ? 'Words' : 'Speed'}</h2>
-        <div className="flex rounded-control bg-subtle p-1" role="group" aria-label="Trend metric">
-          {(['words', 'speed'] as const).map((id) => (
-            <button
-              key={id}
-              onClick={() => setMode(id)}
-              aria-pressed={mode === id}
-              className={`min-h-8 rounded-menu-item px-3 text-caption focus-visible:outline-2 focus-visible:outline-accent ${id === mode ? 'bg-surface text-accent font-semibold' : 'text-muted'}`}
-            >
-              {id === 'words' ? 'Words' : 'Speed'}
-            </button>
-          ))}
-        </div>
       </div>
       <div className="mt-6 flex gap-3">
         <div
@@ -242,16 +264,25 @@ export function TrendChart({ data }: { data: Analytics }) {
               : 'Yearly'}{' '}
         {mode === 'words' ? 'word totals' : 'weighted WPM'}
       </p>
-      <details className="mt-3 text-caption text-muted">
-        <summary className="cursor-pointer">Trend values</summary>
-        <div className="mt-2 max-h-32 overflow-auto">
-          {rows.map((d) => (
-            <p key={d.date}>
-              {d.date} · {d.words} words · {d.wordsPerMinute} WPM
-            </p>
+      <table className="sr-only">
+        <caption>
+          {mode === 'words' ? 'Word totals' : 'Weighted speed'} by {data.trend.bucket}
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">Date</th>
+            <th scope="col">{mode === 'words' ? 'Words' : 'WPM'}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, index) => (
+            <tr key={row.date}>
+              <th scope="row">{row.date}</th>
+              <td>{values[index]}</td>
+            </tr>
           ))}
-        </div>
-      </details>
+        </tbody>
+      </table>
     </section>
   );
 }

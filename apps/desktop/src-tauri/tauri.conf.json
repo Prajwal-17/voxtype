@@ -53,15 +53,7 @@
     "shortDescription": "Personal voice dictation",
     "linux": {
       "deb": {
-        "depends": [
-          "pulseaudio-utils",
-          "wl-clipboard",
-          "ydotool",
-          "ydotoold",
-          "xdotool",
-          "gnome-keyring",
-          "xclip"
-        ]
+        "depends": ["pulseaudio-utils", "ydotool", "ydotoold", "xdotool", "gnome-keyring"]
       }
     }
   }

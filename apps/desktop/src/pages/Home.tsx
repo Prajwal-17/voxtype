@@ -128,7 +128,7 @@ export function HomePage({
             </p>
             {!active && take.text && (
               <Button variant="outline" className="mt-4" onClick={() => copy.mutate(take.text)}>
-                <CopyIcon size={16} />
+                <CopyIcon size={20} />
                 Copy text
               </Button>
             )}
@@ -185,8 +185,12 @@ export function HomePage({
                   {duration(item.durationMs)}
                 </p>
               </div>
-              <IconButton label="Copy transcript" onClick={() => copy.mutate(item.text)}>
-                <CopyIcon size={16} />
+              <IconButton
+                label="Copy transcript"
+                disabled={copy.isPending}
+                onClick={() => copy.mutate(item.text)}
+              >
+                <CopyIcon size={20} />
               </IconButton>
             </div>
           ))}

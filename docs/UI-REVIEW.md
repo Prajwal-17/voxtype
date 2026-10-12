@@ -1,15 +1,15 @@
 # Interface review
 
 The refined Still direction now covers desktop, Android screens and the recording
-capsules. Desktop uses a 174px sidebar (158px below 980px), Mona Sans, the petrol
+capsules. Desktop uses a fixed 232px sidebar, Mona Sans, the petrol
 accent and compact bordered surfaces. Mobile uses four native tabs and a separate
 Account screen, with the same hierarchy adapted to touch targets and safe areas.
 
 | Area          | Result                                                                                                                                                                                            |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Home          | Recorder first, account metrics and three recent transcripts. In-app results survive navigation and remain separate from shortcut/bubble sessions.                                                |
-| Transcripts   | Search before pagination, inline expansion, independent copy/delete controls, confirmation and retry without removing a failed deletion.                                                          |
-| Insights      | 7-day, 30-day and all-time metrics; independent 14-week calendar with 12px cells and 3px gaps; Words/Speed chart; accessible exact values and native CSV export.                                  |
+| Transcripts   | Search before pagination, fully visible text, independent copy/delete controls, confirmation and retry without removing a failed deletion.                                                        |
+| Insights      | 7-day, 30-day and all-time metrics; independent 14-week calendar with 12px cells and 3px gaps; separate Words and Speed charts; accessible exact values and native CSV export.                    |
 | Settings      | Desktop Voice, Workflow and Desktop tabs preserve drafts, save explicitly and confirm discarded navigation. Android retains actual permission, reconnecting-service and iQOO diagnostic guidance. |
 | Account       | Google identity, cloud archive/device cache explanation, sync state and sign-out.                                                                                                                 |
 | Capsules      | Dark, fully rounded recording surface; real audio levels followed by Finish and Cancel. Processing has a stable width and concise status.                                                         |
@@ -20,7 +20,7 @@ Account screen, with the same hierarchy adapted to touch targets and safe areas.
 - Workspace TypeScript, ESLint, formatting, generated-theme checks and Rust Clippy pass.
   The local Turbo check uses `--env-mode=loose` to retain the rootless Rust and GTK
   toolchain paths; CI uses ordinary `pnpm check` with system dependencies.
-- `pnpm test` passes all 11 TypeScript cases and five Rust cases. Analytics cases
+- `pnpm test` passes all 14 TypeScript cases and five headless Rust cases. Analytics cases
   include fractional timezone offsets, local midnight, DST, inclusive range bounds,
   account isolation, deletion, full-history streaks, CSV zero days and bounded trends.
 - Desktop production build and Expo web production export pass.
@@ -42,3 +42,25 @@ or OS dialogs. Physical Android permission prompts, Google callback handling,
 TalkBack/font scaling, launcher masks, accessibility retention on iQOO/Funtouch,
 and Linux focus/multi-monitor capsule placement need installed-device verification.
 Deploy the analytics API with the clients; no new database migration is required.
+
+## Desktop corrections
+
+Both production and development main-window configurations disable native decorations;
+the development configuration has its own window array and must set this explicitly.
+The custom 44px title bar is part of a fixed-height app shell. Only the main content
+pane scrolls; the sidebar fills the remaining height and stays 232px wide. Home uses
+a house icon, and desktop icons use bold strokes with 20px action targets inside
+40px controls. There is no responsive sidebar collapse or transcript disclosure.
+
+Transcripts show their complete text, including paragraph breaks, beside independent
+copy/delete actions. Insights shows day details beside the calendar and separate
+word/speed charts. Raw chart values remain in accessible tables, without disclosure
+controls or nested scroll areas; range selection and CSV export remain available.
+
+Copy uses GTK's clipboard on the app event thread, reusing its existing display.
+Neither manual copy nor external dictation launches `wl-copy`/`xclip`; this removes
+Wayland helper surfaces that can disturb focus or flicker the dock. The native
+clipboard test runs under Xvfb and reads repeated Unicode/multiline copies from an
+external X11 reader while checking that the app remains visible and no extra window
+appears. Xvfb is not a GNOME Wayland compositor; compositor-specific behavior still
+requires the user's installed desktop session.

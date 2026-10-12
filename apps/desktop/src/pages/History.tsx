@@ -77,22 +77,16 @@ export function HistoryPage({ onRecord }: { onRecord: () => void }) {
                     {item.words} words · {duration(item.durationMs)}
                   </span>
                 </div>
-                <details className="group mt-2">
-                  <summary className="cursor-pointer text-body focus-visible:outline-2 focus-visible:outline-accent [overflow-wrap:anywhere]">
-                    <span className="line-clamp-1 group-open:hidden">
-                      {item.text.split('\n').find((l) => l.trim()) || 'Empty transcript'}
-                    </span>
-                    <span className="hidden text-ui font-medium text-accent group-open:inline">
-                      Collapse transcript
-                    </span>
-                  </summary>
-                  <p className="mt-3 select-text whitespace-pre-wrap text-body [overflow-wrap:anywhere]">
-                    {item.text || 'Empty transcript'}
-                  </p>
-                </details>
-                <div className="mt-1 flex justify-end gap-1">
-                  <IconButton label="Copy transcript" onClick={() => copy.mutate(item.text)}>
-                    <CopyIcon size={16} />
+                <p className="mt-3 select-text whitespace-pre-wrap text-body leading-relaxed [overflow-wrap:anywhere]">
+                  {item.text || 'Empty transcript'}
+                </p>
+                <div className="mt-3 flex justify-end gap-2">
+                  <IconButton
+                    label="Copy transcript"
+                    disabled={copy.isPending}
+                    onClick={() => copy.mutate(item.text)}
+                  >
+                    <CopyIcon size={20} />
                   </IconButton>
                   <IconButton
                     label="Delete transcript"
@@ -103,7 +97,7 @@ export function HistoryPage({ onRecord }: { onRecord: () => void }) {
                       setDeleting(item);
                     }}
                   >
-                    <TrashSimpleIcon size={16} />
+                    <TrashSimpleIcon size={20} />
                   </IconButton>
                 </div>
               </article>

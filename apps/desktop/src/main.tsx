@@ -1,4 +1,4 @@
-import { isTauri } from '@tauri-apps/api/core';
+import { IconContext } from './components/icons';
 import { TitleBar } from './components/title-bar';
 import '@fontsource-variable/mona-sans';
 import { TooltipProvider } from './components/ui/tooltip';
@@ -23,8 +23,7 @@ document.body.className = overlay
   ? 'm-0 h-full min-w-0 overflow-hidden bg-transparent'
   : 'm-0 min-w-[360px] bg-canvas';
 
-root!.className = overlay ? 'h-full w-full overflow-hidden bg-transparent' : '';
-if (!overlay && isTauri()) document.documentElement.classList.add('native-window');
+root!.className = overlay ? 'h-full w-full overflow-hidden bg-transparent' : 'h-full';
 if (overlay) document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#203d33');
 
 function Root() {
@@ -35,10 +34,14 @@ function Root() {
         {overlay ? (
           <VoiceOverlay />
         ) : (
-          <>
-            <TitleBar />
-            <App />
-          </>
+          <IconContext.Provider value={{ weight: 'bold', size: 20 }}>
+            <div className="desktop-shell">
+              <TitleBar />
+              <div className="desktop-body">
+                <App />
+              </div>
+            </div>
+          </IconContext.Provider>
         )}
         {!overlay && (
           <Toaster
