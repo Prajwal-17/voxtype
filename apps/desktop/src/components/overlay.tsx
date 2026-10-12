@@ -44,7 +44,7 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
   return (
     <div
       className={cn(
-        'relative isolate grid h-[52px] grid-cols-[minmax(0,1fr)_36px_36px] items-center gap-2 rounded-full bg-overlay px-3 py-[7px] text-overlay-text shadow-floating scheme-dark',
+        'relative isolate grid h-[52px] grid-cols-[36px_minmax(0,1fr)_36px] items-center gap-2 rounded-full bg-overlay px-3 py-[7px] text-overlay-text shadow-floating scheme-dark',
         'before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border before:border-overlay-line before:opacity-80',
         preview
           ? 'mx-auto mt-2 w-[272px]'
@@ -75,9 +75,6 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
       >
         {finishing ? (
           <>
-            <span className="mr-2 text-caption">
-              {session.phase === 'cleaning' ? 'Cleaning' : 'Transcribing'}
-            </span>
             <CircleNotchIcon
               size={16}
               className="animate-spin motion-reduce:animate-none"
@@ -100,7 +97,7 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
         )}
       </div>
       <button
-        className="inline-flex size-9 items-center justify-center rounded-full border-0 bg-overlay-text p-0 text-overlay transition-[transform,background-color] duration-150 ease-out enabled:active:scale-[.97] enabled:hover:bg-inverse-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-overlay-text disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100"
+        className="order-first inline-flex size-9 items-center justify-center rounded-full border-0 bg-overlay-text p-0 text-overlay transition-[transform,background-color] duration-150 ease-out enabled:active:scale-[.97] enabled:hover:bg-inverse-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-overlay-text disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100"
         title={failed || done ? 'Open transcript' : 'Finish dictation'}
         aria-label={failed || done ? 'Open VoxType to recover transcript' : 'Finish dictation'}
         disabled={!!preview || finishing || stop.isPending || (!active && !failed && !done)}
@@ -128,7 +125,7 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
                 )
         }
       >
-        <XIcon size={16} aria-hidden="true" />
+        <XIcon size={18} weight="bold" aria-hidden="true" />
       </button>
 
       <span className="sr-only" role={failed ? 'alert' : 'status'}>

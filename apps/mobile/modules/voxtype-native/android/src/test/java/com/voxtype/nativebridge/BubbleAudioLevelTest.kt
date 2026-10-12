@@ -8,6 +8,15 @@ class BubbleAudioLevelTest {
     listOf(it.toByte(), (it shr 8).toByte())
   }.toByteArray()
 
+  @Test fun displayGainKeepsSilenceAndRetainsQuietSpeechVariation() {
+    assertEquals(0f, BubbleAudioLevel.displayGain(0f))
+    assertEquals(0f, BubbleAudioLevel.displayGain(Float.NaN))
+    assertTrue(BubbleAudioLevel.displayGain(0.2f) > 0.2f)
+    assertTrue(BubbleAudioLevel.displayGain(0.4f) > BubbleAudioLevel.displayGain(0.2f))
+    assertTrue(BubbleAudioLevel.displayGain(0.4f) < 1f)
+    assertEquals(1f, BubbleAudioLevel.displayGain(1f))
+  }
+
   @Test fun silenceAndEmptyBuffersStayStill() {
     assertEquals(0f, BubbleAudioLevel.fromPcm(ByteArray(3200)))
     assertEquals(0f, BubbleAudioLevel.fromPcm(byteArrayOf()))

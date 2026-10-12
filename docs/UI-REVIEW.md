@@ -64,3 +64,22 @@ clipboard test runs under Xvfb and reads repeated Unicode/multiline copies from 
 external X11 reader while checking that the app remains visible and no extra window
 appears. Xvfb is not a GNOME Wayland compositor; compositor-specific behavior still
 requires the user's installed desktop session.
+
+## Overlay and cancellation corrections
+
+The custom title bar uses the app's petrol accent, inverse controls and a restore
+icon that follows the native maximized state. Both overlay capsules place Stop at
+the left and Close at the right. Desktop processing shows a spinner without visible
+Transcribing/Cleaning labels; those states remain available to screen readers.
+Android preserves the Close touch target during processing while disabling Stop.
+Waveforms use stronger display gain and faster response to real audio samples;
+silence and reduced-motion behavior remain supported.
+
+Android Close cancels recording and processing. Dropping the bubble on the drag
+close target also cancels, rather than finishing and inserting. Cancellation
+invalidates the take generation, stops capture and cleanup calls/jobs, closes the
+speech stream and deletes pending audio. Saving and insertion share the main-thread
+commit with the cancel event, so a late result cannot save or paste a canceled take.
+The in-app recorder follows the same cleanup/pending-audio cancellation rules.
+Native tests cover end controls, processing cancellation, the drag close target,
+queued results, in-app cleanup and successful uncanceled completion.

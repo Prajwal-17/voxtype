@@ -42,10 +42,14 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
+import okhttp3.Call
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.File
@@ -104,7 +108,9 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   private var lastSavedId: String? = null
   private var lastDelivered = false
   private var lastCopied = false
-  private var lifecycleGeneration = 0
+  @Volatile private var lifecycleGeneration = 0
+  private var processingJob: Job? = null
+  @Volatile private var cleanupCall: Call? = null
   /** Bridge contract: plain strings (idle/connecting/listening/processing/saved/...). */
   var status: String = DictationStatus.IDLE.bridge; private set
 
@@ -179,6 +185,8 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     bubbleRefresh.cancel()
     main.removeCallbacksAndMessages(null)
     lifecycleGeneration++; recordingUserId = null
+    processingJob?.cancel(); cleanupCall?.cancel()
+    recordingFile?.delete(); recordingFile = null
     capture?.stop(); engine?.close(); hideBubble("disconnected"); instance = null
     stopForeground(STOP_FOREGROUND_REMOVE)
     foregroundMode = ForegroundMode.NONE
@@ -454,7 +462,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       isClickable = true
       isFocusable = false
     }
-    row.addView(bars); row.addView(done); row.addView(cancel)
+    row.addView(done); row.addView(bars); row.addView(cancel)
     row.setPadding(4.dp, 0, 4.dp, 0)
     // Inset rounded controls retain their full 44dp touch targets.
     cancel.background = InsetDrawable(cancel.background, 7.dp)
@@ -526,13 +534,19 @@ class VoxTypeAccessibilityService : AccessibilityService() {
         bubbleMark?.visibility = View.GONE
         bubbleGlyph?.visibility = View.GONE
         actionsRow?.visibility = View.VISIBLE
+        waveform?.visibility = View.VISIBLE
+        doneBtn?.isEnabled = true
+        doneBtn?.alpha = 1f
         waveform?.setListening(true)
         animateBubbleWidth(VoxConstants.BUBBLE_LISTEN_WIDTH_DP.dp)
       }
       DictationStatus.CONNECTING.bridge, DictationStatus.PROCESSING.bridge -> {
         bg?.setColor(VoxConstants.BUBBLE_ACTIVE_COLOR)
         bubbleMark?.visibility = View.GONE
-        actionsRow?.visibility = View.GONE
+        actionsRow?.visibility = View.VISIBLE
+        doneBtn?.isEnabled = false
+        doneBtn?.alpha = 0.55f
+        waveform?.visibility = View.INVISIBLE
         bubbleGlyph?.visibility = View.GONE
         spinner?.visibility = View.VISIBLE
         animateBubbleWidth(VoxConstants.BUBBLE_LISTEN_WIDTH_DP.dp)
@@ -728,7 +742,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     if (droppedOnClose) {
       // Dismiss this keyboard session, preserving the user's enabled preference.
       dismissedForKeyboard = true
-      if (status == DictationStatus.LISTENING.bridge) stopRecording()
+      cancelRecording()
       hideBubble("dismissed")
       try { VoxTypeNativeModule.changed() } catch (e: Exception) { VoxLog.w("notify change failed", e) }
       return
@@ -783,7 +797,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     }
     val recordingApiUrl = session.apiUrl ?: run { recordingUserId = null; releaseTarget(); return }
     val stream = speechStream()
-    val generation = lifecycleGeneration
+    val generation = ++lifecycleGeneration
     try {
       stream.begin()
       showMicrophoneNotification()
@@ -812,7 +826,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
           recordingDuration = duration
           releaseMicrophoneForeground()
           setStatus(DictationStatus.PROCESSING)
-          try { stream.finalize { finishDictation(it, recordingApiUrl) } }
+          try { stream.finalize { if (generation == lifecycleGeneration) finishDictation(it, recordingApiUrl) } }
           catch (error: Exception) {
             VoxLog.e("speech finalization failed", error)
             BubbleHealth.record(this, "finalization_error:${error.javaClass.simpleName}")
@@ -854,14 +868,10 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     main.post { if (status == DictationStatus.LISTENING.bridge) stopRecording() }
   }, vocabulary = { VoxTypeStore(this).use { it.vocabulary } }).also { engine = it }
 
-  /** ✕ while listening: drop the take entirely, no transcript, no insert. */
+  /** Cancel remains available during capture, finalization and cleanup. */
   private fun cancelRecording() {
-    if (status != DictationStatus.LISTENING.bridge) return
-    discardNext = true
-    engine?.abort()
-    setStatus(DictationStatus.PROCESSING)
-    try { capture?.stop() } catch (e: Exception) { VoxLog.w("capture stop failed", e) }
-    capture = null
+    if (status !in listOf(DictationStatus.LISTENING.bridge, DictationStatus.PROCESSING.bridge, DictationStatus.CONNECTING.bridge)) return
+    recoverRecording()
   }
 
   private fun showMicrophoneNotification() {
@@ -942,8 +952,10 @@ class VoxTypeAccessibilityService : AccessibilityService() {
 
   private fun recoverRecording() {
     lifecycleGeneration++
+    processingJob?.cancel(); processingJob = null
+    cleanupCall?.cancel(); cleanupCall = null
     recordingUserId = null
-    recordingFile = null
+    recordingFile?.delete(); recordingFile = null
     discardNext = false
     try { capture?.stop() } catch (error: Exception) { VoxLog.w("capture recovery failed", error) }
     capture = null
@@ -959,13 +971,36 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     val generation = lifecycleGeneration
     val audio = recordingFile
     val duration = recordingDuration
-    recordingFile = null; recordingUserId = null
-    serviceScope.launch(Dispatchers.IO) {
-      val cleaned = try { if (store.cleanupEnabled) cleanup(original) else original }
-        catch (error: Exception) { VoxLog.w("cleanup preference unavailable", error); original }
-      val id = try {
-        store.save(userId, cleaned, original, duration, audio, apiUrl)
-      } catch (e: Exception) {
+    recordingUserId = null
+    processingJob = serviceScope.launch(Dispatchers.IO) {
+      var saved = false
+      try {
+        ensureActive()
+        if (generation != lifecycleGeneration) return@launch
+        val cleaned = try { if (store.cleanupEnabled) cleanup(original, generation) else original }
+          catch (cancelled: CancellationException) { throw cancelled }
+          catch (error: Exception) { VoxLog.w("cleanup preference unavailable", error); original }
+        ensureActive()
+        // Serialize the final save/insert with the X event on Android's main thread.
+        // A canceled take cannot slip between a background save and queued insertion.
+        withContext(Dispatchers.Main) {
+          if (generation != lifecycleGeneration || session.userId != userId) return@withContext
+          val id = store.save(userId, cleaned, original, duration, audio, apiUrl)
+          saved = true
+          recordingFile = null
+          val delivered = try { cleaned.isNotBlank() && insertIntoTarget(cleaned) }
+            catch (error: Exception) { VoxLog.w("target insertion failed", error); false }
+          if (delivered) {
+            try { store.setDelivery(id, "pasted") } catch (e: Exception) { VoxLog.w("setDelivery failed", e) }
+          }
+          lastSavedId = id; lastDelivered = delivered; lastCopied = false
+          setStatus(DictationStatus.SAVED)
+          val delay = if (delivered) VoxConstants.SAVED_AUTO_DISMISS_DELIVERED_MS else VoxConstants.SAVED_AUTO_DISMISS_MS
+          main.postDelayed({ if (generation == lifecycleGeneration && status == DictationStatus.SAVED.bridge) setStatus(DictationStatus.IDLE) }, delay)
+        }
+        if (saved && generation == lifecycleGeneration && cleaned.isNotBlank()) TranscriptUploads.sendPending(applicationContext)
+      } catch (cancelled: CancellationException) { throw cancelled }
+      catch (e: Exception) {
         VoxLog.e("dictation save failed", e)
         BubbleHealth.record(this@VoxTypeAccessibilityService, "save_error:${e.javaClass.simpleName}")
         withContext(Dispatchers.Main) {
@@ -974,32 +1009,23 @@ class VoxTypeAccessibilityService : AccessibilityService() {
             android.widget.Toast.makeText(this@VoxTypeAccessibilityService, "Couldn’t save this recording", android.widget.Toast.LENGTH_LONG).show()
           }
         }
-        return@launch
+      } finally {
+        if (!saved) audio?.delete()
       }
-      withContext(Dispatchers.Main) {
-        if (generation != lifecycleGeneration) return@withContext
-        val delivered = try { cleaned.isNotBlank() && insertIntoTarget(cleaned) }
-          catch (error: Exception) { VoxLog.w("target insertion failed", error); false }
-        if (delivered) {
-          try { store.setDelivery(id, "pasted") } catch (e: Exception) { VoxLog.w("setDelivery failed", e) }
-        }
-        lastSavedId = id; lastDelivered = delivered; lastCopied = false
-        setStatus(DictationStatus.SAVED)
-        val delay = if (delivered) VoxConstants.SAVED_AUTO_DISMISS_DELIVERED_MS else VoxConstants.SAVED_AUTO_DISMISS_MS
-        main.postDelayed({ if (status == DictationStatus.SAVED.bridge) setStatus(DictationStatus.IDLE) }, delay)
-      }
-      if (cleaned.isNotBlank()) TranscriptUploads.sendPending(applicationContext)
     }
   }
 
-  private fun cleanup(original: String): String {
+  private fun cleanup(original: String, generation: Int): String {
     val bearer = session.token ?: return original
     val url = session.apiUrl ?: return original
     if (original.isBlank()) return original
     return try {
       val body = JSONObject().put("text", original).toString().toRequestBody("application/json".toMediaType())
-      HttpClients.cleanup.newCall(Request.Builder().url("$url${VoxConstants.CLEANUP_PATH}")
-        .header("Authorization", "Bearer $bearer").post(body).build()).execute().use { response ->
+      val call = HttpClients.cleanup.newCall(Request.Builder().url("$url${VoxConstants.CLEANUP_PATH}")
+        .header("Authorization", "Bearer $bearer").post(body).build())
+      cleanupCall = call
+      if (generation != lifecycleGeneration) { call.cancel(); return original }
+      try { call.execute().use { response ->
         if (!response.isSuccessful) {
           VoxLog.w("cleanup HTTP ${response.code}")
           return original
@@ -1012,7 +1038,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
         } catch (e: Exception) {
           VoxLog.w("cleanup parse failed", e); null
         } ?: original
-      }
+      } } finally { if (cleanupCall === call) cleanupCall = null }
     } catch (e: Exception) {
       VoxLog.w("cleanup failed", e)
       original

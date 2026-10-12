@@ -42,7 +42,7 @@ export function LiveWaveform({ active }: { active: boolean }) {
           style={{
             width: 3,
             borderRadius: 999,
-            height: 3 + Math.sqrt(active ? level : 0) * 32,
+            height: 3 + Math.min(1, Math.pow(active ? level : 0, 0.7) * 1.25) * 34,
             backgroundColor: theme.colors.primary,
           }}
         />

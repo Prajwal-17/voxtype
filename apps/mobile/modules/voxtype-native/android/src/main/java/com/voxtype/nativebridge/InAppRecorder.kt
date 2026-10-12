@@ -6,6 +6,7 @@ import android.os.Looper
 import kotlinx.coroutines.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
+import okhttp3.Call
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 
@@ -22,6 +23,9 @@ object InAppRecorder {
   @Volatile var durationMs = 0L; private set
   @Volatile var level = 0f; private set
   private var lastLevelAt = 0L
+  private var processingJob: Job? = null
+  private var pendingFile: java.io.File? = null
+  @Volatile private var cleanupCall: Call? = null
   val busy: Boolean get() = status == "listening" || status == "processing"
   fun snapshot() = mapOf("status" to status, "text" to text, "error" to error, "durationMs" to durationMs, "level" to level)
   private fun changed() {
@@ -54,26 +58,33 @@ object InAppRecorder {
         main.post {
           if (current != generation) { file?.delete(); return@post }
           capture = null
+          pendingFile = file
           durationMs = duration
           status = "processing"; level = 0f; changed()
           stream.finalize { original ->
             stream.close()
             if (current != generation) { file?.delete(); return@finalize }
-            scope.launch {
+            processingJob = scope.launch {
               val store = VoxTypeStore(context)
+              var saved = false
               try {
-                val cleaned = if (store.cleanupEnabled && original.isNotBlank()) cleanup(session, original) else original
-                // Save only for the account that initiated this take.
-                if (current != generation || session.userId != userId) { file?.delete(); return@launch }
-                store.save(userId, cleaned, original, duration, file, apiUrl)
-                main.post {
-                  if (current == generation) { text = cleaned; status = "saved"; if (text.isBlank()) error = "No speech detected"; changed() }
+                ensureActive()
+                if (current != generation) return@launch
+                val cleaned = if (store.cleanupEnabled && original.isNotBlank()) cleanup(session, original, current) else original
+                ensureActive()
+                withContext(Dispatchers.Main) {
+                  if (current != generation || session.userId != userId) return@withContext
+                  store.save(userId, cleaned, original, duration, file, apiUrl)
+                  saved = true
+                  pendingFile = null
+                  text = cleaned; status = "saved"; if (text.isBlank()) error = "No speech detected"; changed()
                 }
-                if (cleaned.isNotBlank()) TranscriptUploads.sendPending(context)
-              } catch (exception: Exception) {
+                if (saved && current == generation && cleaned.isNotBlank()) TranscriptUploads.sendPending(context)
+              } catch (cancelled: CancellationException) { throw cancelled }
+              catch (exception: Exception) {
                 main.post { if (current == generation) { text = original; error = "Couldn’t save recording"; status = "error"; changed() } }
                 VoxLog.e("in-app save failed", exception)
-              } finally { store.close() }
+              } finally { if (!saved) file?.delete(); store.close() }
             }
           }
         }
@@ -92,19 +103,25 @@ object InAppRecorder {
   }
   fun cancel() {
     generation++
+    processingJob?.cancel(); processingJob = null
+    cleanupCall?.cancel(); cleanupCall = null
+    pendingFile?.delete(); pendingFile = null
     capture?.stop(); capture = null
     engine?.abort(); engine?.close(); engine = null
     status = "idle"; text = ""; error = ""; level = 0f; changed()
   }
-  private fun cleanup(session: NativeSession, original: String): String {
+  private fun cleanup(session: NativeSession, original: String, current: Int): String {
     if (original.length > 12000) return original
     return try {
       val request = Request.Builder().url("${session.apiUrl}${VoxConstants.CLEANUP_PATH}")
         .header("Authorization", "Bearer ${session.token}")
         .post(JSONObject().put("text", original).toString().toRequestBody("application/json".toMediaType())).build()
-      HttpClients.cleanup.newCall(request).execute().use { response ->
+      val call = HttpClients.cleanup.newCall(request)
+      cleanupCall = call
+      if (current != generation) { call.cancel(); return original }
+      try { call.execute().use { response ->
         if (!response.isSuccessful) original else JSONObject(response.body?.string() ?: "{}").optJSONObject("data")?.optString("text")?.takeIf { it.isNotBlank() } ?: original
-      }
+      } } finally { if (cleanupCall === call) cleanupCall = null }
     } catch (_: Exception) { original }
   }
 }
