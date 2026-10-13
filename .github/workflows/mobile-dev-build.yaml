@@ -1,5 +1,5 @@
 name: Android Development Build
-run-name: ${{ inputs.commit_title || 'VoxType Dev standalone APK' }}
+run-name: ${{ inputs.commit_title || github.event.head_commit.message || github.event.pull_request.title || 'Android Development Build' }}
 
 on:
   workflow_call:
@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
     inputs:
       commit_title:
-        description: Optional run title
+        description: Optional commit title
         required: false
         type: string
       branch:
