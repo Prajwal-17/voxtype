@@ -10,6 +10,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.io.IOException
+import java.time.Duration
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
@@ -107,6 +109,38 @@ class DeepgramCompletionTest {
       listener.onMessage(socket, final("Quick take"))
       listener.onMessage(socket, """{"type":"Metadata"}"""); idle()
       assertEquals("Quick take", result)
+    } finally { stream.close() }
+  }
+
+  @Test fun losingTheConnectionWhileFinalizingNeverReportsSuccessOrReconnectsTheTake() {
+    val factory = Factory()
+    var failed = 0; var completed = 0
+    val stream = DeepgramSession({ "test" }, { "https://example.test" }, { failed++ }, factory,
+      OkHttpClient.Builder().addInterceptor { response(it.request()) }.build())
+    try {
+      stream.begin(); val (socket, listener) = opened(factory)
+      listener.onMessage(socket, final("Partial speech")); idle()
+      stream.finalize { completed++ }
+      listener.onFailure(socket, IOException("offline"), null); idle()
+      listener.onMessage(socket, """{"type":"Metadata"}""")
+      listener.onClosed(socket, 1000, "late close"); idle()
+      shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(30))
+      assertEquals(1, failed)
+      assertEquals(0, completed)
+      assertSame(socket, factory.socket)
+    } finally { stream.close() }
+  }
+
+  @Test fun finalizationDeadlineShowsFailureInsteadOfAnEmptyDoneState() {
+    val factory = Factory(); var failed = 0; var completed = 0
+    val stream = DeepgramSession({ "test" }, { "https://example.test" }, { failed++ }, factory,
+      OkHttpClient.Builder().addInterceptor { response(it.request()) }.build())
+    try {
+      stream.begin(); opened(factory)
+      stream.finalize { completed++ }
+      shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(VoxConstants.FINALIZE_TIMEOUT_MS + 1))
+      assertEquals(1, failed)
+      assertEquals(0, completed)
     } finally { stream.close() }
   }
 }

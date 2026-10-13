@@ -35,16 +35,17 @@ object VoxConstants {
   const val BYTE_RATE = 32_000
   const val WAV_HEADER_BYTES = 44
 
-  // Light mint recording surface with petrol controls, matching the mobile UI.
-  val BUBBLE_MUTED_COLOR = VoxTheme.surfaceSubtle
-  val BUBBLE_ACTIVE_COLOR = VoxTheme.accentSoft
-  val BUBBLE_ACTION_COLOR = VoxTheme.surface
-  val BUBBLE_DONE_COLOR = VoxTheme.surface
-  val BUBBLE_DONE_ICON = VoxTheme.accentInk
-  val BUBBLE_WAVE_COLOR = VoxTheme.accent
-  val BUBBLE_SAVED_COLOR = VoxTheme.accentSoft
-  val CLOSE_COLOR = androidx.core.graphics.ColorUtils.setAlphaComponent(VoxTheme.dangerSoft, 240)
-  val CLOSE_HOT_COLOR = VoxTheme.dangerSoft
+  // Translucent brand surfaces; glyphs remain readable over light and dark host apps.
+  val BUBBLE_MUTED_COLOR = androidx.core.graphics.ColorUtils.setAlphaComponent(VoxTheme.accent, 184)
+  val BUBBLE_ACTIVE_COLOR = androidx.core.graphics.ColorUtils.setAlphaComponent(VoxTheme.overlay, 184)
+  val BUBBLE_ACTION_COLOR = androidx.core.graphics.ColorUtils.setAlphaComponent(VoxTheme.inverse, 32)
+  val BUBBLE_DONE_COLOR = BUBBLE_ACTION_COLOR
+  val BUBBLE_DONE_ICON = androidx.core.graphics.ColorUtils.setAlphaComponent(VoxTheme.inverse, 235)
+  val BUBBLE_WAVE_COLOR = androidx.core.graphics.ColorUtils.setAlphaComponent(VoxTheme.overlayWave, 235)
+  val BUBBLE_OUTLINE_COLOR = androidx.core.graphics.ColorUtils.setAlphaComponent(VoxTheme.inverse, 40)
+  val BUBBLE_SAVED_COLOR = BUBBLE_MUTED_COLOR
+  val CLOSE_COLOR = androidx.core.graphics.ColorUtils.setAlphaComponent(VoxTheme.danger, 150)
+  val CLOSE_HOT_COLOR = androidx.core.graphics.ColorUtils.setAlphaComponent(VoxTheme.danger, 200)
   const val BUBBLE_RADIUS_DP = 14
   const val BUBBLE_CAPSULE_RADIUS_DP = 999
   const val BUBBLE_ACTION_RADIUS_DP = 999
@@ -58,6 +59,6 @@ object VoxConstants {
   const val BUBBLE_ACTION_DP = 44
   const val BUBBLE_GLYPH_SP = 22f
   const val CLOSE_SIZE_DP = 72
-  const val BUBBLE_WIDTH_ANIM_MS = 150L
+  const val BUBBLE_WIDTH_ANIM_MS = 220L
   const val BUBBLE_SNAP_ANIM_MS = 320L
 }

@@ -10,6 +10,7 @@ enum class DictationStatus(val bridge: String) {
   LISTENING("listening"),
   PROCESSING("processing"),
   SAVED("saved"),
+  ERROR("error"),
   MICROPHONE_PERMISSION_NEEDED("microphone_permission_needed");
 
   companion object {

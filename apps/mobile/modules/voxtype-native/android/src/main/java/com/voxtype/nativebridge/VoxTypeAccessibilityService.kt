@@ -5,6 +5,7 @@ import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.InputMethod
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
+import android.animation.ArgbEvaluator
 import android.animation.ValueAnimator
 import android.app.Notification
 import android.app.NotificationChannel
@@ -18,6 +19,8 @@ import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.view.Gravity
 import android.view.HapticFeedbackConstants
 import android.view.ViewConfiguration
@@ -77,6 +80,9 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   private var doneBtn: TextView? = null
   private var waveform: BubbleWaveformView? = null
   private var spinner: ProgressBar? = null
+  private var bubbleColor = VoxConstants.BUBBLE_MUTED_COLOR
+  private var bubbleError = ""
+  private var connectionError = false
   private var dismissedForKeyboard = false
   @Volatile private var foregroundMode = ForegroundMode.NONE
   val foregroundStatus: String get() = foregroundMode.name.lowercase()
@@ -345,7 +351,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       bottom.coerceAtLeast(top + VoxConstants.BUBBLE_SIZE_DP.dp))
   }
 
-  /** Only the dismiss target and old preference migration use the keyboard's bounds. */
+  /** Only old preference migration uses keyboard bounds; live placement stays screen-relative. */
   private fun keyboardBounds(): BubbleGeometry {
     val area = safeBounds()
     val bounds = screenBounds()
@@ -380,25 +386,46 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     val targetWidth = desiredWidth.coerceAtMost((area.right - area.left).coerceAtLeast(1))
     val x = area.dockX(dockRight, targetWidth)
     val y = area.yAt(verticalPosition, params.height)
+    val background = bubble?.background as? GradientDrawable
+    val targetRadius = if (status in listOf("idle", "microphone_permission_needed"))
+      VoxConstants.BUBBLE_RADIUS_DP.dp.toFloat() else minOf(targetWidth, params.height) / 2f
+    val targetColor = when (status) {
+      "listening", "processing", "connecting" -> VoxConstants.BUBBLE_ACTIVE_COLOR
+      "microphone_permission_needed" -> VoxConstants.CLOSE_COLOR
+      else -> VoxConstants.BUBBLE_MUTED_COLOR
+    }
     placementAnimator?.cancel()
     placementAnimator = null
     // A fast stop can arrive while expansion is still at its initial width.
     // Cancel that animation even when the new compact target already matches.
-    if (params.x == x && params.y == y && params.width == targetWidth) return
+    if (params.x == x && params.y == y && params.width == targetWidth &&
+      background?.cornerRadius == targetRadius && bubbleColor == targetColor) return
     if (!animate || !ValueAnimator.areAnimatorsEnabled()) {
       params.x = x; params.y = y; params.width = targetWidth
+      background?.cornerRadius = targetRadius
+      bubbleColor = targetColor; background?.setColor(bubbleColor)
+      bubble?.invalidateOutline()
       updateBubbleLayout()
       return
     }
     val startX = params.x; val startY = params.y; val startWidth = params.width
+    val startRadius = background?.cornerRadius ?: targetRadius
+    val startColor = bubbleColor
+    val colorEvaluator = ArgbEvaluator()
     placementAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
-      duration = if (startWidth != targetWidth) VoxConstants.BUBBLE_WIDTH_ANIM_MS else VoxConstants.BUBBLE_SNAP_ANIM_MS
+      duration = if (startWidth != targetWidth || startRadius != targetRadius || startColor != targetColor)
+        VoxConstants.BUBBLE_WIDTH_ANIM_MS else VoxConstants.BUBBLE_SNAP_ANIM_MS
       interpolator = PathInterpolator(0.2f, 0f, 0f, 1f)
       addUpdateListener {
         val fraction = it.animatedValue as Float
         params.x = (startX + (x - startX) * fraction).toInt()
         params.y = (startY + (y - startY) * fraction).toInt()
         params.width = (startWidth + (targetWidth - startWidth) * fraction).toInt()
+        background?.cornerRadius = (startRadius + (targetRadius - startRadius) * fraction)
+          .coerceAtMost(minOf(params.width, params.height) / 2f)
+        bubbleColor = colorEvaluator.evaluate(fraction, startColor, targetColor) as Int
+        background?.setColor(bubbleColor)
+        bubble?.invalidateOutline()
         updateBubbleLayout()
       }
       addListener(object : AnimatorListenerAdapter() {
@@ -416,10 +443,11 @@ class VoxTypeAccessibilityService : AccessibilityService() {
    */
   private fun createBubble() {
     val size = VoxConstants.BUBBLE_SIZE_DP.dp
+    bubbleColor = VoxConstants.BUBBLE_MUTED_COLOR
     val root = FrameLayout(this).apply {
       background = GradientDrawable().apply {
         setColor(VoxConstants.BUBBLE_MUTED_COLOR)
-        setStroke(1.dp, VoxTheme.lineStrong)
+        setStroke(1.dp, VoxConstants.BUBBLE_OUTLINE_COLOR)
         cornerRadius = VoxConstants.BUBBLE_RADIUS_DP.dp.toFloat()
       }
       elevation = VoxConstants.BUBBLE_ELEVATION_DP.dp.toFloat()
@@ -430,7 +458,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     val mark = ImageView(this).apply {
       setImageResource(R.drawable.voxtype_bubble_mark)
       scaleType = ImageView.ScaleType.FIT_CENTER
-      setColorFilter(VoxTheme.accentInk)
+      setColorFilter(VoxConstants.BUBBLE_DONE_ICON)
       alpha = 1f
       layoutParams = FrameLayout.LayoutParams(
         VoxConstants.BUBBLE_ICON_DP.dp, VoxConstants.BUBBLE_ICON_DP.dp, Gravity.CENTER)
@@ -450,7 +478,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     }
     val actionSize = VoxConstants.BUBBLE_ACTION_DP.dp
     val cancel = TextView(this).apply {
-      text = "✕"; setTextColor(VoxTheme.accentInk); textSize = 18f; gravity = Gravity.CENTER
+      text = "✕"; setTextColor(VoxConstants.BUBBLE_DONE_ICON); textSize = 18f; gravity = Gravity.CENTER
       background = GradientDrawable().apply {
         setColor(VoxConstants.BUBBLE_ACTION_COLOR)
         cornerRadius = VoxConstants.BUBBLE_ACTION_RADIUS_DP.dp.toFloat()
@@ -547,17 +575,13 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   private fun updateBubbleContent() {
     val root = bubble ?: return
     // Accessibility events fire constantly; never restart running animations.
-    val renderKey = "$status|$lastDelivered|$lastCopied"
+    val renderKey = "$status|$lastDelivered|$lastCopied|$connectionError|$bubbleError"
     if (renderKey == lastBubbleRender) return
     lastBubbleRender = renderKey
-    val bg = root.background as? GradientDrawable
-    val rounded = status in listOf("listening", "processing", "connecting", "saved")
-    bg?.cornerRadius = (if (rounded) VoxConstants.BUBBLE_CAPSULE_RADIUS_DP else VoxConstants.BUBBLE_RADIUS_DP).dp.toFloat()
     stopMotion()
     spinner?.visibility = View.GONE
     when (status) {
       DictationStatus.LISTENING.bridge -> {
-        bg?.setColor(VoxConstants.BUBBLE_ACTIVE_COLOR)
         bubbleMark?.visibility = View.GONE
         bubbleGlyph?.visibility = View.GONE
         actionsRow?.visibility = View.VISIBLE
@@ -568,7 +592,6 @@ class VoxTypeAccessibilityService : AccessibilityService() {
         animateBubbleWidth(VoxConstants.BUBBLE_LISTEN_WIDTH_DP.dp)
       }
       DictationStatus.CONNECTING.bridge, DictationStatus.PROCESSING.bridge -> {
-        bg?.setColor(VoxConstants.BUBBLE_ACTIVE_COLOR)
         bubbleMark?.visibility = View.GONE
         actionsRow?.visibility = View.GONE
         waveform?.visibility = View.GONE
@@ -577,25 +600,32 @@ class VoxTypeAccessibilityService : AccessibilityService() {
         animateBubbleWidth(VoxConstants.BUBBLE_SIZE_DP.dp)
       }
       DictationStatus.SAVED.bridge -> {
-        bg?.setColor(VoxConstants.BUBBLE_SAVED_COLOR)
         bubbleMark?.visibility = View.GONE
         actionsRow?.visibility = View.GONE
         bubbleGlyph?.visibility = View.VISIBLE
         bubbleGlyph?.text = "✓"
-        bubbleGlyph?.setTextColor(VoxTheme.accentInk)
+        bubbleGlyph?.setTextColor(VoxConstants.BUBBLE_DONE_ICON)
         animateBubbleWidth(VoxConstants.BUBBLE_SIZE_DP.dp)
       }
       DictationStatus.MICROPHONE_PERMISSION_NEEDED.bridge -> {
-        bg?.setColor(VoxConstants.CLOSE_COLOR)
         bubbleMark?.visibility = View.GONE
         actionsRow?.visibility = View.GONE
         bubbleGlyph?.visibility = View.VISIBLE
         bubbleGlyph?.text = "!"
-        bubbleGlyph?.setTextColor(VoxTheme.danger)
+        bubbleGlyph?.setTextColor(VoxConstants.BUBBLE_DONE_ICON)
+        animateBubbleWidth(VoxConstants.BUBBLE_SIZE_DP.dp)
+      }
+      DictationStatus.ERROR.bridge -> {
+        actionsRow?.visibility = View.GONE
+        bubbleGlyph?.visibility = if (connectionError) View.GONE else View.VISIBLE
+        bubbleGlyph?.text = "!"
+        bubbleGlyph?.setTextColor(VoxConstants.BUBBLE_DONE_ICON)
+        bubbleMark?.setImageResource(R.drawable.voxtype_connection_error)
+        bubbleMark?.visibility = if (connectionError) View.VISIBLE else View.GONE
         animateBubbleWidth(VoxConstants.BUBBLE_SIZE_DP.dp)
       }
       else -> {
-        bg?.setColor(VoxConstants.BUBBLE_MUTED_COLOR)
+        bubbleMark?.setImageResource(R.drawable.voxtype_bubble_mark)
         bubbleMark?.visibility = View.VISIBLE
         bubbleMark?.alpha = 1f
         bubbleGlyph?.visibility = View.GONE
@@ -610,6 +640,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     DictationStatus.LISTENING.bridge -> "Dictating. Tap stop to finish, cross to cancel, or drag to dock on either edge."
     DictationStatus.PROCESSING.bridge, DictationStatus.CONNECTING.bridge -> "VoxType $status. Tap to cancel dictation."
     DictationStatus.MICROPHONE_PERMISSION_NEEDED.bridge -> "VoxType needs microphone access"
+    DictationStatus.ERROR.bridge -> "$bubbleError Tap to retry dictation."
     DictationStatus.SAVED.bridge -> if (lastDelivered) "VoxType text inserted" else "Copy saved VoxType transcript"
     else -> "Start VoxType dictation. Drag to either edge, or drop on the close mark to hide."
   }
@@ -710,7 +741,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     else if (status == DictationStatus.SAVED.bridge && !lastDelivered) {
       lastSavedId?.let { store.copyToClipboard(it) }
       lastCopied = true; refreshBubble()
-    } else if (status == DictationStatus.IDLE.bridge || status == DictationStatus.SAVED.bridge) startRecording()
+    } else if (status in listOf(DictationStatus.IDLE.bridge, DictationStatus.SAVED.bridge, DictationStatus.ERROR.bridge)) startRecording()
   }
 
   private fun showCloseZone() {
@@ -726,7 +757,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
     }
     val cross = TextView(this).apply {
-      text = "✕"; setTextColor(VoxTheme.danger); textSize = 24f; gravity = Gravity.CENTER
+      text = "✕"; setTextColor(VoxConstants.BUBBLE_DONE_ICON); textSize = 24f; gravity = Gravity.CENTER
       layoutParams = FrameLayout.LayoutParams(size, size, Gravity.CENTER)
       importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
     }
@@ -740,8 +771,8 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       gravity = Gravity.TOP or Gravity.LEFT
       flags = flags or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
       setFitInsetsTypes(0)
-      val area = keyboardBounds()
-      x = (area.left + area.right - size) / 2
+      val area = safeBounds()
+      x = area.clampX((screenBounds().width() - size) / 2, size)
       y = (area.bottom - size).coerceAtLeast(area.top)
     }
     closeView = zone
@@ -828,7 +859,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   }
 
   private fun startRecording() {
-    if (InAppRecorder.busy || (status != DictationStatus.IDLE.bridge && status != DictationStatus.SAVED.bridge)) return
+    if (InAppRecorder.busy || status !in listOf(DictationStatus.IDLE.bridge, DictationStatus.SAVED.bridge, DictationStatus.ERROR.bridge)) return
     val node = safeFocus() ?: return
     if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
       node.recycle()
@@ -836,6 +867,17 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       main.postDelayed({ if (status == DictationStatus.MICROPHONE_PERMISSION_NEEDED.bridge) setStatus(DictationStatus.IDLE) }, VoxConstants.MIC_PERMISSION_RESET_MS)
       return
     }
+    val network = getSystemService(ConnectivityManager::class.java)
+    val canConnect = runCatching {
+      network?.activeNetwork?.let { network.getNetworkCapabilities(it) }
+        ?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+    }.getOrDefault(false)
+    if (!canConnect) {
+      node.recycle()
+      connectionFailed()
+      return
+    }
+    bubbleError = ""; connectionError = false
     retainTarget(node)
     recordingUserId = session.userId
     if (recordingUserId == null) {
@@ -877,7 +919,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
           catch (error: Exception) {
             VoxLog.e("speech finalization failed", error)
             BubbleHealth.record(this, "finalization_error:${error.javaClass.simpleName}")
-            recoverRecording()
+            connectionFailed()
           }
         }
       }, {
@@ -889,12 +931,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       setStatus(DictationStatus.LISTENING)
     } catch (e: Exception) {
       VoxLog.e("start capture failed", e)
-      capture = null
-      recordingUserId = null
-      stream.abort()
-      releaseTarget()
-      releaseMicrophoneForeground()
-      setStatus(DictationStatus.IDLE)
+      failRecording("Couldn’t start recording. Try again.")
     }
   }
 
@@ -911,9 +948,19 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     engine = null
   }
 
-  private fun speechStream(): DeepgramSession = engine ?: DeepgramSession({ session.token }, { session.apiUrl }, {
-    main.post { if (status == DictationStatus.LISTENING.bridge) stopRecording() }
-  }, vocabulary = { VoxTypeStore(this).use { it.vocabulary } }).also { engine = it }
+  private fun speechStream(): DeepgramSession {
+    engine?.let { return it }
+    lateinit var stream: DeepgramSession
+    stream = DeepgramSession({ session.token }, { session.apiUrl }, {
+      val generation = lifecycleGeneration
+      main.post {
+        if (engine === stream && generation == lifecycleGeneration &&
+          status in listOf("listening", "processing", "connecting")) connectionFailed()
+      }
+    }, vocabulary = { VoxTypeStore(this).use { it.vocabulary } })
+    engine = stream
+    return stream
+  }
 
   /** Cancel remains available during capture, finalization and cleanup. */
   private fun cancelRecording() {
@@ -997,7 +1044,18 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     }
   }
 
-  private fun recoverRecording() {
+  private fun recoverRecording() = resetRecording(DictationStatus.IDLE)
+
+  private fun connectionFailed() = failRecording("Connection unavailable. Check your internet and try again.", true)
+
+  private fun failRecording(message: String, network: Boolean = false) {
+    bubbleError = message; connectionError = network
+    resetRecording(DictationStatus.ERROR)
+    BubbleHealth.record(this, if (network) "dictation_error:connection" else "dictation_error:recording")
+    android.widget.Toast.makeText(this, message, android.widget.Toast.LENGTH_SHORT).show()
+  }
+
+  private fun resetRecording(next: DictationStatus) {
     lifecycleGeneration++
     processingJob?.cancel(); processingJob = null
     cleanupCall?.cancel(); cleanupCall = null
@@ -1010,11 +1068,15 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     engine = null
     releaseTarget()
     releaseMicrophoneForeground()
-    setStatus(DictationStatus.IDLE)
+    setStatus(next)
   }
 
   private fun finishDictation(original: String, apiUrl: String) {
     val userId = recordingUserId ?: return
+    if (original.isBlank()) {
+      failRecording("No speech detected. Try again.")
+      return
+    }
     val generation = lifecycleGeneration
     val audio = recordingFile
     val duration = recordingDuration
@@ -1052,8 +1114,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
         BubbleHealth.record(this@VoxTypeAccessibilityService, "save_error:${e.javaClass.simpleName}")
         withContext(Dispatchers.Main) {
           if (generation == lifecycleGeneration) {
-            recoverRecording()
-            android.widget.Toast.makeText(this@VoxTypeAccessibilityService, "Couldn’t save this recording", android.widget.Toast.LENGTH_LONG).show()
+            failRecording("Couldn’t save this recording. Try again.")
           }
         }
       } finally {

@@ -69,7 +69,6 @@ class BubbleWaveformView(context: Context, private val level: () -> Float) : Vie
       val amplitude = BubbleAudioLevel.displayGain(value) * envelope
       val barHeight = maxOf(2f * resources.displayMetrics.density, height * (0.14f + amplitude * 0.86f))
       val x = step * (i + 0.5f)
-      paint.alpha = 255
       canvas.drawRoundRect(x - barWidth / 2, (height - barHeight) / 2,
         x + barWidth / 2, (height + barHeight) / 2, barWidth / 2, barWidth / 2, paint)
     }

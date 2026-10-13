@@ -87,8 +87,9 @@ queued results, in-app cleanup and successful uncanceled completion.
 
 ## Mobile bubble motion refinement
 
-Android recording uses a light mint surface, petrol waveform and controls, and a
-subtle outline. Processing and the success check fit the 48dp bubble. Its saved
+Android recording uses translucent petrol surfaces, white brand bars and a quiet
+outline. Width, corner radius and surface color animate together; collapsing never
+switches to square corners while the capsule is still wide. Processing and the success check fit the 48dp bubble. Its saved
 height is relative to the screen, independent of keyboard bounds; older preferences
 are migrated once. Opening or resizing a keyboard leaves the bubble at that saved
 position, including over the keyboard if the user placed it there. Horizontal throws
@@ -98,3 +99,9 @@ a moving bubble interrupts it in place, and reduced motion skips placement anima
 Native regression coverage checks keyboard resizing/reopening, preference migration,
 compact state transitions, interrupted expansion, fling direction and cancellation.
 Animation feel and placement on the user's phone still require installed-device checks.
+
+The drag dismiss target is centered at the bottom of the full screen, independent
+of the keyboard height. Offline requests and failed/finalization-timeout speech
+connections stop the take, discard pending audio and show a stable connection icon
+until an explicit retry. A failed take cannot become a success or paste late results.
+The in-app recorder shares the terminal speech-failure handling.

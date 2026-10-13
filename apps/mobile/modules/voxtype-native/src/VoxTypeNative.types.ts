@@ -48,7 +48,13 @@ export type Snapshot = {
     events: { event: string; timestamp: number }[];
   };
   status:
-    'idle' | 'connecting' | 'listening' | 'processing' | 'saved' | 'microphone_permission_needed';
+    | 'idle'
+    | 'connecting'
+    | 'listening'
+    | 'processing'
+    | 'saved'
+    | 'error'
+    | 'microphone_permission_needed';
   inApp: {
     status: 'idle' | 'listening' | 'processing' | 'saved' | 'error';
     text: string;

@@ -133,4 +133,32 @@ class BubbleCancellationTest {
       assertEquals("saved", service.status)
     } finally { controller.destroy() }
   }
+
+  @Test fun connectionFailureLeavesAStableErrorIconAndRejectsLateSuccess() {
+    val controller = Robolectric.buildService(VoxTypeAccessibilityService::class.java).create()
+    val service = controller.get()
+    val audio = File(service.filesDir, "offline-pending.wav").apply { writeText("audio") }
+    try {
+      set(service, "status", "processing")
+      set(service, "recordingUserId", "offline-owner")
+      set(service, "recordingFile", audio)
+      val job = Job()
+      set(service, "processingJob", job)
+      invoke(service, "connectionFailed")
+      assertEquals("error", service.status)
+      assertTrue(job.isCancelled)
+      assertFalse(audio.exists())
+      assertNull(field(service, "engine"))
+      finish(service, "Late speech must not appear")
+      assertNull(field(service, "lastSavedId"))
+      invoke(service, "createBubble")
+      invoke(service, "updateBubbleContent")
+      assertEquals(View.GONE, (field(service, "spinner") as View).visibility)
+      assertEquals(View.VISIBLE, (field(service, "bubbleMark") as View).visibility)
+      assertTrue((field(service, "bubble") as View).contentDescription.toString().contains("Connection unavailable"))
+      shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(10))
+      assertEquals("error", service.status)
+      VoxTypeStore(service).use { assertTrue(it.dictations("offline-owner").isEmpty()) }
+    } finally { controller.destroy(); audio.delete() }
+  }
 }

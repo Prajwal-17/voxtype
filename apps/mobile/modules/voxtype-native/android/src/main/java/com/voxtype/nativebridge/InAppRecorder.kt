@@ -42,7 +42,16 @@ object InAppRecorder {
     check(session.token != null) { "Sign in again." }
     val current = ++generation
     text = ""; error = ""; durationMs = 0L; level = 0f; lastLevelAt = 0L
-    val stream = DeepgramSession({ session.token }, { session.apiUrl }, { main.post { stop() } }, vocabulary = { VoxTypeStore(context).use { it.vocabulary } })
+    val stream = DeepgramSession({ session.token }, { session.apiUrl }, {
+      main.post {
+        if (current == generation && busy) {
+          cancel()
+          error = "Connection lost. Check your internet and try again."
+          status = "error"
+          changed()
+        }
+      }
+    }, vocabulary = { VoxTypeStore(context).use { it.vocabulary } })
     engine = stream
     try {
       status = "listening"

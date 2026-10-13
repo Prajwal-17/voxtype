@@ -3,6 +3,7 @@ package com.voxtype.nativebridge
 import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Rect
+import android.graphics.drawable.GradientDrawable
 import android.view.View
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityWindowInfo
@@ -107,6 +108,43 @@ class BubblePresentationTest {
       render(service, "processing")
       assertEquals((VoxConstants.BUBBLE_SIZE_DP * service.resources.displayMetrics.density).toInt(), params(service).width)
       assertEquals(View.VISIBLE, (field(service, "spinner") as View).visibility)
+    } finally { controller.destroy() }
+  }
+
+  @Test fun closingMorphsTheCornersWithTheWidthInsteadOfMakingTheBarRectangular() {
+    val controller = Robolectric.buildService(VoxTypeAccessibilityService::class.java).create()
+    val service = controller.get()
+    try {
+      invoke(service, "createBubble"); render(service, "listening")
+      val background = (field(service, "bubble") as View).background as GradientDrawable
+      val startRadius = background.cornerRadius
+      service.javaClass.getDeclaredField("status").apply { isAccessible = true }.set(service, "idle")
+      invoke(service, "updateBubbleContent")
+      assertEquals(startRadius, background.cornerRadius, 0.01f)
+      val animation = field(service, "placementAnimator") as ValueAnimator
+      for (fraction in listOf(0.1f, 0.3f, 0.6f, 0.9f)) {
+        animation.setCurrentFraction(fraction)
+        assertTrue(background.cornerRadius >= VoxConstants.BUBBLE_RADIUS_DP * service.resources.displayMetrics.density)
+        assertTrue(background.cornerRadius <= minOf(params(service).width, params(service).height) / 2f)
+      }
+      animation.end()
+    } finally { controller.destroy() }
+  }
+
+  @Test fun dismissTargetIsCenteredAtTheScreenBottomRegardlessOfKeyboardHeight() {
+    val controller = Robolectric.buildService(VoxTypeAccessibilityService::class.java).create()
+    val service = controller.get()
+    try {
+      val bounds = service.getSystemService(WindowManager::class.java).currentWindowMetrics.bounds
+      val area = service.javaClass.getDeclaredMethod("safeBounds").apply { isAccessible = true }.invoke(service) as BubbleGeometry
+      for (height in listOf(0.4f, 0.7f, null)) {
+        keyboard(service, height)
+        invoke(service, "showCloseZone")
+        val target = (field(service, "closeView") as View).layoutParams as WindowManager.LayoutParams
+        assertEquals(bounds.width() / 2f, target.x + target.width / 2f, 1f)
+        assertEquals(area.bottom, target.y + target.height)
+        invoke(service, "hideCloseZone")
+      }
     } finally { controller.destroy() }
   }
 }

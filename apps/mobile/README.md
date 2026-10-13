@@ -189,11 +189,19 @@ to check waveform response. Check tap vs drag, interrupted drags, drop-to-close,
 reduced motion and haptic settings. These native interactions cannot be verified in the
 Expo web preview.
 
-The recording capsule uses a light mint surface with petrol waveform and controls.
+The bubble uses translucent petrol surfaces and white logo bars matching the app icon.
+Width, corner radius and surface color morph together when recording ends; reduced
+motion applies the final shape immediately. The dismiss target stays centered at the
+bottom of the full screen, including while the keyboard is open.
 Connection setup, processing and success use the compact 48dp rounded bubble. Loading
 shows only a spinner; tap it to cancel the take, or drag to the dismiss target. Recording
 keeps the opposite-end stop and cancel controls. Verify that cancellation during setup
 and processing never pastes or saves a late result.
+
+An unavailable network, failed speech connection or finalization timeout ends the take
+with a stable connection-error icon. Tap to retry when connectivity returns. Failures
+never cycle through loading/success or save and paste a partial/empty result. Dictating
+silence reports no speech without creating an empty transcript.
 
 ## Earlier Mobile 0.0.6 behavior
 

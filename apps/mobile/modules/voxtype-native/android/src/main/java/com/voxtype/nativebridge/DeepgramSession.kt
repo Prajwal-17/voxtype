@@ -121,7 +121,7 @@ class DeepgramSession(private val token: () -> String?,
     pendingDone = onDone
     finishStartedAt = SystemClock.elapsedRealtime()
     keepUntil = SystemClock.elapsedRealtime() + VoxConstants.SOCKET_KEEP_ALIVE_MS
-    if (takeFailed || closed) { complete(); return }
+    if (takeFailed || closed) { lost(); return }
     // If finish was tapped while connecting, onOpen flushes the backlog before CloseStream.
     if (ready) closeStream() else connect()
   }
@@ -130,7 +130,7 @@ class DeepgramSession(private val token: () -> String?,
     if (socket?.send("{\"type\":\"CloseStream\"}") != true) { lost(); return }
     val generation = ++finishGeneration
     main.postDelayed({
-      if (pendingDone != null && generation == finishGeneration) complete()
+      if (pendingDone != null && generation == finishGeneration) lost()
     }, VoxConstants.FINALIZE_TIMEOUT_MS)
   }
 
@@ -250,14 +250,21 @@ class DeepgramSession(private val token: () -> String?,
   }
 
   private fun lost() {
-    val active = takeActive
+    val active = takeActive || pendingDone != null
     takeActive = false
     takeFailed = true
+    pendingDone = null
+    finishGeneration++
+    segments.clear()
     synchronized(audioLock) { recording = false }
     disconnect()
-    if (pendingDone != null) complete()
-    else if (active) {
+    if (active) {
+      // A failed take is terminal. Never report partial/empty text as success or
+      // reconnect that take behind the recorder's error indicator.
+      keepUntil = 0
+      main.removeCallbacks(maintenance)
       try { onLost() } catch (e: Exception) { VoxLog.w("onLost failed", e) }
+      return
     }
     if (!closed && SystemClock.elapsedRealtime() < keepUntil) {
       val shift = minOf(reconnectAttempt++, VoxConstants.RECONNECT_MAX_SHIFT)
