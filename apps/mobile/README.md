@@ -179,14 +179,23 @@ The exclusions avoid the existing upstream Kotlin lint crash; they do not skip V
 source analysis. Seven JVM tests cover edge selection, expansion anchoring, keyboard
 and rotation bounds, tiny windows, PCM silence, amplitude and signed sample decoding.
 
-On a device, drag from both the idle circle and recording controls; release near either
-edge and in the middle. Check that the bubble docks, remains above the keyboard, and
-keeps its edge during expansion, rotation and reopening. Speak quietly/loudly and pause
+On a device, drag from both the idle bubble and recording controls; release near either
+edge and in the middle, then throw left/right from the opposite side. Check that docking
+eases smoothly to the intended edge. The position is saved relative to the screen, so
+opening, resizing or switching keyboards does not move it; it can stay over the keyboard
+where you placed it. Rotation clamps it within the new screen bounds. Close/reopen a field
+and confirm the same position returns. Speak quietly/loudly and pause
 to check waveform response. Check tap vs drag, interrupted drags, drop-to-close, system
 reduced motion and haptic settings. These native interactions cannot be verified in the
 Expo web preview.
 
-## Mobile 0.0.6
+The recording capsule uses a light mint surface with petrol waveform and controls.
+Connection setup, processing and success use the compact 48dp rounded bubble. Loading
+shows only a spinner; tap it to cancel the take, or drag to the dismiss target. Recording
+keeps the opposite-end stop and cancel controls. Verify that cancellation during setup
+and processing never pastes or saves a late result.
+
+## Earlier Mobile 0.0.6 behavior
 
 The recording capsule retains its width while processing and uses a native progress indicator.
 Its waveform has 17 opaque bars in a 120×34dp area; the surrounding surface is 80% opaque.

@@ -8,6 +8,10 @@ data class BubbleGeometry(val left: Int, val top: Int, val right: Int, val botto
   fun clampX(x: Int, width: Int): Int = x.coerceIn(left, (right - width).coerceAtLeast(left))
   fun clampY(y: Int, height: Int): Int = y.coerceIn(top, (bottom - height).coerceAtLeast(top))
   fun nearestRight(x: Int, width: Int): Boolean = x + width / 2f >= (left + right) / 2f
+  /** Deliberate horizontal throws dock in their direction; slow/vertical drags use distance. */
+  fun releaseRight(x: Int, width: Int, velocityX: Float, velocityY: Float, flingThreshold: Float): Boolean =
+    if (kotlin.math.abs(velocityX) >= flingThreshold && kotlin.math.abs(velocityX) > kotlin.math.abs(velocityY))
+      velocityX > 0f else nearestRight(x, width)
   fun yAt(fraction: Float, height: Int): Int =
     top + ((bottom - top - height).coerceAtLeast(0) * fraction.coerceIn(0f, 1f)).toInt()
 

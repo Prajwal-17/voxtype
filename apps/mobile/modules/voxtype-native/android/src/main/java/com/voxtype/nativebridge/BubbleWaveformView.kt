@@ -10,7 +10,7 @@ import kotlin.math.sin
 
 /** Rolling microphone history, rendered in one lightweight native view. */
 class BubbleWaveformView(context: Context, private val level: () -> Float) : View(context) {
-  private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = VoxTheme.overlayWave }
+  private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = VoxConstants.BUBBLE_WAVE_COLOR }
   private val samples = FloatArray(17)
   private val display = FloatArray(17)
   private var listening = false

@@ -71,7 +71,8 @@ The custom title bar uses the app's petrol accent, inverse controls and a restor
 icon that follows the native maximized state. Both overlay capsules place Stop at
 the left and Close at the right. Desktop processing shows a spinner without visible
 Transcribing/Cleaning labels; those states remain available to screen readers.
-Android preserves the Close touch target during processing while disabling Stop.
+Android recording places Stop at the left and Close at the right. Connection setup
+and processing show only a spinner in the compact rounded bubble; tapping it cancels.
 Waveforms use stronger display gain and faster response to real audio samples;
 silence and reduced-motion behavior remain supported.
 
@@ -83,3 +84,17 @@ commit with the cancel event, so a late result cannot save or paste a canceled t
 The in-app recorder follows the same cleanup/pending-audio cancellation rules.
 Native tests cover end controls, processing cancellation, the drag close target,
 queued results, in-app cleanup and successful uncanceled completion.
+
+## Mobile bubble motion refinement
+
+Android recording uses a light mint surface, petrol waveform and controls, and a
+subtle outline. Processing and the success check fit the 48dp bubble. Its saved
+height is relative to the screen, independent of keyboard bounds; older preferences
+are migrated once. Opening or resizing a keyboard leaves the bubble at that saved
+position, including over the keyboard if the user placed it there. Horizontal throws
+use screen-coordinate velocity to choose an edge, then ease into the dock. Touching
+a moving bubble interrupts it in place, and reduced motion skips placement animation.
+
+Native regression coverage checks keyboard resizing/reopening, preference migration,
+compact state transitions, interrupted expansion, fling direction and cancellation.
+Animation feel and placement on the user's phone still require installed-device checks.

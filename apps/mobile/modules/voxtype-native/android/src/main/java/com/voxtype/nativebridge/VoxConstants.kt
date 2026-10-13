@@ -35,13 +35,14 @@ object VoxConstants {
   const val BYTE_RATE = 32_000
   const val WAV_HEADER_BYTES = 44
 
-  // Stable dark capsule; idle handle uses a quiet navigation surface.
+  // Light mint recording surface with petrol controls, matching the mobile UI.
   val BUBBLE_MUTED_COLOR = VoxTheme.surfaceSubtle
-  val BUBBLE_ACTIVE_COLOR = VoxTheme.overlay
-  val BUBBLE_ACTION_COLOR = VoxTheme.overlayRaised
-  val BUBBLE_DONE_COLOR = VoxTheme.overlayRaised
-  val BUBBLE_DONE_ICON = VoxTheme.overlayText
-  val BUBBLE_SAVED_COLOR = VoxTheme.overlay
+  val BUBBLE_ACTIVE_COLOR = VoxTheme.accentSoft
+  val BUBBLE_ACTION_COLOR = VoxTheme.surface
+  val BUBBLE_DONE_COLOR = VoxTheme.surface
+  val BUBBLE_DONE_ICON = VoxTheme.accentInk
+  val BUBBLE_WAVE_COLOR = VoxTheme.accent
+  val BUBBLE_SAVED_COLOR = VoxTheme.accentSoft
   val CLOSE_COLOR = androidx.core.graphics.ColorUtils.setAlphaComponent(VoxTheme.dangerSoft, 240)
   val CLOSE_HOT_COLOR = VoxTheme.dangerSoft
   const val BUBBLE_RADIUS_DP = 14
@@ -58,5 +59,5 @@ object VoxConstants {
   const val BUBBLE_GLYPH_SP = 22f
   const val CLOSE_SIZE_DP = 72
   const val BUBBLE_WIDTH_ANIM_MS = 150L
-  const val BUBBLE_SNAP_ANIM_MS = 220L
+  const val BUBBLE_SNAP_ANIM_MS = 320L
 }

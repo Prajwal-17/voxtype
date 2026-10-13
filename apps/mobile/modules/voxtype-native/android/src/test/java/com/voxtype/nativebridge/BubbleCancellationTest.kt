@@ -39,12 +39,12 @@ class BubbleCancellationTest {
     fail("Processing did not settle")
   }
 
-  @Test fun stopAndCloseRemainOnOppositeEndsWhileProcessingAndCloseCancels() {
+  @Test fun recordingControlsStayAtOppositeEndsAndCompactProcessingTapCancels() {
     val controller = Robolectric.buildService(VoxTypeAccessibilityService::class.java).create()
     val service = controller.get()
     try {
       invoke(service, "createBubble")
-      set(service, "status", "processing")
+      set(service, "status", "listening")
       invoke(service, "updateBubbleContent")
       val row = field(service, "actionsRow") as LinearLayout
       val stop = field(service, "doneBtn") as View
@@ -53,13 +53,19 @@ class BubbleCancellationTest {
       assertSame(close, row.getChildAt(row.childCount - 1))
       assertEquals(View.VISIBLE, row.visibility)
       assertTrue(close.isEnabled)
-      assertFalse(stop.isEnabled)
+      assertTrue(stop.isEnabled)
+      set(service, "status", "processing")
+      invoke(service, "updateBubbleContent")
+      assertEquals(View.GONE, row.visibility)
+      assertEquals(View.VISIBLE, (field(service, "spinner") as View).visibility)
+      val root = field(service, "bubble") as View
+      assertTrue(root.contentDescription.toString().contains("Tap to cancel"))
       val job = Job()
       val call = HttpClients.cleanup.newCall(Request.Builder().url("https://example.test").build())
       set(service, "processingJob", job)
       set(service, "cleanupCall", call)
       val before = field(service, "lifecycleGeneration") as Int
-      close.performClick()
+      root.performClick()
       assertEquals("idle", service.status)
       assertTrue(job.isCancelled)
       assertTrue(call.isCanceled())
@@ -77,8 +83,9 @@ class BubbleCancellationTest {
       set(service, "recordingUserId", "owner")
       set(service, "recordingFile", file)
       set(service, "closeHot", true)
-      service.javaClass.getDeclaredMethod("finishDrag", Boolean::class.javaPrimitiveType)
-        .apply { isAccessible = true }.invoke(service, true)
+      service.javaClass.getDeclaredMethod("finishDrag", Boolean::class.javaPrimitiveType,
+        Float::class.javaPrimitiveType, Float::class.javaPrimitiveType)
+        .apply { isAccessible = true }.invoke(service, true, 0f, 0f)
       assertEquals("idle", service.status)
       assertEquals(true, field(service, "dismissedForKeyboard"))
       assertNull(field(service, "recordingUserId"))

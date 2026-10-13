@@ -20,6 +20,14 @@ class BubbleGeometryTest {
     }
   }
 
+  @Test fun horizontalThrowsReachTheirIntendedEdgeEvenFromTheOtherSide() {
+    assertTrue(portrait.releaseRight(20, 48, 1500f, 100f, 500f))
+    assertFalse(portrait.releaseRight(300, 48, -1500f, 100f, 500f))
+    // Slow drags and mostly vertical throws still settle on the closest edge.
+    assertFalse(portrait.releaseRight(20, 48, 200f, 0f, 500f))
+    assertTrue(portrait.releaseRight(300, 48, -600f, 1800f, 500f))
+  }
+
   @Test fun keyboardAndRotationPreserveHeightPreferenceWithinSafeBounds() {
     val fraction = portrait.fractionAt(360, 48)
     for (area in listOf(portrait, BubbleGeometry(12, 36, 378, 300), BubbleGeometry(36, 12, 800, 220))) {
