@@ -1,5 +1,6 @@
 package com.voxtype.nativebridge
 
+import android.animation.ValueAnimator
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.ProgressBar
@@ -24,6 +25,8 @@ class BubbleRenderingTest {
   private fun status(service: VoxTypeAccessibilityService, value: String) {
     service.javaClass.getDeclaredField("status").apply { isAccessible = true }.set(service, value)
     invoke(service, "updateBubbleContent")
+    // Measure the settled state now that capsule transitions animate.
+    (field(service, "placementAnimator") as? ValueAnimator)?.end()
   }
 
   @Test fun idleBubbleIsARoundedSquareWithACenteredVectorMark() {
@@ -51,7 +54,7 @@ class BubbleRenderingTest {
     } finally { controller.destroy() }
   }
 
-  @Test fun processingKeepsRecordingWidthAndUsesNativeSpinner() {
+  @Test fun recordingHasWaveformSpaceAndProcessingShrinksToOnlyTheNativeSpinner() {
     val controller = Robolectric.buildService(VoxTypeAccessibilityService::class.java).create()
     val service = controller.get()
     try {
@@ -69,9 +72,10 @@ class BubbleRenderingTest {
       assertEquals(34, (wave.measuredHeight / density).toInt())
       assertTrue("Expanded surface has fully rounded ends", (root.background as GradientDrawable).cornerRadius >= height / 2f)
       status(service, "processing")
-      assertEquals("No shrinking while processing", width, root.layoutParams.width)
+      assertEquals("Processing uses the compact bubble", (VoxConstants.BUBBLE_SIZE_DP * density).toInt(), root.layoutParams.width)
       assertEquals(View.VISIBLE, (field(service, "spinner") as ProgressBar).visibility)
       assertEquals(View.GONE, (field(service, "bubbleGlyph") as View).visibility)
+      assertEquals(View.GONE, (field(service, "actionsRow") as View).visibility)
     } finally { controller.destroy() }
   }
 }
