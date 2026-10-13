@@ -13,6 +13,18 @@
     "XDG_SESSION_TYPE"
   ],
   "tasks": {
+    "android": {
+      "cache": false,
+      "persistent": true,
+      "env": ["EXPO_PUBLIC_API_URL"],
+      "passThroughEnv": ["ANDROID_HOME", "ANDROID_SDK_ROOT", "JAVA_HOME"]
+    },
+    "db:migrate:local": {
+      "cache": false
+    },
+    "generate": {
+      "cache": false
+    },
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],

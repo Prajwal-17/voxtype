@@ -1,8 +1,13 @@
-# Shared values
+# Shared
 
-`theme.ts` holds the visual values used by desktop, mobile and the Android bubble.
-`analytics.ts` holds their analytics response contract and number formatting.
+`theme.ts` supplies desktop and mobile theme values; `analytics.ts` supplies shared
+analytics contracts and number formatting. Import theme values from `@voxtype/shared`
+and web styles from `@voxtype/shared/web.css`. Keep UI components in each app.
 
-Import colors or `nativeTheme` from `@voxtype/shared`. Desktop and mobile web import
-`@voxtype/shared/web.css`. Run `pnpm --filter @voxtype/shared generate` after a theme
-change; lint rejects stale CSS or Kotlin. Keep UI components in each app.
+After changing the theme, regenerate CSS and Android colors from the repository root:
+
+```sh
+pnpm exec turbo run generate --filter=@voxtype/shared
+```
+
+Lint checks that generated files are current.

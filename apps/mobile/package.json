@@ -1,6 +1,6 @@
 {
   "name": "@voxtype/mobile",
-  "version": "0.0.8",
+  "version": "0.1.0",
   "main": "expo-router/entry",
   "dependencies": {
     "@rn-primitives/slot": "^1.5.2",
@@ -39,6 +39,7 @@
   },
   "private": true,
   "scripts": {
+    "android": "expo run:android",
     "start": "expo start",
     "check-types": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0"

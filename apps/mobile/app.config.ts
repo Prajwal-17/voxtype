@@ -13,7 +13,7 @@ export function appConfig({ config }: ConfigContext): ExpoConfig {
     scheme: development ? 'voxtype-dev' : 'voxtype',
     slug: config.slug ?? 'voxtype-mobile',
     version: development
-      ? `${config.version ?? '0.0.7'}-dev.${buildCommit?.slice(0, 7) ?? 'local'}`
+      ? `${config.version ?? '0.1.0'}-dev.${buildCommit?.slice(0, 7) ?? 'local'}`
       : config.version,
     android: {
       ...config.android,
