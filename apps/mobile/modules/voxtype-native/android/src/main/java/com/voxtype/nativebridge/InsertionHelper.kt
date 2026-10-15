@@ -7,6 +7,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.os.PersistableBundle
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.inputmethod.SurroundingText
 
 /**
  * Input-connection helpers. Kept separate so the service never
@@ -33,6 +34,15 @@ object InsertionHelper {
     node: AccessibilityNodeInfo,
     connection: InputMethod.AccessibilityInputConnection?,
     text: String,
+  ): Boolean = insert(context, node, text) {
+    connection?.let { commitAndVerify(it, text) } ?: false
+  }
+
+  internal fun insert(
+    context: Context,
+    node: AccessibilityNodeInfo,
+    text: String,
+    commit: () -> Boolean,
   ): Boolean {
     if (text.isBlank()) return false
     try {
@@ -44,7 +54,7 @@ object InsertionHelper {
       clipboard.setPrimaryClip(clip)
     } catch (error: Exception) {
       VoxLog.w("clipboard unavailable", error)
-      return connection?.let { commitAndVerify(it, text) } ?: false
+      return commit()
     }
     try {
       // TextView/WebView can omit ACTION_PASTE while the clipboard is empty.
@@ -55,16 +65,21 @@ object InsertionHelper {
       VoxLog.w("paste action failed", error)
       return false
     }
-    return connection?.let { commitAndVerify(it, text) } ?: false
+    return commit()
   }
 
   /** Commits text and verifies it actually landed, otherwise reports false. */
-  fun commitAndVerify(connection: InputMethod.AccessibilityInputConnection, text: String): Boolean {
+  fun commitAndVerify(connection: InputMethod.AccessibilityInputConnection, text: String): Boolean =
+    commitAndVerify(text, { connection.getSurroundingText(text.length, 0, 0) }) {
+      connection.commitText(text, 1, null)
+    }
+
+  internal fun commitAndVerify(text: String, read: () -> SurroundingText?, commit: () -> Unit): Boolean {
     return try {
       // Surrounding text is optional. A failed read must not prevent the commit.
-      val before = runCatching { connection.getSurroundingText(text.length, 0, 0) }.getOrNull()
-      connection.commitText(text, 1, null)
-      val after = connection.getSurroundingText(text.length, 0, 0)
+      val before = runCatching { read() }.getOrNull()
+      commit()
+      val after = read()
       // Repeated words can produce identical slices; also check cursor movement.
       val changed = before?.text?.toString() != after?.text?.toString() ||
         (before != null && after != null && before.offset >= 0 && after.offset >= 0 &&

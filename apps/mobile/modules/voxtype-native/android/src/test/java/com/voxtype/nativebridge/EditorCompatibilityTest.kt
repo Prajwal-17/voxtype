@@ -1,6 +1,5 @@
 package com.voxtype.nativebridge
 
-import android.accessibilityservice.InputMethod
 import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
@@ -11,7 +10,6 @@ import android.view.inputmethod.SurroundingText
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.Mockito.*
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
@@ -88,45 +86,47 @@ class EditorCompatibilityTest {
 
   @Test fun acceptedAsyncPasteIsNeverFollowedByAnImeCommit() {
     val node = mock(AccessibilityNodeInfo::class.java)
-    val connection = mock(InputMethod.AccessibilityInputConnection::class.java)
     `when`(node.actionList).thenReturn(listOf(AccessibilityNodeInfo.AccessibilityAction.ACTION_PASTE))
     `when`(node.performAction(AccessibilityNodeInfo.ACTION_PASTE)).thenReturn(true)
-    assertTrue(InsertionHelper.insert(context, node, connection, "hello"))
-    verifyNoInteractions(connection)
+    assertTrue(InsertionHelper.insert(context, node, "hello") {
+      fail("An accepted paste must not also commit through the IME")
+      false
+    })
   }
 
   @Test fun rejectedPasteFallsBackToImeCommitAtTheCursor() {
     val node = mock(AccessibilityNodeInfo::class.java)
-    val connection = mock(InputMethod.AccessibilityInputConnection::class.java)
     `when`(node.actionList).thenReturn(listOf(AccessibilityNodeInfo.AccessibilityAction.ACTION_PASTE))
     `when`(node.performAction(AccessibilityNodeInfo.ACTION_PASTE)).thenReturn(false)
-    `when`(connection.getSurroundingText(anyInt(), anyInt(), anyInt())).thenReturn(
-      SurroundingText("", 0, 0, 0), SurroundingText("hello", 5, 5, 0))
-    assertTrue(InsertionHelper.insert(context, node, connection, "hello"))
-    verify(connection, times(1)).commitText("hello", 1, null)
+    val surrounding = ArrayDeque(listOf(SurroundingText("", 0, 0, 0), SurroundingText("hello", 5, 5, 0)))
+    var commits = 0
+    assertTrue(InsertionHelper.insert(context, node, "hello") {
+      InsertionHelper.commitAndVerify("hello", { surrounding.removeFirst() }) { commits++ }
+    })
+    assertEquals(1, commits)
   }
 
   @Test fun repeatedTextIsVerifiedUsingAbsoluteCursorMovement() {
-    val connection = mock(InputMethod.AccessibilityInputConnection::class.java)
-    `when`(connection.getSurroundingText(anyInt(), anyInt(), anyInt())).thenReturn(
-      SurroundingText("hello", 5, 5, 0), SurroundingText("hello", 5, 5, 5))
-    assertTrue(InsertionHelper.commitAndVerify(connection, "hello"))
+    val surrounding = ArrayDeque(listOf(SurroundingText("hello", 5, 5, 0), SurroundingText("hello", 5, 5, 5)))
+    var commits = 0
+    assertTrue(InsertionHelper.commitAndVerify("hello", { surrounding.removeFirst() }) { commits++ })
+    assertEquals(1, commits)
   }
 
   @Test fun unavailableSurroundingTextDoesNotPreventOrRepeatACommit() {
-    val connection = mock(InputMethod.AccessibilityInputConnection::class.java)
-    `when`(connection.getSurroundingText(anyInt(), anyInt(), anyInt())).thenThrow(UnsupportedOperationException())
-    assertFalse(InsertionHelper.commitAndVerify(connection, "hello"))
-    verify(connection, times(1)).commitText("hello", 1, null)
+    var commits = 0
+    assertFalse(InsertionHelper.commitAndVerify("hello", { throw UnsupportedOperationException() }) { commits++ })
+    assertEquals(1, commits)
   }
 
   @Test fun aPasteExceptionWithUnknownOutcomeDoesNotTriggerAnotherInsertion() {
     val node = mock(AccessibilityNodeInfo::class.java)
-    val connection = mock(InputMethod.AccessibilityInputConnection::class.java)
     `when`(node.actionList).thenReturn(listOf(AccessibilityNodeInfo.AccessibilityAction.ACTION_PASTE))
     `when`(node.performAction(AccessibilityNodeInfo.ACTION_PASTE)).thenThrow(IllegalStateException())
-    assertFalse(InsertionHelper.insert(context, node, connection, "hello"))
-    verifyNoInteractions(connection)
+    assertFalse(InsertionHelper.insert(context, node, "hello") {
+      fail("An uncertain paste must not be followed by another insertion")
+      false
+    })
   }
 
   @Test fun matchingClassAndResourceIdDoNotMakeDifferentFieldsTheSameTarget() {
