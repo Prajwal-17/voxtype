@@ -33,7 +33,7 @@ export default function SettingsScreen() {
             })
           }
         />
-        {snapshot?.bubbleEnabled && (
+        {snapshot && (
           <>
             <Text style={[ui.muted, { marginBottom: 12 }]}>
               Appears beside an active text field while the keyboard is open.
@@ -72,6 +72,24 @@ export default function SettingsScreen() {
               )}
               {!snapshot.accessibilityEnabled && (
                 <Text style={ui.muted}>Enable VoxType in Android Settings to use the bubble.</Text>
+              )}
+              <Text style={ui.muted}>
+                Payment apps such as Paytm may require accessibility access to be off. Pause before
+                paying, then enable VoxType in Android accessibility settings to use the bubble
+                again. Turning off the Voice bubble switch alone keeps this access on.
+              </Text>
+              {snapshot.accessibilityEnabled && (
+                <Action
+                  label="Pause for payments"
+                  secondary
+                  disabled={!app.available || app.busy}
+                  onPress={() =>
+                    void app.run(async () => {
+                      await Native.pauseForPayments();
+                      await app.refresh();
+                    })
+                  }
+                />
               )}
             </View>
           </>

@@ -168,6 +168,18 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     requestBubbleRefresh()
   }
   override fun onInterrupt() { stopRecording() }
+
+  /** Android only allows the user to re-enable access after disableSelf(). */
+  fun pauseForPayments() {
+    // Stop recovery and queued delivery before asking Android to revoke access.
+    connected = false
+    bubbleRefresh.cancel()
+    resetRecording(DictationStatus.IDLE)
+    hideBubble("payments_paused")
+    disableSelf()
+    BubbleHealth.record(this, "payments_pause")
+    VoxTypeNativeModule.changed()
+  }
   override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
     super.onConfigurationChanged(newConfig)
     refreshBubble()
@@ -219,11 +231,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       val info = inputMethod?.currentInputEditorInfo ?: return null
       // Editor metadata can still belong to the previous app during a window transition.
       if (info.packageName == null || info.packageName != node.packageName?.toString()) return null
-      val ok = FocusGuard.isEditableTextField(
-        node, packageName,
-        info.packageName, info.inputType,
-        FocusGuard.editorNoPersonalizedLearning(info.imeOptions),
-      )
+      val ok = FocusGuard.isEditableTextField(node, packageName, info)
       if (!ok) { focusFailure = "unsupported_field"; return null }
       owned = false
       return node
@@ -1015,9 +1023,13 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       val builder = Notification.Builder(this, VoxConstants.BUBBLE_CHANNEL_ID)
         .setSmallIcon(R.drawable.voxtype_notification)
         .setContentTitle("${applicationInfo.loadLabel(packageManager)} voice bubble is ready")
-        .setContentText("Open a text field to dictate. Manage the bubble in VoxType.")
+        .setContentText("Open a text field to dictate. Pause here before payments.")
         .setOnlyAlertOnce(true)
         .setOngoing(true)
+        .addAction(Notification.Action.Builder(null, "Pause for payments",
+          PendingIntent.getBroadcast(this, 0,
+            android.content.Intent(this, PauseBubbleReceiver::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)).build())
       packageManager.getLaunchIntentForPackage(packageName)?.let { intent ->
         builder.setContentIntent(PendingIntent.getActivity(this, 0, intent,
           PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
@@ -1159,8 +1171,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     try {
       val pinned = target ?: return false
       if (!InsertionHelper.isSameField(current, pinned)) return false
-      val connection = inputMethod?.currentInputConnection ?: return false
-      return InsertionHelper.commitAndVerify(connection, text)
+      return InsertionHelper.insert(this, current, inputMethod?.currentInputConnection, text)
     } finally {
       // Do not recycle `target` itself here; it is released on next recording/sign-out.
       if (current !== target) {

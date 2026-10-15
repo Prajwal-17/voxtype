@@ -94,6 +94,16 @@ class VoxTypeNativeModule : Module() {
       }
     }
 
+    AsyncFunction("pauseForPayments") {
+      val service = VoxTypeAccessibilityService.instance
+      if (service?.connected == true) service.pauseForPayments()
+      else {
+        // A system-enabled but disconnected service cannot call disableSelf().
+        requireNotNull(appContext.reactContext).startActivity(
+          Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+      }
+    }.runOnQueue(Queues.MAIN)
+
     AsyncFunction("setAuthState") { state: String ->
       requireNotNull(appContext.reactContext).getSharedPreferences("voxtype_oauth", 0).edit()
         .putString("state", state).putLong("created", System.currentTimeMillis()).commit()

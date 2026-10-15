@@ -11,6 +11,7 @@ declare class VoxTypeNativeModule extends NativeModule<VoxTypeNativeModuleEvents
   setSession(token: string, userId: string, apiUrl: string): Promise<void>;
   signOut(): Promise<void>;
   openAccessibilitySettings(): Promise<void>;
+  pauseForPayments?: () => Promise<void>;
   setPreference(key: 'bubbleEnabled' | 'cleanupEnabled', value: string): Promise<void>;
   // Typed alternatives (added natively, optional on older builds).
   setBubbleEnabled?: (enabled: boolean) => Promise<void>;
@@ -71,6 +72,9 @@ const VoxTypeNative = {
     requireVoxTypeModule().setSession(token, userId, apiUrl),
   signOut: () => requireVoxTypeModule().signOut(),
   openAccessibilitySettings: () => requireVoxTypeModule().openAccessibilitySettings(),
+  pauseForPayments: () =>
+    requireVoxTypeModule().pauseForPayments?.() ??
+    requireVoxTypeModule().openAccessibilitySettings(),
   setPreference: (key: 'bubbleEnabled' | 'cleanupEnabled', value: string) =>
     requireVoxTypeModule().setPreference(key, value),
   setBubbleEnabled: (enabled: boolean) =>
