@@ -13,6 +13,7 @@ import org.json.JSONObject
 /** Foreground-only recorder, independent of accessibility and never inserts into other apps. */
 object InAppRecorder {
   private val main = Handler(Looper.getMainLooper())
+  private var recorderContext: Context? = null
   private var capture: AudioCapture? = null
   private var engine: DeepgramSession? = null
   @Volatile private var generation = 0
@@ -40,12 +41,15 @@ object InAppRecorder {
     val userId = requireNotNull(session.userId) { "Sign in again." }
     val apiUrl = requireNotNull(session.apiUrl) { "Sign in again." }
     check(session.token != null) { "Sign in again." }
+    recorderContext = context.applicationContext
+    LocalDiagnostics.record(context, LocalDiagnostics.Event.recording_started)
     val current = ++generation
     text = ""; error = ""; durationMs = 0L; level = 0f; lastLevelAt = 0L
     val stream = DeepgramSession({ session.token }, { session.apiUrl }, {
       main.post {
         if (current == generation && busy) {
           cancel()
+          LocalDiagnostics.record(context, LocalDiagnostics.Event.transcription_failed)
           error = "Connection lost. Check your internet and try again."
           status = "error"
           changed()
@@ -73,13 +77,14 @@ object InAppRecorder {
           stream.finalize { original ->
             stream.close()
             if (current != generation) { file?.delete(); return@finalize }
+            LocalDiagnostics.record(context, LocalDiagnostics.Event.transcription_complete)
             processingJob = scope.launch {
               val store = VoxTypeStore(context)
               var saved = false
               try {
                 ensureActive()
                 if (current != generation) return@launch
-                val cleaned = if (store.cleanupEnabled && original.isNotBlank()) cleanup(session, original, current) else original
+                val cleaned = if (store.cleanupEnabled && original.isNotBlank()) cleanup(context, session, original, current) else original
                 ensureActive()
                 withContext(Dispatchers.Main) {
                   if (current != generation || session.userId != userId) return@withContext
@@ -92,6 +97,7 @@ object InAppRecorder {
               } catch (cancelled: CancellationException) { throw cancelled }
               catch (exception: Exception) {
                 main.post { if (current == generation) { text = original; error = "Couldn’t save recording"; status = "error"; changed() } }
+                LocalDiagnostics.record(context, LocalDiagnostics.Event.save_failed)
                 VoxLog.e("in-app save failed", exception)
               } finally { if (!saved) file?.delete(); store.close() }
             }
@@ -111,6 +117,7 @@ object InAppRecorder {
     capture?.stop(); capture = null
   }
   fun cancel() {
+    if (busy) recorderContext?.let { LocalDiagnostics.record(it, LocalDiagnostics.Event.cancelled) }
     generation++
     processingJob?.cancel(); processingJob = null
     cleanupCall?.cancel(); cleanupCall = null
@@ -119,7 +126,7 @@ object InAppRecorder {
     engine?.abort(); engine?.close(); engine = null
     status = "idle"; text = ""; error = ""; level = 0f; changed()
   }
-  private fun cleanup(session: NativeSession, original: String, current: Int): String {
+  private fun cleanup(context: Context, session: NativeSession, original: String, current: Int): String {
     if (original.length > 12000) return original
     return try {
       val request = Request.Builder().url("${session.apiUrl}${VoxConstants.CLEANUP_PATH}")
@@ -129,8 +136,8 @@ object InAppRecorder {
       cleanupCall = call
       if (current != generation) { call.cancel(); return original }
       try { call.execute().use { response ->
-        if (!response.isSuccessful) original else JSONObject(response.body?.string() ?: "{}").optJSONObject("data")?.optString("text")?.takeIf { it.isNotBlank() } ?: original
+        if (!response.isSuccessful) { LocalDiagnostics.record(context, LocalDiagnostics.Event.cleanup_fallback); original } else JSONObject(response.body?.string() ?: "{}").optJSONObject("data")?.optString("text")?.takeIf { it.isNotBlank() } ?: original
       } } finally { if (cleanupCall === call) cleanupCall = null }
-    } catch (_: Exception) { original }
+    } catch (_: Exception) { LocalDiagnostics.record(context, LocalDiagnostics.Event.cleanup_fallback); original }
   }
 }

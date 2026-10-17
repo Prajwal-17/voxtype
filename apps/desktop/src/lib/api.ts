@@ -11,6 +11,7 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
+import { createDataEvents } from '@voxtype/shared/data-events';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { useEffect } from 'react';
@@ -25,6 +26,7 @@ import {
   type Bootstrap,
   type Diagnostic,
   type HistoryItem,
+  type LocalRecording,
   type Microphone,
   type Session,
   type Settings,
@@ -44,7 +46,7 @@ const previewSignedOut = new URLSearchParams(location.search).get('auth') === 'l
 
 export const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { retry: 1, staleTime: 30_000, refetchOnWindowFocus: false },
+    queries: { retry: 1, staleTime: 120_000, refetchOnWindowFocus: false },
     mutations: {
       retry: false,
       onError: (error, _variables, _result, context) => {
@@ -75,7 +77,7 @@ export const api = {
           settings: defaultSettings,
           snapshot: idleSession,
           shortcutRegistered: false,
-          version: '0.1.3',
+          version: __APP_VERSION__,
           environment: appEnvironment,
           shortcutId,
           shortcutLabel,
@@ -88,19 +90,36 @@ export const api = {
             { id: 'f8', label: 'F8' },
           ],
         }),
-  analytics: (range: AnalyticsRange = '30d', timezone = clientTimezone()) =>
+  analytics: (
+    range: AnalyticsRange = '30d',
+    timezone = clientTimezone(),
+    expectedUserId?: string,
+  ) =>
     native
-      ? command<Analytics>('get_analytics', { range, timezone })
+      ? command<Analytics>('get_analytics', { range, timezone, expectedUserId })
       : Promise.resolve(emptyPeriod(range, timezone)),
   exportAnalytics: (range: AnalyticsRange, timezone: string) =>
     command<boolean>('export_analytics', { range, timezone }),
-  history: (cursor: string | null, query: string) =>
+  history: (cursor: string | null, query: string, expectedUserId?: string) =>
     native
       ? command<{ items: HistoryItem[]; nextCursor: string | null }>('get_history', {
           cursor,
           query,
+          expectedUserId,
         })
       : Promise.resolve({ items: [] as HistoryItem[], nextCursor: null as string | null }),
+  localRecordings: () =>
+    native
+      ? command<LocalRecording[]>('get_local_recordings')
+      : Promise.resolve<LocalRecording[]>([]),
+  localDiagnostics: () =>
+    native
+      ? command<string>('get_local_diagnostics')
+      : Promise.resolve(
+          JSON.stringify({ version: __APP_VERSION__, retentionDays: 14, events: [] }),
+        ),
+  exportRecording: (id: string) => command<void>('export_recording', { id }),
+  exportDiagnostics: () => command<void>('export_local_diagnostics'),
   microphones: () => (native ? command<Microphone[]>('get_microphones') : Promise.resolve([])),
   diagnostics: () =>
     native
@@ -131,14 +150,15 @@ export const useAuthUser = () =>
     retry: false,
     staleTime: Infinity,
   });
-export const useBootstrap = () => useQuery({ queryKey: ['bootstrap'], queryFn: api.bootstrap });
+export const useBootstrap = () =>
+  useQuery({ queryKey: ['bootstrap'], queryFn: api.bootstrap, staleTime: Infinity });
 export const useHistory = (query = '') => {
   const auth = useAuthUser();
   return useInfiniteQuery({
     queryKey: ['history', auth.data?.id, query],
     enabled: !!auth.data,
     initialPageParam: null as string | null,
-    queryFn: ({ pageParam }) => api.history(pageParam, query),
+    queryFn: ({ pageParam }) => api.history(pageParam, query, auth.data?.id),
     getNextPageParam: (page) => page.nextCursor ?? undefined,
   });
 };
@@ -146,8 +166,14 @@ export const useAnalytics = (range: AnalyticsRange = '30d') => {
   const auth = useAuthUser();
   const timezone = clientTimezone();
   return useQuery({
-    queryKey: ['analytics', auth.data?.id, range, timezone],
-    queryFn: () => api.analytics(range, timezone),
+    queryKey: [
+      'analytics',
+      auth.data?.id,
+      range,
+      timezone,
+      new Date().toLocaleDateString('en-CA', { timeZone: timezone }),
+    ],
+    queryFn: () => api.analytics(range, timezone, auth.data?.id),
     enabled: !!auth.data,
   });
 };
@@ -172,6 +198,7 @@ export function useNativeEvents() {
     if (!native) return;
     let disposed = false;
     const unlisteners: (() => void)[] = [];
+    const events = createDataEvents((key) => void client.invalidateQueries({ queryKey: [key] }));
     const subscribe = async () => {
       for (const [event, handler] of [
         [
@@ -183,14 +210,14 @@ export function useNativeEvents() {
               client.setQueryData<Session>(['app-session'], session);
           },
         ],
-        ['analytics-changed', () => void client.invalidateQueries({ queryKey: ['analytics'] })],
+        ['analytics-changed', () => events.changed('analytics')],
         [
           'history-changed',
           () => {
-            void client.invalidateQueries({ queryKey: ['history'] });
-            void client.invalidateQueries({ queryKey: ['analytics'] });
+            events.changed('history');
           },
         ],
+        ['local-recordings-changed', () => events.changed('history')],
         ['app-error', (data: unknown) => toast.error(String(data))],
       ] as const) {
         const unlisten = await listen(event, (e) => handler(e.payload));
@@ -198,7 +225,11 @@ export function useNativeEvents() {
         else unlisteners.push(unlisten);
       }
       // Subscribe first; never overwrite a newer live event with a startup snapshot.
-      const boot = await client.fetchQuery({ queryKey: ['bootstrap'], queryFn: api.bootstrap });
+      const boot = await client.fetchQuery({
+        queryKey: ['bootstrap'],
+        queryFn: api.bootstrap,
+        staleTime: Infinity,
+      });
       if (!disposed) {
         client.setQueryData(['bootstrap'], boot);
         client.setQueryData<Session>(['session'], (previous) =>
@@ -211,6 +242,7 @@ export function useNativeEvents() {
     });
     return () => {
       disposed = true;
+      events.dispose();
       unlisteners.forEach((unlisten) => unlisten());
     };
   }, [client]);
@@ -236,6 +268,9 @@ export function useAuthActions() {
     onSuccess: (user) => {
       client.removeQueries({ queryKey: ['history'] });
       client.removeQueries({ queryKey: ['analytics'] });
+      client.removeQueries({ queryKey: ['local-recordings'] });
+      client.setQueryData(['session'], idleSession);
+      client.setQueryData(['app-session'], idleSession);
       client.setQueryData<AuthUser>(['auth-user'], user);
     },
   });

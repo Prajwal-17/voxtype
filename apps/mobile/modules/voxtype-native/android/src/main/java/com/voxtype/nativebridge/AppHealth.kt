@@ -35,6 +35,7 @@ internal object AppHealth {
     return mapOf(
       "appName" to runCatching { context.applicationInfo.loadLabel(context.packageManager).toString() }.getOrNull(),
       "packageName" to context.packageName,
+      "versionCode" to runCatching { context.packageManager.getPackageInfo(context.packageName, 0).longVersionCode }.getOrNull(),
       "appVersion" to runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull(),
       "manufacturer" to Build.MANUFACTURER,
       "model" to Build.MODEL,

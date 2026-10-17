@@ -23,8 +23,8 @@ class VoxTypeNativeModule : Module() {
   companion object {
     private var active = WeakReference<VoxTypeNativeModule>(null)
     private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
-    fun changed() { mainHandler.post {
-      try { active.get()?.sendEvent("onChange", mapOf("changed" to true)) }
+    fun changed(kind: String = "state") { mainHandler.post {
+      try { active.get()?.sendEvent("onChange", mapOf("changed" to true, "kind" to kind)) }
       catch (error: Exception) { VoxLog.w("UI bridge unavailable", error) }
     } }
     fun audioLevel(level: Float) { mainHandler.post {
@@ -60,6 +60,7 @@ class VoxTypeNativeModule : Module() {
     OnCreate {
       active = WeakReference(this@VoxTypeNativeModule)
       observePermissions()
+      appContext.reactContext?.let { LocalDiagnostics.prune(it) }
     }
 
     AsyncFunction("getSnapshot") {
@@ -181,13 +182,38 @@ class VoxTypeNativeModule : Module() {
     AsyncFunction("syncTranscripts") {
       TranscriptUploads.request(requireNotNull(appContext.reactContext))
     }
-    AsyncFunction("getTranscripts") { cursor: String?, query: String ->
+    AsyncFunction("getTranscripts") { cursor: String?, query: String, expectedUserId: String? ->
       val context = requireNotNull(appContext.reactContext)
-      VoxTypeStore(context).use { it.page(requireNotNull(NativeSession(context).userId), cursor, query.take(500)) }
+      val user = requireNotNull(NativeSession(context).userId)
+      require(expectedUserId == null || user == expectedUserId) { "Account changed" }
+      VoxTypeStore(context).use { it.page(user, cursor, query.take(500)) }
     }
     AsyncFunction("deleteTranscript") { id: String ->
       val context = requireNotNull(appContext.reactContext).applicationContext
       runBlocking { TranscriptUploads.delete(context,id) }
+    }
+    AsyncFunction("getLocalRecordings") {
+      val context = requireNotNull(appContext.reactContext)
+      VoxTypeStore(context).use { it.localRecordings(requireNotNull(NativeSession(context).userId)) }
+    }
+    AsyncFunction("shareRecording") { id: String ->
+      val context = requireNotNull(appContext.reactContext)
+      val user = requireNotNull(NativeSession(context).userId)
+      val file = VoxTypeStore(context).use { it.recoveryAudio(user, id) } ?: error("Recording no longer available")
+      val uri = FileProvider.getUriForFile(context, "${context.packageName}.voxtype.exports", file)
+      val intent = Intent(Intent.ACTION_SEND).setType("audio/wav").putExtra(Intent.EXTRA_STREAM, uri)
+        .apply { clipData = android.content.ClipData.newRawUri("Recording", uri); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+      context.startActivity(Intent.createChooser(intent, "Export recording").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+    AsyncFunction("getLocalDiagnostics") {
+      val context = requireNotNull(appContext.reactContext)
+      LocalDiagnostics.export(context, requireNotNull(NativeSession(context).userId))
+    }
+    AsyncFunction("shareLocalDiagnostics") {
+      val context = requireNotNull(appContext.reactContext)
+      val report = LocalDiagnostics.export(context, requireNotNull(NativeSession(context).userId))
+      val intent = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, report)
+      context.startActivity(Intent.createChooser(intent, "Export diagnostics").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
     AsyncFunction("shareInsights") { csv: String ->
       require(csv.toByteArray(Charsets.UTF_8).size <= 8_000_000) { "Export exceeds the file limit" }
@@ -204,7 +230,7 @@ class VoxTypeNativeModule : Module() {
       context.startActivity(Intent.createChooser(intent,"Export insights").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
     OnActivityEntersBackground { mainHandler.post { InAppRecorder.stop() } }
-    OnActivityEntersForeground { observePermissions(); changed(); refreshBubble() }
+    OnActivityEntersForeground { observePermissions(); appContext.reactContext?.let { LocalDiagnostics.prune(it) }; changed(); refreshBubble() }
     OnDestroy {
       runCatching { permissionObserver?.let { observedContext?.contentResolver?.unregisterContentObserver(it) } }
         .onFailure { VoxLog.w("accessibility observer cleanup failed", it) }

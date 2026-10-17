@@ -32,15 +32,15 @@ export default function HomeScreen() {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
           <View
             style={{
-              width: 52,
-              height: 52,
+              width: 40,
+              height: 40,
               borderRadius: 999,
               backgroundColor: theme.colors.primaryContainer,
               alignItems: 'center',
               justifyContent: 'center',
             }}
           >
-            <MicrophoneIcon size={25} color={theme.colors.primary} />
+            <MicrophoneIcon size={22} color={theme.colors.primary} />
           </View>
           <Text style={ui.title}>Dictation</Text>
         </View>

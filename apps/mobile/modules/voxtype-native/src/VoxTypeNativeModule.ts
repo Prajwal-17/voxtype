@@ -1,6 +1,11 @@
 import { NativeModule, requireNativeModule } from 'expo';
 
-import type { Snapshot, TranscriptPage, VoxTypeNativeModuleEvents } from './VoxTypeNative.types';
+import type {
+  LocalRecording,
+  Snapshot,
+  TranscriptPage,
+  VoxTypeNativeModuleEvents,
+} from './VoxTypeNative.types';
 
 declare class VoxTypeNativeModule extends NativeModule<VoxTypeNativeModuleEvents> {
   setVocabulary(terms: string[]): Promise<void>;
@@ -20,9 +25,17 @@ declare class VoxTypeNativeModule extends NativeModule<VoxTypeNativeModuleEvents
   startRecording(): Promise<void>;
   stopRecording(): Promise<void>;
   cancelRecording(): Promise<void>;
-  getTranscripts(cursor: string | null, query: string): Promise<TranscriptPage>;
+  getTranscripts(
+    cursor: string | null,
+    query: string,
+    expectedUserId?: string,
+  ): Promise<TranscriptPage>;
   syncTranscripts(): Promise<void>;
   deleteTranscript(id: string): Promise<void>;
+  getLocalRecordings(): Promise<LocalRecording[]>;
+  shareRecording(id: string): Promise<void>;
+  getLocalDiagnostics(): Promise<string>;
+  shareLocalDiagnostics(): Promise<void>;
   shareInsights(csv: string): Promise<void>;
 }
 
@@ -84,14 +97,18 @@ const VoxTypeNative = {
     requireVoxTypeModule().setCleanupEnabled?.(enabled) ??
     requireVoxTypeModule().setPreference('cleanupEnabled', String(enabled)),
   copyTranscript: (id: string) => requireVoxTypeModule().copyTranscript(id),
-  getTranscripts: (cursor: string | null, query = '') =>
-    requireVoxTypeModule().getTranscripts(cursor, query),
+  getTranscripts: (cursor: string | null, query = '', expectedUserId?: string) =>
+    requireVoxTypeModule().getTranscripts(cursor, query, expectedUserId),
   deleteTranscript: (id: string) => requireVoxTypeModule().deleteTranscript(id),
   shareInsights: (csv: string) => requireVoxTypeModule().shareInsights(csv),
   syncTranscripts: () => requireVoxTypeModule().syncTranscripts(),
   startRecording: () => requireVoxTypeModule().startRecording(),
   cancelRecording: () => requireVoxTypeModule().cancelRecording(),
   stopRecording: () => requireVoxTypeModule().stopRecording(),
+  getLocalRecordings: () => requireVoxTypeModule().getLocalRecordings(),
+  shareRecording: (id: string) => requireVoxTypeModule().shareRecording(id),
+  getLocalDiagnostics: () => requireVoxTypeModule().getLocalDiagnostics(),
+  shareLocalDiagnostics: () => requireVoxTypeModule().shareLocalDiagnostics(),
   addListener: <EventName extends keyof VoxTypeNativeModuleEvents>(
     eventName: EventName,
     listener: VoxTypeNativeModuleEvents[EventName],

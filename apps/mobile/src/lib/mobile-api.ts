@@ -107,9 +107,10 @@ export async function getAnalytics(
   range: AnalyticsRange = '30d',
   timezone = clientTimezone(),
   signal?: AbortSignal,
+  expectedUserId?: string,
 ): Promise<Analytics> {
-  const { token } = await VoxTypeNative.getSession();
-  if (!token) throw new Error('Sign in again');
+  const { token, userId } = await VoxTypeNative.getSession();
+  if (!token || (expectedUserId && userId !== expectedUserId)) throw new Error('Sign in again');
   const response = await fetch(
     `${API_URL}/v1/analytics?${new URLSearchParams({ range, timezone }).toString()}`,
     {
@@ -118,7 +119,10 @@ export async function getAnalytics(
     },
   );
   if (!response.ok) throw new Error('Analytics unavailable');
-  return parseAnalyticsResponse(await response.json());
+  const body: unknown = await response.json();
+  const current = await VoxTypeNative.getSession();
+  if (current.token !== token || current.userId !== userId) throw new Error('Account changed');
+  return parseAnalyticsResponse(body);
 }
 
 export async function exportInsights(

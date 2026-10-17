@@ -148,7 +148,7 @@ export function App() {
             boot.data && (
               <>
                 <div hidden={page !== 'home'}>
-                  <HomePage visible={page === 'home'} onNavigate={navigate} />
+                  <HomePage key={auth.data.id} visible={page === 'home'} onNavigate={navigate} />
                 </div>
                 {page === 'transcripts' && <HistoryPage onRecord={() => navigate('home')} />}
                 {page === 'insights' && <InsightsPage />}

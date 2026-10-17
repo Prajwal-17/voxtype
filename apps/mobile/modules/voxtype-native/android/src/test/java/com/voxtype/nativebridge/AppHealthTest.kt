@@ -16,6 +16,17 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33, 35])
 class AppHealthTest {
+  @Test fun versionComesFromTheInstalledPackageIncludingDevelopmentSuffixAndCode() {
+    val context = RuntimeEnvironment.getApplication()
+    val info = context.packageManager.getPackageInfo(context.packageName, 0)
+    info.versionName = "1.2.3-dev.abcdef0"
+    info.setLongVersionCode(42L)
+    org.robolectric.Shadows.shadowOf(context.packageManager).installPackage(info)
+    val report = AppHealth.snapshot(context)
+    assertEquals("1.2.3-dev.abcdef0", report["appVersion"])
+    assertEquals(42L, report["versionCode"])
+  }
+
   @Test fun diagnosticsRemainAvailableWithoutSystemExitHistory() {
     val context = object : ContextWrapper(RuntimeEnvironment.getApplication()) {
       override fun getSystemService(name: String): Any? {

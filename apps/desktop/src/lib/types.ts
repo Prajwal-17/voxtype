@@ -67,6 +67,13 @@ export interface AuthUser {
   email: string;
   image?: string | null;
 }
+export type LocalRecording = {
+  id: string;
+  originalText: string;
+  createdAt: number;
+  durationMs: number;
+  audioFile?: string | null;
+};
 export interface HistoryItem {
   id: string;
   text: string;

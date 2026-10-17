@@ -893,6 +893,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       return
     }
     val recordingApiUrl = session.apiUrl ?: run { recordingUserId = null; releaseTarget(); return }
+    LocalDiagnostics.record(this, LocalDiagnostics.Event.recording_started)
     val stream = speechStream()
     val generation = ++lifecycleGeneration
     try {
@@ -972,6 +973,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
 
   /** Cancel remains available during capture, finalization and cleanup. */
   private fun cancelRecording() {
+    LocalDiagnostics.record(this, LocalDiagnostics.Event.cancelled)
     if (status !in listOf(DictationStatus.LISTENING.bridge, DictationStatus.PROCESSING.bridge, DictationStatus.CONNECTING.bridge)) return
     recoverRecording()
   }
@@ -1061,6 +1063,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   private fun connectionFailed() = failRecording("Connection unavailable. Check your internet and try again.", true)
 
   private fun failRecording(message: String, network: Boolean = false) {
+    LocalDiagnostics.record(this, LocalDiagnostics.Event.transcription_failed)
     bubbleError = message; connectionError = network
     resetRecording(DictationStatus.ERROR)
     BubbleHealth.record(this, if (network) "dictation_error:connection" else "dictation_error:recording")
@@ -1085,6 +1088,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
 
   private fun finishDictation(original: String, apiUrl: String) {
     val userId = recordingUserId ?: return
+    LocalDiagnostics.record(this, LocalDiagnostics.Event.transcription_complete)
     if (original.isBlank()) {
       failRecording("No speech detected. Try again.")
       return
@@ -1111,6 +1115,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
           recordingFile = null
           val delivered = try { cleaned.isNotBlank() && insertIntoTarget(cleaned) }
             catch (error: Exception) { VoxLog.w("target insertion failed", error); false }
+          LocalDiagnostics.record(this@VoxTypeAccessibilityService, if (delivered) LocalDiagnostics.Event.delivery_sent else LocalDiagnostics.Event.delivery_recovery)
           if (delivered) {
             try { store.setDelivery(id, "pasted") } catch (e: Exception) { VoxLog.w("setDelivery failed", e) }
           }
@@ -1122,6 +1127,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
         if (saved && generation == lifecycleGeneration && cleaned.isNotBlank()) TranscriptUploads.sendPending(applicationContext)
       } catch (cancelled: CancellationException) { throw cancelled }
       catch (e: Exception) {
+        LocalDiagnostics.record(this@VoxTypeAccessibilityService, LocalDiagnostics.Event.save_failed)
         VoxLog.e("dictation save failed", e)
         BubbleHealth.record(this@VoxTypeAccessibilityService, "save_error:${e.javaClass.simpleName}")
         withContext(Dispatchers.Main) {
@@ -1147,6 +1153,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       if (generation != lifecycleGeneration) { call.cancel(); return original }
       try { call.execute().use { response ->
         if (!response.isSuccessful) {
+          LocalDiagnostics.record(this, LocalDiagnostics.Event.cleanup_fallback)
           VoxLog.w("cleanup HTTP ${response.code}")
           return original
         }
@@ -1160,6 +1167,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
         } ?: original
       } } finally { if (cleanupCall === call) cleanupCall = null }
     } catch (e: Exception) {
+      LocalDiagnostics.record(this, LocalDiagnostics.Event.cleanup_fallback)
       VoxLog.w("cleanup failed", e)
       original
     }

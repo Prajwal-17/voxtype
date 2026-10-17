@@ -5,6 +5,7 @@ import * as Clipboard from 'expo-clipboard';
 import { CopyIcon } from 'phosphor-react-native/src/icons/Copy';
 import { TrashIcon } from 'phosphor-react-native/src/icons/Trash';
 import { nativeTheme as theme } from '@voxtype/shared';
+import { LocalRecovery } from '../components/local-recovery';
 import { Screen } from '../components/screen';
 import { Action, Card, Loader, Text } from '../components/primitives';
 import { styles as ui } from '../components/styles';
@@ -39,25 +40,28 @@ export default function TranscriptsScreen() {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24, gap: 12 }}
         ListHeaderComponent={
-          <TextInput
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Search transcripts"
-            placeholderTextColor={c.textMuted}
-            accessibilityLabel="Search transcripts"
-            autoCapitalize="none"
-            style={{
-              minHeight: 48,
-              borderWidth: 1,
-              borderColor: c.borderStrong,
-              borderRadius: 10,
-              paddingHorizontal: 14,
-              color: c.text,
-              fontFamily: 'MonaSansRegular',
-              fontSize: 16,
-              backgroundColor: c.surface,
-            }}
-          />
+          <View style={{ gap: 12 }}>
+            <LocalRecovery />
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Search transcripts"
+              placeholderTextColor={c.textMuted}
+              accessibilityLabel="Search transcripts"
+              autoCapitalize="none"
+              style={{
+                minHeight: 48,
+                borderWidth: 1,
+                borderColor: c.borderStrong,
+                borderRadius: 10,
+                paddingHorizontal: 14,
+                color: c.text,
+                fontFamily: 'MonaSansRegular',
+                fontSize: 16,
+                backgroundColor: c.surface,
+              }}
+            />
+          </View>
         }
         renderItem={({ item }) => (
           <TranscriptRow
@@ -135,8 +139,9 @@ export default function TranscriptsScreen() {
                 Delete this transcript?
               </Text>
               <Text style={[ui.muted, { marginTop: 12 }]}>
-                This removes the transcript from your account and this device’s cache. Other devices
-                update after sync.
+                This removes the cleaned transcript from your account and synced cache. Local
+                recordings and originals remain until replaced by newer takes. Other devices update
+                after sync.
               </Text>
               <Text numberOfLines={2} style={{ marginTop: 12 }}>
                 {deleting?.text}
