@@ -1,13 +1,29 @@
 //! Synchronize account transcripts with the cloud; audio remains a private device cache.
 use crate::{auth, model::HistoryItem, storage, AppState};
 use serde::{Deserialize, Serialize};
+use std::{
+    sync::Mutex,
+    time::{Duration, Instant},
+};
 use tauri::{AppHandle, Emitter, Manager};
+static LAST_RESTORE: Mutex<Option<(String, String, Instant)>> = Mutex::new(None);
+// Emit once per batch, including when a later upload/restore fails after a successful write.
+struct CloudChanges<'a> {
+    app: &'a AppHandle,
+    changed: bool,
+}
+impl Drop for CloudChanges<'_> {
+    fn drop(&mut self) {
+        if self.changed {
+            let _ = self.app.emit("analytics-changed", ());
+        }
+    }
+}
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct TranscriptUpload<'a> {
     text: &'a str,
-    original_text: Option<&'a str>,
     created_at: u64,
     duration_ms: u64,
     source: &'static str,
@@ -16,10 +32,6 @@ impl<'a> From<&'a HistoryItem> for TranscriptUpload<'a> {
     fn from(item: &'a HistoryItem) -> Self {
         Self {
             text: &item.text,
-            original_text: item
-                .original_text
-                .as_deref()
-                .filter(|t| !t.trim().is_empty()),
             created_at: item.created_at,
             duration_ms: item.duration_ms,
             source: "desktop",
@@ -34,15 +46,15 @@ async fn flush(app: &AppHandle) -> Result<(), String> {
     storage::claim_legacy_history(app, &user.id)?;
     let pending = storage::pending_uploads(app)?;
     let api_url = auth::api_url();
+    let mut changes = CloudChanges {
+        app,
+        changed: false,
+    };
     for item in pending.iter().filter(|item| {
         item.user_id.as_deref() == Some(user.id.as_str())
             && item.upload_api_url.as_deref() == Some(api_url.as_str())
     }) {
-        if !app
-            .state::<AppState>()
-            .authenticated
-            .load(std::sync::atomic::Ordering::Acquire)
-        {
+        if !owns_session(app, &user.id) {
             break;
         }
         let response = client
@@ -54,11 +66,21 @@ async fn flush(app: &AppHandle) -> Result<(), String> {
             .map_err(|_| "Transcript is waiting to sync.")?;
         if response.status().is_success() {
             storage::acknowledge_upload(app, item)?;
-            let _ = app.emit("analytics-changed", ());
+            changes.changed = true;
         } else if response.status().as_u16() == 401 || response.status().as_u16() == 403 {
             break;
         }
         // Upload retries use the same transcript ID.
+    }
+    if LAST_RESTORE
+        .lock()
+        .map_err(|_| "Cloud history unavailable.")?
+        .as_ref()
+        .is_some_and(|(owner, api, time)| {
+            owner == &user.id && api == &api_url && time.elapsed() < Duration::from_secs(120)
+        })
+    {
+        return Ok(());
     }
     let mut cursor: Option<String> = None;
     let mut seen = std::collections::HashSet::new();
@@ -94,7 +116,7 @@ async fn flush(app: &AppHandle) -> Result<(), String> {
             .map(|row| HistoryItem {
                 id: row.id,
                 text: row.text,
-                original_text: row.original_text,
+                original_text: None,
                 created_at: row.created_at,
                 duration_ms: row.duration_ms,
                 words: row.words,
@@ -104,7 +126,7 @@ async fn flush(app: &AppHandle) -> Result<(), String> {
                 upload_api_url: Some(api_url.clone()),
             })
             .collect();
-        storage::restore_history(app, rows)?;
+        changes.changed |= storage::restore_history(app, rows)?;
         cursor = page.next_cursor;
         match &cursor {
             None => {
@@ -116,7 +138,11 @@ async fn flush(app: &AppHandle) -> Result<(), String> {
         }
     }
     if complete_listing && owns_session(app, &user.id) {
-        storage::reconcile_history(app, &user.id, &api_url, &cloud_ids)?;
+        changes.changed |= storage::reconcile_history(app, &user.id, &api_url, &cloud_ids)?;
+        *LAST_RESTORE
+            .lock()
+            .map_err(|_| "Cloud history unavailable.")? =
+            Some((user.id.clone(), api_url, Instant::now()));
     }
     Ok(())
 }
@@ -145,7 +171,6 @@ struct CloudPage {
 struct CloudRow {
     id: String,
     text: String,
-    original_text: Option<String>,
     created_at: u64,
     duration_ms: u64,
     words: usize,
@@ -167,4 +192,28 @@ pub fn send_pending(app: AppHandle) {
             }
         }
     });
+}
+
+#[cfg(test)]
+mod privacy_tests {
+    use super::*;
+    #[test]
+    fn upload_dto_excludes_local_original_audio_and_owner() {
+        let item = HistoryItem {
+            id: "id".into(),
+            text: "clean".into(),
+            original_text: Some("private raw".into()),
+            created_at: 1,
+            duration_ms: 2,
+            words: 1,
+            delivery: "saved".into(),
+            user_id: Some("private owner".into()),
+            audio_file: Some("/private.wav".into()),
+            upload_api_url: Some("https://private".into()),
+        };
+        let payload = serde_json::to_value(TranscriptUpload::from(&item)).unwrap();
+        assert_eq!(payload["text"], "clean");
+        assert_eq!(payload.as_object().unwrap().len(), 4);
+        assert!(!payload.to_string().contains("private"));
+    }
 }

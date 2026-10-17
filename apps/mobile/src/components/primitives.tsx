@@ -55,6 +55,8 @@ export function Action({
       <Text
         style={{
           fontWeight: '600',
+          fontSize: 14,
+          lineHeight: 20,
           color: secondary ? c.primary : c.onPrimary,
           flexShrink: 1,
           textAlign: 'center',

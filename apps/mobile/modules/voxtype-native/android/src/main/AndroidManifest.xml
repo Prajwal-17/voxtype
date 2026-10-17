@@ -7,6 +7,7 @@
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
   <application>
+    <receiver android:name="com.voxtype.nativebridge.PauseBubbleReceiver" android:exported="false" />
     <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.voxtype.exports" android:exported="false" android:grantUriPermissions="true">
       <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/voxtype_exports" />
     </provider>

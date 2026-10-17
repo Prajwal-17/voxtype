@@ -22,8 +22,8 @@ export default function AccountScreen() {
       <Card style={{ gap: 12 }}>
         <Text style={ui.title}>Storage</Text>
         <Text style={ui.muted}>
-          Transcripts sync with your account. Device preferences and the newest 10 audio recordings
-          stay on this device.
+          Cleaned transcripts sync with your account. The newest 10 audio recordings and raw
+          originals, device preferences and 14-day diagnostics stay on this device.
         </Text>
         {app.snapshot?.syncing && (
           <Text accessibilityLiveRegion="polite" style={ui.muted}>

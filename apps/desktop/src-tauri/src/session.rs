@@ -101,6 +101,7 @@ pub async fn start(app: AppHandle, test: bool, external: bool) -> Result<(), Str
         external,
         ..Snapshot::default()
     };
+    crate::local::record(&app, &user_id, crate::local::Event::RecordingStarted);
     publish(&app, &snapshot);
     if external {
         show_overlay(&app);
@@ -141,10 +142,19 @@ pub async fn start(app: AppHandle, test: bool, external: bool) -> Result<(), Str
                 }
             }
         }
+        if keep_take {
+            if let Err(error) = crate::local::retain(
+                &app,
+                &history_item(&snapshot, &user_id, created_at, audio_file.as_deref()),
+            ) {
+                recording_error = Some(error);
+            }
+        }
         let mut history_saved = false;
         let mut history_error = None;
         match result {
             Ok(false) => {
+                crate::local::record(&app, &user_id, crate::local::Event::Cancelled);
                 snapshot = Snapshot {
                     session_id: snapshot.session_id.clone(),
                     external,
@@ -164,6 +174,11 @@ pub async fn start(app: AppHandle, test: bool, external: bool) -> Result<(), Str
                         "No speech detected. Check your microphone and try again.".into();
                 } else {
                     // In-app recordings intentionally stay in VoxType. External recordings paste into the focused application.
+                    crate::local::record(
+                        &app,
+                        &user_id,
+                        crate::local::Event::TranscriptionComplete,
+                    );
                     snapshot.delivery = "saved".into();
                     snapshot.message = "Your transcript is ready.".into();
                     // Commit received text before clipboard/paste work can fail or interrupt us.
@@ -193,11 +208,21 @@ pub async fn start(app: AppHandle, test: bool, external: bool) -> Result<(), Str
                                     };
                                     match delivery {
                                         Ok(()) => {
+                                            crate::local::record(
+                                                &app,
+                                                &user_id,
+                                                crate::local::Event::DeliverySent,
+                                            );
                                             snapshot.delivery = "pasted".into();
                                             snapshot.message =
                                                 "Paste sent to the focused app.".into();
                                         }
                                         Err(e) => {
+                                            crate::local::record(
+                                                &app,
+                                                &user_id,
+                                                crate::local::Event::DeliveryRecovery,
+                                            );
                                             snapshot.message = e;
                                             show_overlay(&app);
                                         }
@@ -205,6 +230,11 @@ pub async fn start(app: AppHandle, test: bool, external: bool) -> Result<(), Str
                                 }
                             }
                             Err(e) => {
+                                crate::local::record(
+                                    &app,
+                                    &user_id,
+                                    crate::local::Event::ClipboardFailed,
+                                );
                                 snapshot.message = e;
                                 show_overlay(&app);
                             }
@@ -213,6 +243,7 @@ pub async fn start(app: AppHandle, test: bool, external: bool) -> Result<(), Str
                 }
             }
             Err(e) => {
+                crate::local::record(&app, &user_id, crate::local::Event::TranscriptionFailed);
                 snapshot.phase = Phase::Error;
                 snapshot.message = e;
             }
@@ -236,6 +267,7 @@ pub async fn start(app: AppHandle, test: bool, external: bool) -> Result<(), Str
             }
         }
         if let Some(error) = history_error {
+            crate::local::record(&app, &user_id, crate::local::Event::SaveFailed);
             snapshot.message = format!("{} History could not be saved: {error}", snapshot.message);
         }
         if keep_take {
@@ -247,6 +279,7 @@ pub async fn start(app: AppHandle, test: bool, external: bool) -> Result<(), Str
             snapshot.message = format!("{} {error}", snapshot.message);
         }
         if !snapshot.cleanup_warning.is_empty() {
+            crate::local::record(&app, &user_id, crate::local::Event::CleanupFallback);
             snapshot.message = format!("{} {}", snapshot.message, snapshot.cleanup_warning);
             let _ = app.emit("app-error", &snapshot.cleanup_warning);
         }

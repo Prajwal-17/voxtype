@@ -111,6 +111,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   private var engine: DeepgramSession? = null
   private var capture: AudioCapture? = null
   private var target: AccessibilityNodeInfo? = null
+  private var recovery: RecordingRecovery? = null
   private var recordingUserId: String? = null
   private var recordingFile: File? = null
   private var recordingDuration = 0L
@@ -163,11 +164,26 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   }
 
   override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+    // Rendering our overlay also emits content events; don't feed those back into rendering.
+    if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED &&
+      event.packageName?.toString() == packageName) return
     refreshBubble()
     // A transient empty window list must not leave the overlay hidden indefinitely.
     requestBubbleRefresh()
   }
   override fun onInterrupt() { stopRecording() }
+
+  /** Android only allows the user to re-enable access after disableSelf(). */
+  fun pauseForPayments() {
+    // Stop recovery and queued delivery before asking Android to revoke access.
+    connected = false
+    bubbleRefresh.cancel()
+    resetRecording(DictationStatus.IDLE)
+    hideBubble("payments_paused")
+    disableSelf()
+    BubbleHealth.record(this, "payments_pause")
+    VoxTypeNativeModule.changed()
+  }
   override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
     super.onConfigurationChanged(newConfig)
     refreshBubble()
@@ -193,9 +209,11 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     BubbleHealth.record(this, "service_destroyed")
     bubbleRefresh.cancel()
     main.removeCallbacksAndMessages(null)
+    recovery?.received(engine?.partialTranscript().orEmpty())
+    recovery?.stopped(recordingFile, recordingDuration)
     lifecycleGeneration++; recordingUserId = null
     processingJob?.cancel(); cleanupCall?.cancel()
-    recordingFile?.delete(); recordingFile = null
+    recordingFile = null
     capture?.stop(); engine?.close(); hideBubble("disconnected"); instance = null
     stopForeground(STOP_FOREGROUND_REMOVE)
     foregroundMode = ForegroundMode.NONE
@@ -205,25 +223,33 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     super.onDestroy()
   }
 
-  private fun focus(): AccessibilityNodeInfo? {
+  private fun focus(editorPackage: String): AccessibilityNodeInfo? {
+    // The active accessibility window may be the IME rather than the editor's window.
+    findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.let { node ->
+      if (FocusedEditor.isCandidate(node) && node.packageName?.toString() == editorPackage) return node
+      node.recycle()
+    }
+    val focusedWindow = getWindows().firstOrNull {
+      it.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION && it.isFocused
+    }
+    focusedWindow?.root?.let { root ->
+      try { FocusedEditor.find(root, editorPackage)?.let { return it } } finally { root.recycle() }
+    }
     val root = rootInActiveWindow ?: return null
-    return try { root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) } finally { root.recycle() }
+    return try { FocusedEditor.find(root, editorPackage) } finally { root.recycle() }
   }
 
   private fun safeFocus(): AccessibilityNodeInfo? {
     focusFailure = "waiting_for_editor"
     if (!keyboardVisible()) { focusFailure = "keyboard_closed"; return null }
-    val node = try { focus() } catch (e: Exception) { VoxLog.w("focus unavailable", e); null } ?: return null
+    val info = inputMethod?.currentInputEditorInfo ?: return null
+    val editorPackage = info.packageName ?: return null
+    val node = try { focus(editorPackage) } catch (e: Exception) { VoxLog.w("focus unavailable", e); null } ?: return null
     var owned = true
     try {
-      val info = inputMethod?.currentInputEditorInfo ?: return null
       // Editor metadata can still belong to the previous app during a window transition.
       if (info.packageName == null || info.packageName != node.packageName?.toString()) return null
-      val ok = FocusGuard.isEditableTextField(
-        node, packageName,
-        info.packageName, info.inputType,
-        FocusGuard.editorNoPersonalizedLearning(info.imeOptions),
-      )
+      val ok = FocusGuard.isEditableTextField(node, packageName, info)
       if (!ok) { focusFailure = "unsupported_field"; return null }
       owned = false
       return node
@@ -273,7 +299,9 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   }
 
   private fun needsBubbleRetry(): Boolean = connected &&
-    (foregroundError != null || hiddenReason in listOf("waiting_for_editor", "overlay_error", "state_error"))
+    (foregroundError != null || hiddenReason in listOf(
+      "waiting_for_editor", "keyboard_closed", "unsupported_field", "overlay_error", "state_error",
+    ))
 
   private fun refreshBubbleOnce() {
     try {
@@ -885,6 +913,9 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       return
     }
     val recordingApiUrl = session.apiUrl ?: run { recordingUserId = null; releaseTarget(); return }
+    LocalDiagnostics.record(this, LocalDiagnostics.Event.recording_started)
+    val take = RecordingRecovery(applicationContext, requireNotNull(recordingUserId), recordingApiUrl)
+    recovery = take
     val stream = speechStream()
     val generation = ++lifecycleGeneration
     try {
@@ -896,10 +927,8 @@ class VoxTypeAccessibilityService : AccessibilityService() {
         stream.audio(bytes)
       }, { file, duration ->
         main.post {
-          if (generation != lifecycleGeneration) {
-            try { file?.delete() } catch (e: Exception) { VoxLog.w("discarded audio delete failed", e) }
-            return@post
-          }
+          take.stopped(file, duration)
+          if (generation != lifecycleGeneration) return@post
           capture = null
           audioLevel = 0f
           if (discardNext || recordingUserId == null) {
@@ -925,7 +954,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       }, {
         main.post {
           android.widget.Toast.makeText(this, "Microphone is in use by another app", android.widget.Toast.LENGTH_SHORT).show()
-          cancelRecording()
+          failRecording("Microphone interrupted. Audio is kept in Local recordings.")
         }
       }).also { it.start() }
       setStatus(DictationStatus.LISTENING)
@@ -964,6 +993,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
 
   /** Cancel remains available during capture, finalization and cleanup. */
   private fun cancelRecording() {
+    LocalDiagnostics.record(this, LocalDiagnostics.Event.cancelled)
     if (status !in listOf(DictationStatus.LISTENING.bridge, DictationStatus.PROCESSING.bridge, DictationStatus.CONNECTING.bridge)) return
     recoverRecording()
   }
@@ -1015,9 +1045,13 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       val builder = Notification.Builder(this, VoxConstants.BUBBLE_CHANNEL_ID)
         .setSmallIcon(R.drawable.voxtype_notification)
         .setContentTitle("${applicationInfo.loadLabel(packageManager)} voice bubble is ready")
-        .setContentText("Open a text field to dictate. Manage the bubble in VoxType.")
+        .setContentText("Open a text field to dictate. Pause here before payments.")
         .setOnlyAlertOnce(true)
         .setOngoing(true)
+        .addAction(Notification.Action.Builder(null, "Pause for payments",
+          PendingIntent.getBroadcast(this, 0,
+            android.content.Intent(this, PauseBubbleReceiver::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)).build())
       packageManager.getLaunchIntentForPackage(packageName)?.let { intent ->
         builder.setContentIntent(PendingIntent.getActivity(this, 0, intent,
           PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
@@ -1049,7 +1083,8 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   private fun connectionFailed() = failRecording("Connection unavailable. Check your internet and try again.", true)
 
   private fun failRecording(message: String, network: Boolean = false) {
-    bubbleError = message; connectionError = network
+    LocalDiagnostics.record(this, LocalDiagnostics.Event.transcription_failed)
+    bubbleError = "$message Audio is kept in Transcripts → Local recordings."; connectionError = network
     resetRecording(DictationStatus.ERROR)
     BubbleHealth.record(this, if (network) "dictation_error:connection" else "dictation_error:recording")
     android.widget.Toast.makeText(this, message, android.widget.Toast.LENGTH_SHORT).show()
@@ -1059,8 +1094,14 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     lifecycleGeneration++
     processingJob?.cancel(); processingJob = null
     cleanupCall?.cancel(); cleanupCall = null
+    if (next == DictationStatus.ERROR) {
+      val take = recovery ?: recordingUserId?.let { RecordingRecovery(applicationContext, it, session.apiUrl) }
+      take?.received(engine?.partialTranscript().orEmpty())
+      take?.stopped(recordingFile, recordingDuration)
+    } else { recovery?.discard(); recordingFile?.delete() }
+    recovery = null
     recordingUserId = null
-    recordingFile?.delete(); recordingFile = null
+    recordingFile = null
     discardNext = false
     try { capture?.stop() } catch (error: Exception) { VoxLog.w("capture recovery failed", error) }
     capture = null
@@ -1073,6 +1114,8 @@ class VoxTypeAccessibilityService : AccessibilityService() {
 
   private fun finishDictation(original: String, apiUrl: String) {
     val userId = recordingUserId ?: return
+    recovery?.received(original)
+    LocalDiagnostics.record(this, LocalDiagnostics.Event.transcription_complete)
     if (original.isBlank()) {
       failRecording("No speech detected. Try again.")
       return
@@ -1080,6 +1123,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     val generation = lifecycleGeneration
     val audio = recordingFile
     val duration = recordingDuration
+    val take = recovery
     recordingUserId = null
     processingJob = serviceScope.launch(Dispatchers.IO) {
       var saved = false
@@ -1094,11 +1138,14 @@ class VoxTypeAccessibilityService : AccessibilityService() {
         // A canceled take cannot slip between a background save and queued insertion.
         withContext(Dispatchers.Main) {
           if (generation != lifecycleGeneration || session.userId != userId) return@withContext
-          val id = store.save(userId, cleaned, original, duration, audio, apiUrl)
+          val id = if (take != null) store.save(userId, cleaned, original, duration, audio, apiUrl, take.id, take.createdAt)
+            else store.save(userId, cleaned, original, duration, audio, apiUrl)
+          take?.commit()
           saved = true
           recordingFile = null
           val delivered = try { cleaned.isNotBlank() && insertIntoTarget(cleaned) }
             catch (error: Exception) { VoxLog.w("target insertion failed", error); false }
+          LocalDiagnostics.record(this@VoxTypeAccessibilityService, if (delivered) LocalDiagnostics.Event.delivery_sent else LocalDiagnostics.Event.delivery_recovery)
           if (delivered) {
             try { store.setDelivery(id, "pasted") } catch (e: Exception) { VoxLog.w("setDelivery failed", e) }
           }
@@ -1110,6 +1157,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
         if (saved && generation == lifecycleGeneration && cleaned.isNotBlank()) TranscriptUploads.sendPending(applicationContext)
       } catch (cancelled: CancellationException) { throw cancelled }
       catch (e: Exception) {
+        LocalDiagnostics.record(this@VoxTypeAccessibilityService, LocalDiagnostics.Event.save_failed)
         VoxLog.e("dictation save failed", e)
         BubbleHealth.record(this@VoxTypeAccessibilityService, "save_error:${e.javaClass.simpleName}")
         withContext(Dispatchers.Main) {
@@ -1117,8 +1165,6 @@ class VoxTypeAccessibilityService : AccessibilityService() {
             failRecording("Couldn’t save this recording. Try again.")
           }
         }
-      } finally {
-        if (!saved) audio?.delete()
       }
     }
   }
@@ -1135,6 +1181,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       if (generation != lifecycleGeneration) { call.cancel(); return original }
       try { call.execute().use { response ->
         if (!response.isSuccessful) {
+          LocalDiagnostics.record(this, LocalDiagnostics.Event.cleanup_fallback)
           VoxLog.w("cleanup HTTP ${response.code}")
           return original
         }
@@ -1148,6 +1195,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
         } ?: original
       } } finally { if (cleanupCall === call) cleanupCall = null }
     } catch (e: Exception) {
+      LocalDiagnostics.record(this, LocalDiagnostics.Event.cleanup_fallback)
       VoxLog.w("cleanup failed", e)
       original
     }
@@ -1159,8 +1207,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     try {
       val pinned = target ?: return false
       if (!InsertionHelper.isSameField(current, pinned)) return false
-      val connection = inputMethod?.currentInputConnection ?: return false
-      return InsertionHelper.commitAndVerify(connection, text)
+      return InsertionHelper.insert(this, current, inputMethod?.currentInputConnection, text)
     } finally {
       // Do not recycle `target` itself here; it is released on next recording/sign-out.
       if (current !== target) {
@@ -1196,6 +1243,9 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   }
 
   fun onSignOut() {
+    recovery?.discard(); recovery = null
+    processingJob?.cancel(); processingJob = null
+    cleanupCall?.cancel(); cleanupCall = null
     lifecycleGeneration++
     try { capture?.stop() } catch (e: Exception) { VoxLog.w("capture stop failed", e) }
     try { engine?.close() } catch (e: Exception) { VoxLog.w("engine close failed", e) }

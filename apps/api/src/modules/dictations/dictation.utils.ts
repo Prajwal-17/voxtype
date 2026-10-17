@@ -14,7 +14,8 @@ export function toNewDictation(userId: string, id: string, input: DictationInput
     id,
     userId,
     text: input.text,
-    originalText: input.originalText ?? null,
+    // Omitted originals stay omitted so cleaned-only retries preserve legacy remote data.
+    originalText: input.originalText,
     createdAt: new Date(input.createdAt),
     durationMs: input.durationMs,
     wordCount: countWords(input.text),

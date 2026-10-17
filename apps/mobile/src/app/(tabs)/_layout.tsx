@@ -1,6 +1,5 @@
 import { useWindowDimensions } from 'react-native';
 import { Tabs } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WaveformIcon } from 'phosphor-react-native/src/icons/Waveform';
 import { FileTextIcon } from 'phosphor-react-native/src/icons/FileText';
@@ -16,7 +15,6 @@ export default function TabLayout() {
   if (!app.user || app.loading) return <SignInScreen />;
   return (
     <>
-      <StatusBar style="dark" />
       <Tabs
         screenOptions={{
           headerShown: false,

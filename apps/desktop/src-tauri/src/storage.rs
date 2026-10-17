@@ -117,14 +117,6 @@ pub fn delete_history(app: &AppHandle, user_id: &str, id: Option<&str>) -> Resul
             serde_json::to_value(pending).map_err(|e| e.to_string())?,
         );
     write_history_unlocked(app, items.clone())?;
-    for removed in old
-        .iter()
-        .filter(|old| !items.iter().any(|item| item.id == old.id))
-    {
-        if let Some(path) = &removed.audio_file {
-            recordings::remove(app, path);
-        }
-    }
     Ok(())
 }
 fn write_history_unlocked(app: &AppHandle, items: Vec<HistoryItem>) -> Result<(), String> {
@@ -140,7 +132,7 @@ fn write_history_unlocked(app: &AppHandle, items: Vec<HistoryItem>) -> Result<()
     Ok(())
 }
 /// Restore missing cloud records without overwriting pending local recordings or audio paths.
-pub fn restore_history(app: &AppHandle, incoming: Vec<HistoryItem>) -> Result<(), String> {
+pub fn restore_history(app: &AppHandle, incoming: Vec<HistoryItem>) -> Result<bool, String> {
     let state = app.state::<AppState>();
     let _lock = state
         .local_data
@@ -149,17 +141,18 @@ pub fn restore_history(app: &AppHandle, incoming: Vec<HistoryItem>) -> Result<()
     let mut rows = history(app)?;
     let previous = rows.len();
     merge_cloud_rows(&mut rows, incoming);
-    if rows.len() != previous {
+    let changed = rows.len() != previous;
+    if changed {
         write_history_unlocked(app, rows)?;
     }
-    Ok(())
+    Ok(changed)
 }
 pub fn reconcile_history(
     app: &AppHandle,
     user_id: &str,
     api_url: &str,
     cloud_ids: &std::collections::HashSet<String>,
-) -> Result<(), String> {
+) -> Result<bool, String> {
     let state = app.state::<AppState>();
     let _lock = state
         .local_data
@@ -177,10 +170,11 @@ pub fn reconcile_history(
             || pending.contains(&row.id)
             || cloud_ids.contains(&row.id)
     });
-    if before != rows.len() {
+    let changed = before != rows.len();
+    if changed {
         write_history_unlocked(app, rows)?;
     }
-    Ok(())
+    Ok(changed)
 }
 
 fn merge_cloud_rows(rows: &mut Vec<HistoryItem>, incoming: Vec<HistoryItem>) {
@@ -198,7 +192,9 @@ fn merge_cloud_rows(rows: &mut Vec<HistoryItem>, incoming: Vec<HistoryItem>) {
     });
 }
 
-pub fn append_history(app: &AppHandle, item: HistoryItem) -> Result<(), String> {
+pub fn append_history(app: &AppHandle, mut item: HistoryItem) -> Result<(), String> {
+    crate::local::retain(app, &item)?;
+    item.original_text = None;
     let state = app.state::<AppState>();
     let _lock = state
         .local_data
@@ -208,7 +204,10 @@ pub fn append_history(app: &AppHandle, item: HistoryItem) -> Result<(), String> 
     let mut pending = pending_uploads_unlocked(app)?;
     pending.retain(|queued| queued.id != item.id);
     if !item.text.trim().is_empty() && item.user_id.is_some() {
-        pending.push(item.clone());
+        let mut queued = item.clone();
+        queued.original_text = None;
+        queued.audio_file = None;
+        pending.push(queued);
     }
     items.retain(|existing| existing.id != item.id);
     items.insert(0, item);
@@ -304,9 +303,16 @@ pub fn claim_legacy_history(app: &AppHandle, user_id: &str) -> Result<(), String
     let mut changed = false;
     for item in items.iter_mut().filter(|item| item.user_id.is_none()) {
         item.user_id = Some(user_id.into());
+        if item.audio_file.is_some() {
+            crate::local::retain(app, item)?;
+        }
+        item.original_text = None;
         item.upload_api_url = Some(crate::auth::api_url());
         if !item.text.trim().is_empty() {
-            pending.push(item.clone());
+            let mut queued = item.clone();
+            queued.original_text = None;
+            queued.audio_file = None;
+            pending.push(queued);
         }
         changed = true;
     }
@@ -321,6 +327,42 @@ pub fn claim_legacy_history(app: &AppHandle, user_id: &str) -> Result<(), String
         write_history_unlocked(app, items)?;
     }
     Ok(())
+}
+
+pub fn migrate_originals(app: &AppHandle) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let _lock = state
+        .local_data
+        .lock()
+        .map_err(|_| "Local data unavailable.")?;
+    let mut items = history(app)?;
+    let mut legacy: Vec<_> = items
+        .iter()
+        .filter(|item| item.audio_file.is_some())
+        .cloned()
+        .collect();
+    legacy.sort_by_key(|item| item.created_at);
+    for item in legacy {
+        crate::local::retain(app, &item)?;
+    }
+    for item in &mut items {
+        if item.user_id.is_some() || item.audio_file.is_none() {
+            item.original_text = None;
+        }
+    }
+    let mut pending = pending_uploads_unlocked(app)?;
+    for item in &mut pending {
+        item.original_text = None;
+        item.audio_file = None;
+    }
+    let store = app
+        .store(environment::store_file())
+        .map_err(|e| e.to_string())?;
+    store.set(
+        "uploads",
+        serde_json::to_value(pending).map_err(|e| e.to_string())?,
+    );
+    write_history_unlocked(app, items)
 }
 
 pub fn prune_audio(app: &AppHandle) -> Result<(), String> {

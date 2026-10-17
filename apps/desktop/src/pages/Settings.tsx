@@ -100,8 +100,12 @@ export function SettingsPage({
         />
         <div hidden={tab !== 'desktop'}>
           <DesktopSetup boot={boot} active={active} onDirtyChange={setShortcutDirty} />
+          <LocalDiagnostics />
         </div>
       </div>
+      <p className="mt-5 text-caption text-muted">
+        VoxType{boot.environment === 'development' ? ' Dev' : ''} · {boot.version}
+      </p>
     </>
   );
 }
@@ -489,6 +493,50 @@ function DesktopSetup({
             {check.detail}
           </p>
         ))}
+    </section>
+  );
+}
+
+function LocalDiagnostics() {
+  const [busy, setBusy] = useState(false);
+  const run = async (action: () => Promise<void>) => {
+    setBusy(true);
+    try {
+      await action();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Diagnostics unavailable');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <section className="mb-5 rounded-panel border border-line bg-surface p-5">
+      <h2 className="text-title font-semibold">Local diagnostics</h2>
+      <p className="my-3 text-ui text-muted">
+        Recording and delivery events from the last 14 days, up to 500 events. Text, credentials and
+        target app details are excluded. Diagnostics stay on this device.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant="outline"
+          disabled={busy || !native}
+          onClick={() =>
+            void run(async () => {
+              await api.copy(await api.localDiagnostics());
+              toast.success('Diagnostics copied');
+            })
+          }
+        >
+          Copy diagnostics
+        </Button>
+        <Button
+          variant="outline"
+          disabled={busy || !native}
+          onClick={() => void run(api.exportDiagnostics)}
+        >
+          Export diagnostics
+        </Button>
+      </div>
     </section>
   );
 }

@@ -156,10 +156,3 @@ pub fn prune_directory(dir: &Path) -> Result<Vec<String>, String> {
     }
     Ok(removed)
 }
-
-pub fn remove(app: &AppHandle, path: &str) {
-    // Never delete paths outside this app's private recordings folder.
-    if directory(app).ok().as_deref() == Path::new(path).parent() {
-        let _ = fs::remove_file(path);
-    }
-}

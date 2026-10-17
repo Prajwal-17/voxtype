@@ -26,6 +26,20 @@ reachable from the phone for Google sign-in.
 Sign in, grant microphone permission, and enable **VoxType Dev voice bubble** in
 Android accessibility settings.
 
+## App compatibility
+
+The bubble supports ordinary text fields, including chat editors that disable
+personalized keyboard learning. Editors that support pasting receive dictation
+through their paste action; the transcript stays on the clipboard for manual
+paste if needed. Password, OTP, numeric and payment fields remain excluded.
+
+Some payment apps, including Paytm, block payments while an accessibility service
+is enabled, even with its bubble hidden. Before paying, choose **Pause for
+payments** in VoxType Settings or its ready notification. This cancels any pending
+bubble dictation and turns off VoxType's accessibility service. After paying, use
+**Enable accessibility** in VoxType Settings to enable it again. Android requires
+you to re-enable access yourself; VoxType does not bypass payment security checks.
+
 ## Build
 
 Run [Android Development Build](../../.github/workflows/mobile-dev-build.yaml) in

@@ -1,6 +1,7 @@
 import { useState, useDeferredValue, useRef } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { CopyIcon, TrashSimpleIcon } from '../components/icons';
+import { LocalRecovery } from '../components/local-recovery';
 import { PageHeader } from '../components/layout';
 import { Loader } from '../components/loader';
 import { Button, IconButton } from '../components/ui';
@@ -21,21 +22,20 @@ export function HistoryPage({ onRecord }: { onRecord: () => void }) {
     [deleting, setDeleting] = useState<HistoryItem | null>(null);
   const query = useDeferredValue(search),
     history = useHistory(query),
-    client = useQueryClient(),
     copy = useCopy();
   const deleteTrigger = useRef<HTMLButtonElement | null>(null);
   const remove = useMutation({
     mutationFn: api.deleteHistory,
     onSuccess: () => {
       setDeleting(null);
-      void client.invalidateQueries({ queryKey: ['history'] });
-      void client.invalidateQueries({ queryKey: ['analytics'] });
+      // Native history/analytics events invalidate the affected queries once.
     },
   });
   const items = history.data?.pages.flatMap((p) => p.items) ?? [];
   return (
     <>
       <PageHeader title="Transcripts" />
+      <LocalRecovery />
       <Input
         type="search"
         placeholder="Search transcripts"
@@ -135,8 +135,8 @@ export function HistoryPage({ onRecord }: { onRecord: () => void }) {
         >
           <AlertDialogTitle>Delete this transcript?</AlertDialogTitle>
           <AlertDialogDescription>
-            This removes the transcript from your account and this device’s cache. Other devices
-            update after sync.
+            This removes the cleaned transcript from your account and synced cache. Local recordings
+            and originals remain until replaced by newer takes. Other devices update after sync.
           </AlertDialogDescription>
           <p className="line-clamp-2 text-ui text-muted">{deleting?.text}</p>
           {remove.isError && (

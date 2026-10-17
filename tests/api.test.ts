@@ -273,3 +273,25 @@ test('timezone validation rejects SQL-like input and long-history trend payloads
   );
   assert.equal(data.days[1]?.words, 0);
 });
+
+test('cleaned-only sync preserves existing remote originals and never creates new originals', async () => {
+  const input = {
+    text: 'Cleaned transcript',
+    createdAt: 1,
+    durationMs: 1000,
+    source: 'mobile' as const,
+  };
+  await transcripts.upsert('alice', 'legacy-original', {
+    ...input,
+    originalText: 'Previously stored remote original',
+  });
+  await transcripts.upsert('alice', 'legacy-original', { ...input, text: 'Cleaned retry' });
+  assert.equal(
+    (await transcripts.get('alice', 'legacy-original')).originalText,
+    'Previously stored remote original',
+  );
+  await transcripts.upsert('alice', 'new-cleaned', input);
+  assert.equal((await transcripts.get('alice', 'new-cleaned')).originalText, undefined);
+  await transcripts.remove('alice', 'legacy-original');
+  await transcripts.remove('alice', 'new-cleaned');
+});

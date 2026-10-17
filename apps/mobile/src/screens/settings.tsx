@@ -8,6 +8,7 @@ import { Action, Card, Setting, Text } from '../components/primitives';
 import { styles as ui } from '../components/styles';
 import { useAppState } from '../state/app-state';
 import { accessibilityLabel, bubbleDiagnostics } from '../lib/bubble-health';
+import appConfig from '../../app.json';
 import Native from '../../modules/voxtype-native/src/VoxTypeNativeModule';
 const c = theme.colors;
 export default function SettingsScreen() {
@@ -33,7 +34,7 @@ export default function SettingsScreen() {
             })
           }
         />
-        {snapshot?.bubbleEnabled && (
+        {snapshot && (
           <>
             <Text style={[ui.muted, { marginBottom: 12 }]}>
               Appears beside an active text field while the keyboard is open.
@@ -72,6 +73,24 @@ export default function SettingsScreen() {
               )}
               {!snapshot.accessibilityEnabled && (
                 <Text style={ui.muted}>Enable VoxType in Android Settings to use the bubble.</Text>
+              )}
+              <Text style={ui.muted}>
+                Payment apps such as Paytm may require accessibility access to be off. Pause before
+                paying, then enable VoxType in Android accessibility settings to use the bubble
+                again. Turning off the Voice bubble switch alone keeps this access on.
+              </Text>
+              {snapshot.accessibilityEnabled && (
+                <Action
+                  label="Pause for payments"
+                  secondary
+                  disabled={!app.available || app.busy}
+                  onPress={() =>
+                    void app.run(async () => {
+                      await Native.pauseForPayments();
+                      await app.refresh();
+                    })
+                  }
+                />
               )}
             </View>
           </>
@@ -154,12 +173,45 @@ export default function SettingsScreen() {
           />
         </Card>
       )}
+      <Card style={{ gap: 8 }}>
+        <Text accessibilityRole="header" style={ui.title}>
+          Local diagnostics
+        </Text>
+        <Text style={ui.muted}>
+          Recording and delivery events from the last 14 days, up to 500 events. Text, credentials
+          and target app details are excluded. Diagnostics stay on this device.
+        </Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          <Action
+            label="Copy diagnostics"
+            secondary
+            disabled={!app.available || app.busy}
+            onPress={() =>
+              void app.run(async () => {
+                const report = await Native.getLocalDiagnostics();
+                await Clipboard.setStringAsync(report);
+                app.notify('Diagnostics copied');
+              })
+            }
+          />
+          <Action
+            label="Export diagnostics"
+            secondary
+            disabled={!app.available || app.busy}
+            onPress={() => void app.run(() => Native.shareLocalDiagnostics())}
+          />
+        </View>
+      </Card>
+      <Text style={ui.muted}>
+        {snapshot?.appHealth?.appName ?? 'VoxType'} ·{' '}
+        {snapshot?.appHealth?.appVersion ?? appConfig.expo.version}
+        {snapshot?.appHealth?.versionCode != null ? ` (${snapshot.appHealth.versionCode})` : ''}
+        {app.preview ? ' · Web preview' : ''}
+      </Text>
       <Action label="Account →" secondary onPress={() => router.push('/account')} />
       {snapshot?.appHealth && (
         <Card style={{ gap: 12 }}>
-          <Text style={ui.muted}>
-            {snapshot.appHealth.appName} · {snapshot.appHealth.appVersion}
-          </Text>
+          <Text style={ui.muted}>Android app health</Text>
           {snapshot.appHealth.lastExit && (
             <Text style={ui.muted}>
               Previous Android exit: {snapshot.appHealth.lastExit.reason.replaceAll('_', ' ')}

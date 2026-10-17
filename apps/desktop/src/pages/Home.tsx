@@ -135,9 +135,14 @@ export function HomePage({
           </div>
         )}
         {take?.phase === 'error' && (
-          <p role="alert" className="px-5 py-3 text-ui text-danger">
-            {take.message}
-          </p>
+          <div className="px-5 py-3">
+            <p role="alert" className="mb-3 text-ui text-danger">
+              {take.message}
+            </p>
+            <Button variant="outline" onClick={() => onNavigate('transcripts')}>
+              Recover recording
+            </Button>
+          </div>
         )}
         {take?.cleanupWarning && (
           <p role="status" className="px-5 py-3 text-ui text-warning">

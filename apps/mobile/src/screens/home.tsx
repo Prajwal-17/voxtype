@@ -32,15 +32,15 @@ export default function HomeScreen() {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
           <View
             style={{
-              width: 52,
-              height: 52,
+              width: 40,
+              height: 40,
               borderRadius: 999,
               backgroundColor: theme.colors.primaryContainer,
               alignItems: 'center',
               justifyContent: 'center',
             }}
           >
-            <MicrophoneIcon size={25} color={theme.colors.primary} />
+            <MicrophoneIcon size={22} color={theme.colors.primary} />
           </View>
           <Text style={ui.title}>Dictation</Text>
         </View>
@@ -83,12 +83,19 @@ export default function HomeScreen() {
           </View>
         )}
         {!!take?.error && (
-          <Text
-            accessibilityLiveRegion="polite"
-            style={{ marginTop: 12, color: theme.colors.danger }}
-          >
-            {take.error}
-          </Text>
+          <View style={{ marginTop: 12, gap: 8 }}>
+            <Text
+              accessibilityLiveRegion="polite"
+              style={{ marginTop: 12, color: theme.colors.danger }}
+            >
+              {take.error}
+            </Text>
+            <Action
+              label="Recover recording"
+              secondary
+              onPress={() => router.navigate('/(tabs)/transcripts')}
+            />
+          </View>
         )}
         {!app.available && (
           <Text style={[ui.muted, { marginTop: 12 }]}>

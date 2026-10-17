@@ -1,5 +1,6 @@
 /* eslint-disable react-refresh/only-export-components -- provider and its typed hooks form one state module */
 import {
+  Fragment,
   createContext,
   useCallback,
   useContext,
@@ -16,11 +17,13 @@ import {
   type Analytics,
   type AnalyticsRange,
 } from '@voxtype/shared/analytics';
-import { currentUser, getAnalytics, signIn, signOut, type User } from '../lib/mobile-api';
+import { RequestCache } from '@voxtype/shared/request-cache';
+import { API_URL, currentUser, getAnalytics, signIn, signOut, type User } from '../lib/mobile-api';
 import Native, {
   isVoxTypeNativeAvailable,
 } from '../../modules/voxtype-native/src/VoxTypeNativeModule';
 import type { Snapshot, Dictation } from '../../modules/voxtype-native/src/VoxTypeNative.types';
+const analyticsCache = new RequestCache<Analytics>();
 const preview = __DEV__ && Platform.OS === 'web';
 const previewSnapshot: Snapshot = {
   accessibilityEnabled: false,
@@ -42,13 +45,17 @@ function useAppStateValue() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(preview ? previewSnapshot : null);
   const [loading, setLoading] = useState(available),
     [busy, setBusy] = useState(false),
-    [revision, setRevision] = useState(0);
+    [revision, setRevision] = useState(0),
+    [analyticsRevision, setAnalyticsRevision] = useState(0),
+    [foregroundRevision, setForegroundRevision] = useState(0);
   const [message, setMessage] = useState<{ text: string; kind: 'success' | 'error' } | null>(null);
   const generation = useRef(0),
     account = useRef(user),
     alive = useRef(true);
   const clear = useCallback(() => {
     generation.current++;
+    analyticsCache.clear();
+    setAnalyticsRevision((n) => n + 1);
     setSnapshot(null);
     setRevision((n) => n + 1);
   }, []);
@@ -97,7 +104,9 @@ function useAppStateValue() {
         alive.current = false;
       };
     let disposed = false;
-    const checkAccount = async () => {
+    let checking: Promise<void> | null = null;
+    let checkedAt = 0;
+    const loadAccount = async () => {
       const gen = generation.current;
       const next = await currentUser();
       if (disposed || gen !== generation.current) return;
@@ -109,23 +118,47 @@ function useAppStateValue() {
         });
       }
     };
+    const checkAccount = () => {
+      if (checking) return checking;
+      if (Date.now() - checkedAt < 60_000) return Promise.resolve();
+      checking = loadAccount()
+        .then(() => {
+          checkedAt = Date.now();
+        })
+        .finally(() => {
+          checking = null;
+        });
+      return checking;
+    };
     void checkAccount()
       .catch(() => notify('Couldn’t load account. Check your connection.', 'error'))
       .finally(() => {
         if (!disposed) setLoading(false);
       });
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const subscription = Native.addListener('onChange', () => {
-      void refresh().catch(() => {});
+    let historyChanged = false,
+      analyticsChanged = false;
+    const subscription = Native.addListener('onChange', ({ kind }) => {
+      historyChanged ||= kind === 'history';
+      analyticsChanged ||= kind === 'analytics';
       clearTimeout(timer);
       timer = setTimeout(() => {
-        if (!disposed) setRevision((n) => n + 1);
-      }, 300);
+        if (disposed) return;
+        void refresh().catch(() => {});
+        if (historyChanged) setRevision((n) => n + 1);
+        if (analyticsChanged) {
+          analyticsCache.clear();
+          setAnalyticsRevision((n) => n + 1);
+        }
+        historyChanged = false;
+        analyticsChanged = false;
+      }, 180);
     });
     const lifecycle = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
         void checkAccount().catch(() => {});
         void refresh().catch(() => {});
+        setForegroundRevision((n) => n + 1);
         setRevision((n) => n + 1);
       }
     });
@@ -177,6 +210,8 @@ function useAppStateValue() {
     available,
     preview,
     revision,
+    analyticsRevision,
+    foregroundRevision,
     message,
     setMessage,
     notify,
@@ -195,7 +230,11 @@ function useAppStateValue() {
 const AppContext = createContext<ReturnType<typeof useAppStateValue> | null>(null);
 export function AppStateProvider({ children }: { children: ReactNode }) {
   const value = useAppStateValue();
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+  return (
+    <AppContext.Provider value={value}>
+      <Fragment key={value.user?.id ?? 'signed-out'}>{children}</Fragment>
+    </AppContext.Provider>
+  );
 }
 export function useAppState() {
   const state = useContext(AppContext);
@@ -203,24 +242,35 @@ export function useAppState() {
   return state;
 }
 export function useAnalyticsData(range: AnalyticsRange) {
-  const { user, available, preview, revision } = useAppState(),
+  const { user, available, preview, analyticsRevision, foregroundRevision } = useAppState(),
     timezone = clientTimezone();
   const userId = user?.id;
-  const [data, setData] = useState<Analytics | null>(preview ? emptyPeriod('30d', timezone) : null),
+  const dataKey = JSON.stringify([userId, range, timezone]);
+  const [result, setResult] = useState<{ key: string; data: Analytics } | null>(null),
     [error, setError] = useState(false),
     [loading, setLoading] = useState(false),
     [retry, setRetry] = useState(0);
   useEffect(() => {
     let disposed = false;
-    const controller = new AbortController();
+
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reset data on account/range changes before subscribing to the request
-    setData(preview ? emptyPeriod(range, timezone) : null);
+    if (preview) setResult({ key: dataKey, data: emptyPeriod(range, timezone) });
     setError(false);
     if (!userId || !available) return;
     setLoading(true);
-    void getAnalytics(range, timezone, controller.signal)
+    void analyticsCache
+      .get(
+        JSON.stringify([
+          API_URL,
+          userId,
+          range,
+          timezone,
+          new Date().toLocaleDateString('en-CA', { timeZone: timezone }),
+        ]),
+        () => getAnalytics(range, timezone, undefined, userId),
+      )
       .then((next) => {
-        if (!disposed) setData(next);
+        if (!disposed) setResult({ key: dataKey, data: next });
       })
       .catch(() => {
         if (!disposed) setError(true);
@@ -230,10 +280,27 @@ export function useAnalyticsData(range: AnalyticsRange) {
       });
     return () => {
       disposed = true;
-      controller.abort();
     };
-  }, [userId, available, preview, revision, range, timezone, retry]);
-  return { data, error, loading, retry: () => setRetry((n) => n + 1) };
+  }, [
+    userId,
+    available,
+    preview,
+    analyticsRevision,
+    foregroundRevision,
+    range,
+    timezone,
+    retry,
+    dataKey,
+  ]);
+  return {
+    data: result?.key === dataKey ? result.data : preview ? emptyPeriod(range, timezone) : null,
+    error,
+    loading,
+    retry: () => {
+      analyticsCache.clear();
+      setRetry((n) => n + 1);
+    },
+  };
 }
 /** Query runs over the entire native account cache before the 12-row cursor limit. */
 export function useTranscripts(query = '') {
@@ -255,7 +322,7 @@ export function useTranscripts(query = '') {
       setLoading(true);
       setError(false);
       try {
-        const page = await Native.getTranscripts(next, query.trim());
+        const page = await Native.getTranscripts(next, query.trim(), userId);
         if (id !== request.current || gen !== generation.current) return;
         setItems((old) =>
           next

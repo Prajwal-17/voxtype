@@ -249,13 +249,15 @@ class DeepgramSession(private val token: () -> String?,
     }
   }
 
+  fun partialTranscript(): String = segments.values.filter { it.isNotBlank() }.joinToString(" ").trim()
+
   private fun lost() {
     val active = takeActive || pendingDone != null
     takeActive = false
     takeFailed = true
     pendingDone = null
     finishGeneration++
-    segments.clear()
+    // Keep received words until the recorder has checkpointed the failed take.
     synchronized(audioLock) { recording = false }
     disconnect()
     if (active) {
@@ -280,7 +282,7 @@ class DeepgramSession(private val token: () -> String?,
     main.removeCallbacks(maintenance)
     pendingDone = null
     finishGeneration++
-    segments.clear()
+    // Keep received words until the recorder has checkpointed the failed take.
     synchronized(audioLock) { recording = false }
     disconnect()
   }
