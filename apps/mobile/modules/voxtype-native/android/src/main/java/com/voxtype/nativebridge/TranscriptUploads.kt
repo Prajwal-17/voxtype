@@ -70,6 +70,11 @@ object TranscriptUploads {
   }
 
 
+  fun sendPendingAsync(context: Context) {
+    val app = context.applicationContext
+    scope.launch { sendPending(app) }
+  }
+
   suspend fun sendPending(context: Context) = lock.withLock {
     TranscriptSyncJob.schedule(context)
     val session = NativeSession(context)
@@ -82,6 +87,12 @@ object TranscriptUploads {
     } catch (e: Exception) {
       VoxLog.w("transcript queued for cloud retry", e)
     }
+  }
+
+  internal suspend fun replaceTranscript(context: Context, id: String, user: String, api: String,
+    raw: String, text: String, sameAccount: () -> Boolean) = lock.withLock {
+    check(sameAccount()) { "Account changed" }
+    VoxTypeStore(context).use { it.replaceTranscript(user,id,raw,text,api) }
   }
 
   /** Serialize delete with restore/upload so a queued PUT cannot resurrect the record. */

@@ -118,6 +118,10 @@ export const api = {
       : Promise.resolve(
           JSON.stringify({ version: __APP_VERSION__, retentionDays: 14, events: [] }),
         ),
+  recordingAudio: (id: string, expectedUserId: string) =>
+    command<ArrayBuffer>('get_recording_audio', { id, expectedUserId }),
+  regenerateTranscript: (id: string, expectedUserId: string) =>
+    command<string>('regenerate_transcript', { id, expectedUserId }),
   exportRecording: (id: string) => command<void>('export_recording', { id }),
   exportDiagnostics: () => command<void>('export_local_diagnostics'),
   microphones: () => (native ? command<Microphone[]>('get_microphones') : Promise.resolve([])),

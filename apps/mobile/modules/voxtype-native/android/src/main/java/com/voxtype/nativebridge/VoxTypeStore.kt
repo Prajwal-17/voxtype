@@ -67,9 +67,8 @@ class VoxTypeStore(
       }
       putSetting("vocabulary", JSONArray(terms).toString())
     }
-  fun save(userId: String, text: String, original: String, duration: Long, audio: File?, apiUrl: String?): String {
-    val id = UUID.randomUUID().toString()
-    val now = System.currentTimeMillis()
+  fun save(userId: String, text: String, original: String, duration: Long, audio: File?, apiUrl: String?, id: String = UUID.randomUUID().toString(), createdAt: Long = System.currentTimeMillis()): String {
+    val now = createdAt
     val words = if (text.isBlank()) 0 else text.trim().split(Regex("\\s+")).count { it.isNotBlank() }
     val db = writableDatabase
     db.beginTransaction()
@@ -193,6 +192,37 @@ class VoxTypeStore(
       db.execSQL("DELETE FROM local_recordings WHERE id NOT IN (SELECT id FROM local_recordings ORDER BY created_at DESC,id DESC LIMIT 10)")
       db.setTransactionSuccessful()
     } finally { db.endTransaction() }
+  }
+
+  fun discardRecovery(userId: String, id: String) {
+    writableDatabase.delete("local_recordings", "user_id = ? AND id = ?", arrayOf(userId, id))
+    onChanged()
+  }
+
+  /** One transaction replaces the existing ID, raw original and upload revision. Failed retries never call this. */
+  fun replaceTranscript(userId: String, id: String, raw: String, text: String, apiUrl: String) {
+    require(raw.isNotBlank() && text.isNotBlank() && raw.length <= 100_000 && text.length <= 100_000) { "No usable transcript received. The previous text is unchanged." }
+    val db = writableDatabase
+    db.beginTransaction()
+    try {
+      val take = db.rawQuery("SELECT created_at,duration_ms,audio_file FROM local_recordings WHERE user_id = ? AND id = ?", arrayOf(userId,id)).use {
+        check(it.moveToFirst()) { "Recording no longer available" }
+        Triple(it.getLong(0), it.getLong(1), it.getString(2))
+      }
+      db.rawQuery("SELECT user_id FROM dictations WHERE id = ?", arrayOf(id)).use {
+        check(!it.moveToFirst() || it.getString(0) == userId) { "Account changed" }
+      }
+      db.delete("dictations", "id = ? AND user_id = ?", arrayOf(id,userId))
+      db.insertOrThrow("dictations", null, ContentValues().apply {
+        put("id", id); put("user_id", userId); put("text", text)
+        put("created_at", take.first); put("updated_at", System.currentTimeMillis()); put("duration_ms", take.second)
+        put("word_count", text.trim().split(Regex("\\s+")).size); put("delivery", "saved")
+        put("audio_file", take.third); put("upload_api_url", apiUrl); put("uploaded", 0)
+      })
+      db.execSQL("UPDATE local_recordings SET original_text = ? WHERE id = ? AND user_id = ?", arrayOf(raw,id,userId))
+      db.setTransactionSuccessful()
+    } finally { db.endTransaction() }
+    onChanged()
   }
 
   fun localRecordings(userId: String): List<Map<String, Any?>> {

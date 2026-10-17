@@ -147,7 +147,8 @@ class BubbleCancellationTest {
       invoke(service, "connectionFailed")
       assertEquals("error", service.status)
       assertTrue(job.isCancelled)
-      assertFalse(audio.exists())
+      assertTrue(audio.exists())
+      VoxTypeStore(service).use { assertEquals(1, it.localRecordings("offline-owner").size) }
       assertNull(field(service, "engine"))
       finish(service, "Late speech must not appear")
       assertNull(field(service, "lastSavedId"))

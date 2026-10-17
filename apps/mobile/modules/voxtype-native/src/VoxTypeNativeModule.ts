@@ -34,6 +34,8 @@ declare class VoxTypeNativeModule extends NativeModule<VoxTypeNativeModuleEvents
   deleteTranscript(id: string): Promise<void>;
   getLocalRecordings(): Promise<LocalRecording[]>;
   shareRecording(id: string): Promise<void>;
+  getRecordingUri(id: string, expectedUserId: string): Promise<string>;
+  regenerateTranscript(id: string, expectedUserId: string): Promise<string>;
   getLocalDiagnostics(): Promise<string>;
   shareLocalDiagnostics(): Promise<void>;
   shareInsights(csv: string): Promise<void>;
@@ -106,6 +108,10 @@ const VoxTypeNative = {
   cancelRecording: () => requireVoxTypeModule().cancelRecording(),
   stopRecording: () => requireVoxTypeModule().stopRecording(),
   getLocalRecordings: () => requireVoxTypeModule().getLocalRecordings(),
+  getRecordingUri: (id: string, expectedUserId: string) =>
+    requireVoxTypeModule().getRecordingUri(id, expectedUserId),
+  regenerateTranscript: (id: string, expectedUserId: string) =>
+    requireVoxTypeModule().regenerateTranscript(id, expectedUserId),
   shareRecording: (id: string) => requireVoxTypeModule().shareRecording(id),
   getLocalDiagnostics: () => requireVoxTypeModule().getLocalDiagnostics(),
   shareLocalDiagnostics: () => requireVoxTypeModule().shareLocalDiagnostics(),

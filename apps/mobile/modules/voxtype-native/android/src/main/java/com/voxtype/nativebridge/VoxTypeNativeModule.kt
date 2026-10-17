@@ -196,6 +196,17 @@ class VoxTypeNativeModule : Module() {
       val context = requireNotNull(appContext.reactContext)
       VoxTypeStore(context).use { it.localRecordings(requireNotNull(NativeSession(context).userId)) }
     }
+    AsyncFunction("getRecordingUri") { id: String, expectedUserId: String ->
+      val context = requireNotNull(appContext.reactContext)
+      check(NativeSession(context).userId == expectedUserId) { "Account changed" }
+      val file = VoxTypeStore(context).use { it.recoveryAudio(expectedUserId,id) } ?: error("Recording no longer available")
+      android.net.Uri.fromFile(file).toString()
+    }
+    AsyncFunction("regenerateTranscript") { id: String, expectedUserId: String ->
+      val context = requireNotNull(appContext.reactContext).applicationContext
+      check(!InAppRecorder.busy && VoxTypeAccessibilityService.instance?.status !in listOf("listening","connecting","processing")) { "Finish recording first" }
+      runBlocking { RecordingTranscription.regenerate(context,id,expectedUserId) }
+    }
     AsyncFunction("shareRecording") { id: String ->
       val context = requireNotNull(appContext.reactContext)
       val user = requireNotNull(NativeSession(context).userId)
@@ -237,7 +248,7 @@ class VoxTypeNativeModule : Module() {
       permissionObserver = null
       observedContext = null
       if (active.get() === this@VoxTypeNativeModule) active.clear()
-      mainHandler.post { InAppRecorder.cancel() }
+      mainHandler.post { if (InAppRecorder.busy) InAppRecorder.fail("Recording interrupted. Audio is kept in Local recordings.") }
     }
   }
 }

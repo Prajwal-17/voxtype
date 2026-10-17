@@ -9,7 +9,7 @@ internal object LocalDiagnostics {
   const val RETENTION_MS = 14L * 24 * 60 * 60 * 1000
   const val LIMIT = 500
   enum class Event { recording_started, transcription_complete, transcription_failed, cleanup_fallback,
-    delivery_sent, delivery_recovery, clipboard_failed, save_failed, cancelled }
+    delivery_sent, delivery_recovery, clipboard_failed, save_failed, cancelled, regeneration_started, regeneration_complete, regeneration_failed }
 
   @Synchronized fun record(context: Context, event: Event, now: Long = System.currentTimeMillis()) {
     runCatching {

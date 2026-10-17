@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
 import { View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import Native from '../../modules/voxtype-native/src/VoxTypeNativeModule';
@@ -12,7 +14,59 @@ export function LocalRecovery() {
   const [open, setOpen] = useState(false),
     [rows, setRows] = useState<LocalRecording[]>([]),
     [error, setError] = useState(false),
-    [retry, setRetry] = useState(0);
+    [retry, setRetry] = useState(0),
+    [regeneratingId, setRegeneratingId] = useState<string | null>(null);
+  const player = useAudioPlayer(null);
+  const playback = useAudioPlayerStatus(player);
+  const [playingId, setPlayingId] = useState<string | null>(null);
+  const playbackRequest = useRef(0);
+  useFocusEffect(
+    useCallback(
+      () => () => {
+        playbackRequest.current++;
+        player.pause();
+      },
+      [player],
+    ),
+  );
+  const play = (id: string) =>
+    void app.run(async () => {
+      if (!user) return;
+      if (playingId === id) {
+        if (playback.playing) player.pause();
+        else {
+          if (playback.didJustFinish) await player.seekTo(0);
+          player.play();
+        }
+        return;
+      }
+      const sequence = ++playbackRequest.current;
+      const uri = await Native.getRecordingUri(id, user.id);
+      if (sequence !== playbackRequest.current) return;
+      await setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: false });
+      if (sequence !== playbackRequest.current) return;
+      player.replace({ uri });
+      setPlayingId(id);
+      player.play();
+    });
+  const regenerate = (id: string) =>
+    void app.run(async () => {
+      if (!user) return;
+      player.pause();
+      playbackRequest.current++;
+      setRegeneratingId(id);
+      try {
+        await Native.regenerateTranscript(id, user.id);
+        setRetry((n) => n + 1);
+        await app.refresh();
+        app.notify('Transcript regenerated and replaced');
+      } finally {
+        setRegeneratingId(null);
+      }
+    });
+  const recording =
+    ['listening', 'processing'].includes(app.snapshot?.inApp.status ?? '') ||
+    ['listening', 'connecting', 'processing'].includes(app.snapshot?.status ?? '');
   useEffect(() => {
     if (!open || !available || !user) return;
     let disposed = false;
@@ -30,6 +84,12 @@ export function LocalRecovery() {
       disposed = true;
     };
   }, [open, available, user, revision, retry]);
+  useEffect(() => {
+    if (recording || !open) {
+      playbackRequest.current++;
+      player.pause();
+    }
+  }, [recording, open, player]);
   return (
     <Card style={{ gap: 8 }}>
       <Action
@@ -38,8 +98,8 @@ export function LocalRecovery() {
         onPress={() => setOpen(!open)}
       />
       <Text style={ui.muted}>
-        Latest 10 takes on this device. Raw originals and audio stay local. Export or copy to
-        recover a take.
+        Latest 10 takes on this device. Play saved audio or regenerate its text. Regenerating sends
+        the recording for transcription and replaces the existing text.
       </Text>
       {open &&
         (error ? (
@@ -51,9 +111,23 @@ export function LocalRecovery() {
             <View key={row.id} style={{ gap: 8, paddingVertical: 8 }}>
               <Text style={ui.muted}>{new Date(row.createdAt).toLocaleString()}</Text>
               <Text selectable>
-                {row.originalText || 'No transcript received. Recover the audio if available.'}
+                {row.originalText || 'No transcript received. Play or regenerate the saved audio.'}
               </Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                <Action
+                  label={
+                    playingId === row.id && playback.playing ? 'Pause recording' : 'Play recording'
+                  }
+                  secondary
+                  disabled={!row.audioAvailable || app.busy || recording}
+                  onPress={() => play(row.id)}
+                />
+                <Action
+                  label={regeneratingId === row.id ? 'Regenerating…' : 'Regenerate text'}
+                  secondary
+                  disabled={!row.audioAvailable || app.busy || recording}
+                  onPress={() => regenerate(row.id)}
+                />
                 <Action
                   label="Copy original"
                   secondary
@@ -72,6 +146,24 @@ export function LocalRecovery() {
                   onPress={() => void app.run(() => Native.shareRecording(row.id))}
                 />
               </View>
+              {playingId === row.id && (
+                <View style={{ gap: 8 }}>
+                  <Text style={ui.muted}>
+                    {Math.floor(playback.currentTime)} / {Math.floor(playback.duration)} seconds
+                  </Text>
+                  <Action
+                    label="Restart playback"
+                    secondary
+                    disabled={app.busy || recording}
+                    onPress={() =>
+                      void app.run(async () => {
+                        await player.seekTo(0);
+                        player.play();
+                      })
+                    }
+                  />
+                </View>
+              )}
             </View>
           ))
         ))}

@@ -34,6 +34,9 @@ pub enum Event {
     ClipboardFailed,
     SaveFailed,
     Cancelled,
+    RegenerationStarted,
+    RegenerationComplete,
+    RegenerationFailed,
 }
 #[derive(Clone, Serialize, Deserialize)]
 struct Entry {
@@ -67,14 +70,19 @@ pub fn retain(app: &AppHandle, item: &HistoryItem) -> Result<(), String> {
         }
         None => vec![],
     };
-    if item.original_text.is_none() && rows.iter().any(|row| row.id == item.id) {
-        return Ok(());
-    }
+    let previous_raw = rows
+        .iter()
+        .find(|row| row.id == item.id)
+        .map(|row| row.original_text.clone());
     rows.retain(|row| row.id != item.id);
     rows.push(LocalRecording {
         id: item.id.clone(),
         user_id: user_id.clone(),
-        original_text: item.original_text.as_deref().unwrap_or(&item.text).into(),
+        original_text: item
+            .original_text
+            .clone()
+            .or(previous_raw)
+            .unwrap_or_else(|| item.text.clone()),
         created_at: item.created_at,
         duration_ms: item.duration_ms,
         audio_file: item.audio_file.clone(),

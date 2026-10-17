@@ -111,6 +111,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   private var engine: DeepgramSession? = null
   private var capture: AudioCapture? = null
   private var target: AccessibilityNodeInfo? = null
+  private var recovery: RecordingRecovery? = null
   private var recordingUserId: String? = null
   private var recordingFile: File? = null
   private var recordingDuration = 0L
@@ -205,9 +206,11 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     BubbleHealth.record(this, "service_destroyed")
     bubbleRefresh.cancel()
     main.removeCallbacksAndMessages(null)
+    recovery?.received(engine?.partialTranscript().orEmpty())
+    recovery?.stopped(recordingFile, recordingDuration)
     lifecycleGeneration++; recordingUserId = null
     processingJob?.cancel(); cleanupCall?.cancel()
-    recordingFile?.delete(); recordingFile = null
+    recordingFile = null
     capture?.stop(); engine?.close(); hideBubble("disconnected"); instance = null
     stopForeground(STOP_FOREGROUND_REMOVE)
     foregroundMode = ForegroundMode.NONE
@@ -894,6 +897,8 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     }
     val recordingApiUrl = session.apiUrl ?: run { recordingUserId = null; releaseTarget(); return }
     LocalDiagnostics.record(this, LocalDiagnostics.Event.recording_started)
+    val take = RecordingRecovery(applicationContext, requireNotNull(recordingUserId), recordingApiUrl)
+    recovery = take
     val stream = speechStream()
     val generation = ++lifecycleGeneration
     try {
@@ -905,10 +910,8 @@ class VoxTypeAccessibilityService : AccessibilityService() {
         stream.audio(bytes)
       }, { file, duration ->
         main.post {
-          if (generation != lifecycleGeneration) {
-            try { file?.delete() } catch (e: Exception) { VoxLog.w("discarded audio delete failed", e) }
-            return@post
-          }
+          take.stopped(file, duration)
+          if (generation != lifecycleGeneration) return@post
           capture = null
           audioLevel = 0f
           if (discardNext || recordingUserId == null) {
@@ -934,7 +937,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       }, {
         main.post {
           android.widget.Toast.makeText(this, "Microphone is in use by another app", android.widget.Toast.LENGTH_SHORT).show()
-          cancelRecording()
+          failRecording("Microphone interrupted. Audio is kept in Local recordings.")
         }
       }).also { it.start() }
       setStatus(DictationStatus.LISTENING)
@@ -1064,7 +1067,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
 
   private fun failRecording(message: String, network: Boolean = false) {
     LocalDiagnostics.record(this, LocalDiagnostics.Event.transcription_failed)
-    bubbleError = message; connectionError = network
+    bubbleError = "$message Audio is kept in Transcripts → Local recordings."; connectionError = network
     resetRecording(DictationStatus.ERROR)
     BubbleHealth.record(this, if (network) "dictation_error:connection" else "dictation_error:recording")
     android.widget.Toast.makeText(this, message, android.widget.Toast.LENGTH_SHORT).show()
@@ -1074,8 +1077,14 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     lifecycleGeneration++
     processingJob?.cancel(); processingJob = null
     cleanupCall?.cancel(); cleanupCall = null
+    if (next == DictationStatus.ERROR) {
+      val take = recovery ?: recordingUserId?.let { RecordingRecovery(applicationContext, it, session.apiUrl) }
+      take?.received(engine?.partialTranscript().orEmpty())
+      take?.stopped(recordingFile, recordingDuration)
+    } else { recovery?.discard(); recordingFile?.delete() }
+    recovery = null
     recordingUserId = null
-    recordingFile?.delete(); recordingFile = null
+    recordingFile = null
     discardNext = false
     try { capture?.stop() } catch (error: Exception) { VoxLog.w("capture recovery failed", error) }
     capture = null
@@ -1088,6 +1097,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
 
   private fun finishDictation(original: String, apiUrl: String) {
     val userId = recordingUserId ?: return
+    recovery?.received(original)
     LocalDiagnostics.record(this, LocalDiagnostics.Event.transcription_complete)
     if (original.isBlank()) {
       failRecording("No speech detected. Try again.")
@@ -1096,6 +1106,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     val generation = lifecycleGeneration
     val audio = recordingFile
     val duration = recordingDuration
+    val take = recovery
     recordingUserId = null
     processingJob = serviceScope.launch(Dispatchers.IO) {
       var saved = false
@@ -1110,7 +1121,9 @@ class VoxTypeAccessibilityService : AccessibilityService() {
         // A canceled take cannot slip between a background save and queued insertion.
         withContext(Dispatchers.Main) {
           if (generation != lifecycleGeneration || session.userId != userId) return@withContext
-          val id = store.save(userId, cleaned, original, duration, audio, apiUrl)
+          val id = if (take != null) store.save(userId, cleaned, original, duration, audio, apiUrl, take.id, take.createdAt)
+            else store.save(userId, cleaned, original, duration, audio, apiUrl)
+          take?.commit()
           saved = true
           recordingFile = null
           val delivered = try { cleaned.isNotBlank() && insertIntoTarget(cleaned) }
@@ -1135,8 +1148,6 @@ class VoxTypeAccessibilityService : AccessibilityService() {
             failRecording("Couldn’t save this recording. Try again.")
           }
         }
-      } finally {
-        if (!saved) audio?.delete()
       }
     }
   }
@@ -1215,6 +1226,9 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   }
 
   fun onSignOut() {
+    recovery?.discard(); recovery = null
+    processingJob?.cancel(); processingJob = null
+    cleanupCall?.cancel(); cleanupCall = null
     lifecycleGeneration++
     try { capture?.stop() } catch (e: Exception) { VoxLog.w("capture stop failed", e) }
     try { engine?.close() } catch (e: Exception) { VoxLog.w("engine close failed", e) }

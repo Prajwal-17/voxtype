@@ -7,6 +7,7 @@ mod environment;
 mod local;
 mod model;
 mod recordings;
+mod recovery;
 mod session;
 mod speech;
 mod startup;
@@ -27,6 +28,7 @@ pub struct AppState {
     pub user: Mutex<Option<AuthUser>>,
     pub local_data: Mutex<()>,
     pub upload_lock: tokio::sync::Mutex<()>,
+    pub regeneration_lock: tokio::sync::Mutex<()>,
     pub shortcut_registered: AtomicBool,
 }
 impl Default for AppState {
@@ -38,6 +40,7 @@ impl Default for AppState {
             user: Mutex::new(None),
             local_data: Mutex::new(()),
             upload_lock: tokio::sync::Mutex::new(()),
+            regeneration_lock: tokio::sync::Mutex::new(()),
             shortcut_registered: AtomicBool::new(false),
         }
     }
@@ -559,6 +562,8 @@ pub fn run() {
             export_analytics,
             delete_history,
             get_local_recordings,
+            recovery::get_recording_audio,
+            recovery::regenerate_transcript,
             get_local_diagnostics,
             export_recording,
             export_local_diagnostics,
