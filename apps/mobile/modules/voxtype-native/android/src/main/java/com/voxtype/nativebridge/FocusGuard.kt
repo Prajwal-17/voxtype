@@ -10,6 +10,8 @@ import android.view.inputmethod.EditorInfo
  * Password, OTP, payment and non-text fields are always rejected.
  */
 object FocusGuard {
+  internal fun isTextEditor(node: AccessibilityNodeInfo): Boolean = node.isEditable ||
+    node.actionList.any { it.id == AccessibilityNodeInfo.ACTION_SET_TEXT }
   private val PIN_HINT = Regex("\\b(?:pin|mpin)\\b")
   private val BLOCKED_HINTS = listOf(
     "password", "passcode", "pin code", "security code", "verification code",
@@ -28,7 +30,7 @@ object FocusGuard {
     ownPackage: String,
     editor: EditorInfo,
   ): Boolean {
-    if (!node.isEditable || !node.isFocused || !node.isVisibleToUser || !node.isEnabled || node.isPassword) return false
+    if (!isTextEditor(node) || !node.isFocused || !node.isVisibleToUser || !node.isEnabled || node.isPassword) return false
     if (node.packageName?.toString() == ownPackage) return false
     if (Build.VERSION.SDK_INT < 33) return false
     if (editor.packageName == null || editor.packageName != node.packageName?.toString()) return false

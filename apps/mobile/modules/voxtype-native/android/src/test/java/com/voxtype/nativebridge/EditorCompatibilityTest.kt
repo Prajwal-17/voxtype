@@ -64,6 +64,26 @@ class EditorCompatibilityTest {
     } finally { node.recycle() }
   }
 
+  @Test fun focusedSetTextEditorsAreSupportedWithoutTheEditableFlag() {
+    val node = node()
+    try {
+      node.isEditable = false
+      assertFalse(FocusGuard.isEditableTextField(node, "voxtype", editor()))
+      node.addAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SET_TEXT)
+      assertTrue(FocusGuard.isEditableTextField(node, "voxtype", editor()))
+      node.isFocused = false
+      assertFalse(FocusGuard.isEditableTextField(node, "voxtype", editor()))
+      node.isFocused = true
+      node.isPassword = true
+      assertFalse(FocusGuard.isEditableTextField(node, "voxtype", editor()))
+      node.isPassword = false
+      assertFalse(FocusGuard.isEditableTextField(node, "voxtype", editor(InputType.TYPE_CLASS_NUMBER)))
+      assertFalse(FocusGuard.isEditableTextField(node, "voxtype", editor().apply { packageName = "other.app" }))
+      node.hintText = "UPI PIN"
+      assertFalse(FocusGuard.isEditableTextField(node, "voxtype", editor()))
+    } finally { node.recycle() }
+  }
+
   @Test fun richEditorPasteWorksWithoutAnImeConnectionOrSurroundingText() {
     val node = mock(AccessibilityNodeInfo::class.java)
     `when`(node.actionList).thenReturn(listOf(AccessibilityNodeInfo.AccessibilityAction.ACTION_PASTE))

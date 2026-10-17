@@ -164,6 +164,9 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   }
 
   override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+    // Rendering our overlay also emits content events; don't feed those back into rendering.
+    if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED &&
+      event.packageName?.toString() == packageName) return
     refreshBubble()
     // A transient empty window list must not leave the overlay hidden indefinitely.
     requestBubbleRefresh()
@@ -220,18 +223,30 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     super.onDestroy()
   }
 
-  private fun focus(): AccessibilityNodeInfo? {
+  private fun focus(editorPackage: String): AccessibilityNodeInfo? {
+    // The active accessibility window may be the IME rather than the editor's window.
+    findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.let { node ->
+      if (FocusedEditor.isCandidate(node) && node.packageName?.toString() == editorPackage) return node
+      node.recycle()
+    }
+    val focusedWindow = getWindows().firstOrNull {
+      it.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION && it.isFocused
+    }
+    focusedWindow?.root?.let { root ->
+      try { FocusedEditor.find(root, editorPackage)?.let { return it } } finally { root.recycle() }
+    }
     val root = rootInActiveWindow ?: return null
-    return try { root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) } finally { root.recycle() }
+    return try { FocusedEditor.find(root, editorPackage) } finally { root.recycle() }
   }
 
   private fun safeFocus(): AccessibilityNodeInfo? {
     focusFailure = "waiting_for_editor"
     if (!keyboardVisible()) { focusFailure = "keyboard_closed"; return null }
-    val node = try { focus() } catch (e: Exception) { VoxLog.w("focus unavailable", e); null } ?: return null
+    val info = inputMethod?.currentInputEditorInfo ?: return null
+    val editorPackage = info.packageName ?: return null
+    val node = try { focus(editorPackage) } catch (e: Exception) { VoxLog.w("focus unavailable", e); null } ?: return null
     var owned = true
     try {
-      val info = inputMethod?.currentInputEditorInfo ?: return null
       // Editor metadata can still belong to the previous app during a window transition.
       if (info.packageName == null || info.packageName != node.packageName?.toString()) return null
       val ok = FocusGuard.isEditableTextField(node, packageName, info)
@@ -284,7 +299,9 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   }
 
   private fun needsBubbleRetry(): Boolean = connected &&
-    (foregroundError != null || hiddenReason in listOf("waiting_for_editor", "overlay_error", "state_error"))
+    (foregroundError != null || hiddenReason in listOf(
+      "waiting_for_editor", "keyboard_closed", "unsupported_field", "overlay_error", "state_error",
+    ))
 
   private fun refreshBubbleOnce() {
     try {
