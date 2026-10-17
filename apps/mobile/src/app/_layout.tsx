@@ -8,9 +8,10 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useEffect } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
 import { AppStateProvider } from '../state/app-state';
-import { Action, Loader, Text } from '../components/primitives';
+import { Action, Text } from '../components/primitives';
 import { nativeTheme } from '@voxtype/shared';
 import { useFonts } from 'expo-font';
+import { StatusBar } from 'expo-status-bar';
 
 WebBrowser.maybeCompleteAuthSession();
 void SplashScreen.preventAutoHideAsync();
@@ -45,9 +46,10 @@ export default function Layout() {
   useEffect(() => {
     if (loaded || error) void SplashScreen.hideAsync();
   }, [loaded, error]);
-  if (!loaded && !error) return <Loader />;
+  if (!loaded && !error) return null;
   return (
     <SafeAreaProvider>
+      <StatusBar style="dark" />
       <ReducedMotionConfig mode={ReduceMotion.System} />
       <AppStateProvider>
         <Stack screenOptions={{ headerShown: false }}>
