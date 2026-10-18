@@ -231,12 +231,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       if (FocusedEditor.isCandidate(node) && node.packageName?.toString() == editorPackage) return node
       node.recycle()
     }
-    val focusedWindow = getWindows().firstOrNull {
-      it.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION && it.isFocused
-    }
-    focusedWindow?.root?.let { root ->
-      try { FocusedEditor.find(root, editorPackage)?.let { return it } } finally { root.recycle() }
-    }
+    FocusedEditor.find(getWindows(), editorPackage)?.let { return it }
     val root = rootInActiveWindow ?: return null
     return try { FocusedEditor.find(root, editorPackage) } finally { root.recycle() }
   }
@@ -244,7 +239,10 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   private fun safeFocus(): AccessibilityNodeInfo? {
     focusFailure = "waiting_for_editor"
     if (!keyboardVisible()) { focusFailure = "keyboard_closed"; return null }
-    val info = inputMethod?.currentInputEditorInfo ?: return null
+    val info = inputMethod?.currentInputEditorInfo ?: run {
+      focusFailure = "waiting_for_editor_info"
+      return null
+    }
     val editorPackage = info.packageName ?: return null
     val node = try { focus(editorPackage) } catch (e: Exception) { VoxLog.w("focus unavailable", e); null } ?: return null
     var owned = true
@@ -302,7 +300,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
 
   private fun needsBubbleRetry(): Boolean = connected &&
     (foregroundError != null || hiddenReason in listOf(
-      "waiting_for_editor", "keyboard_closed", "unsupported_field", "overlay_error", "state_error",
+      "waiting_for_editor", "waiting_for_editor_info", "keyboard_closed", "unsupported_field", "overlay_error", "state_error",
     ))
 
   private fun refreshBubbleOnce() {
@@ -956,7 +954,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       }, {
         main.post {
           android.widget.Toast.makeText(this, "Microphone is in use by another app", android.widget.Toast.LENGTH_SHORT).show()
-          failRecording("Microphone interrupted. Audio is kept in Local recordings.")
+          failRecording("Microphone interrupted. Audio is saved in Transcripts.")
         }
       }).also { it.start() }
       setStatus(DictationStatus.LISTENING)
@@ -1086,7 +1084,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
 
   private fun failRecording(message: String, network: Boolean = false) {
     LocalDiagnostics.record(this, LocalDiagnostics.Event.transcription_failed)
-    bubbleError = "$message Audio is kept in Transcripts → Local recordings."; connectionError = network
+    bubbleError = "$message Audio is saved in Transcripts."; connectionError = network
     resetRecording(DictationStatus.ERROR)
     BubbleHealth.record(this, if (network) "dictation_error:connection" else "dictation_error:recording")
     android.widget.Toast.makeText(this, message, android.widget.Toast.LENGTH_SHORT).show()
@@ -1209,7 +1207,15 @@ class VoxTypeAccessibilityService : AccessibilityService() {
     try {
       val pinned = target ?: return false
       if (!InsertionHelper.isSameField(current, pinned)) return false
-      return InsertionHelper.insert(this, current, inputMethod?.currentInputConnection, text)
+      return InsertionHelper.insert(this, current, text) {
+        // Restoring a rich editor's focus can restart its input connection. Resolve
+        // the current connection after that action and validate the pinned field again.
+        val focused = safeFocus() ?: return@insert false
+        try {
+          if (!InsertionHelper.isSameField(focused, pinned)) false
+          else inputMethod?.currentInputConnection?.let { InsertionHelper.commitAndVerify(it, text) } ?: false
+        } finally { focused.recycle() }
+      }
     } finally {
       // Do not recycle `target` itself here; it is released on next recording/sign-out.
       if (current !== target) {

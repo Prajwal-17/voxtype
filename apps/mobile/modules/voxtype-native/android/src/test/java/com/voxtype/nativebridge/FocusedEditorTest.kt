@@ -1,6 +1,7 @@
 package com.voxtype.nativebridge
 
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -68,5 +69,65 @@ class FocusedEditorTest {
     assertNotNull(result)
     assertEquals("chat.example", result!!.packageName.toString())
     result.recycle()
+  }
+
+  @Test fun findsComposerBesideALongConversationBeforeExhaustingTheBudget() {
+    val root = mock(AccessibilityNodeInfo::class.java)
+    val conversation = mock(AccessibilityNodeInfo::class.java)
+    `when`(root.childCount).thenReturn(2)
+    `when`(root.getChild(0)).thenReturn(conversation)
+    `when`(root.getChild(1)).thenReturn(editor())
+    `when`(conversation.childCount).thenReturn(1000)
+    `when`(conversation.getChild(anyInt())).thenAnswer { AccessibilityNodeInfo.obtain() }
+    val result = FocusedEditor.find(root, "chat.example")
+    assertNotNull("Conversation messages must not starve the composer", result)
+    assertEquals("chat.example", result!!.packageName.toString())
+    result.recycle()
+  }
+
+  @Test fun searchesTheReportedFocusedContainerBeforeUnrelatedWindowContent() {
+    val root = mock(AccessibilityNodeInfo::class.java)
+    val container = mock(AccessibilityNodeInfo::class.java)
+    `when`(root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)).thenReturn(container)
+    `when`(container.childCount).thenReturn(1)
+    `when`(container.getChild(0)).thenReturn(editor())
+    val result = FocusedEditor.find(root, "chat.example")
+    assertNotNull(result)
+    result!!.recycle()
+    verify(root, never()).getChild(anyInt())
+  }
+
+  private fun window(pkg: String, focused: Boolean = false, active: Boolean = false): AccessibilityWindowInfo {
+    val root = mock(AccessibilityNodeInfo::class.java)
+    `when`(root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)).thenReturn(editor().apply { packageName = pkg })
+    return mock(AccessibilityWindowInfo::class.java).also {
+      `when`(it.type).thenReturn(AccessibilityWindowInfo.TYPE_APPLICATION)
+      `when`(it.isFocused).thenReturn(focused)
+      `when`(it.isActive).thenReturn(active)
+      `when`(it.root).thenReturn(root)
+    }
+  }
+
+  @Test fun findsTheAppEditorWhenTheKeyboardOwnsWindowFocus() {
+    val keyboard = mock(AccessibilityWindowInfo::class.java)
+    `when`(keyboard.type).thenReturn(AccessibilityWindowInfo.TYPE_INPUT_METHOD)
+    `when`(keyboard.isFocused).thenReturn(true)
+    val result = FocusedEditor.find(listOf(keyboard, window("chat.example")), "chat.example")
+    assertNotNull(result)
+    assertEquals("chat.example", result!!.packageName.toString())
+    result.recycle()
+    verify(keyboard, never()).getRoot()
+  }
+
+  @Test fun doesNotUseStaleEditorMetadataToSearchABackgroundApp() {
+    val background = window("chat.example")
+    assertNull(FocusedEditor.find(listOf(window("other.app", focused = true), background), "chat.example"))
+    verify(background, never()).getRoot()
+  }
+
+  @Test fun anActiveDialogPreventsFallingBackToABackgroundEditor() {
+    val background = window("chat.example")
+    assertNull(FocusedEditor.find(listOf(window("other.app", active = true), background), "chat.example"))
+    verify(background, never()).getRoot()
   }
 }

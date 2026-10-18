@@ -11,7 +11,8 @@ import android.view.inputmethod.EditorInfo
  */
 object FocusGuard {
   internal fun isTextEditor(node: AccessibilityNodeInfo): Boolean = node.isEditable ||
-    node.actionList.any { it.id == AccessibilityNodeInfo.ACTION_SET_TEXT }
+    node.actionList.any { it.id == AccessibilityNodeInfo.ACTION_SET_TEXT ||
+      it.id == AccessibilityNodeInfo.ACTION_PASTE }
   private val PIN_HINT = Regex("\\b(?:pin|mpin)\\b")
   private val BLOCKED_HINTS = listOf(
     "password", "passcode", "pin code", "security code", "verification code",
@@ -41,7 +42,7 @@ object FocusGuard {
     if ((editorInputType and InputType.TYPE_MASK_VARIATION) in BLOCKED_VARIATIONS) return false
     // NO_PERSONALIZED_LEARNING controls keyboard learning, not explicit dictation.
     // Chat/private editors can set it on ordinary prose fields too.
-    val hint = listOfNotNull(node.hintText?.toString(), node.contentDescription?.toString())
+    val hint = listOfNotNull(node.hintText?.toString(), node.contentDescription?.toString(), editor.hintText?.toString())
       .joinToString(" ").lowercase()
     return !PIN_HINT.containsMatchIn(hint) && BLOCKED_HINTS.none { hint.contains(it) }
   }

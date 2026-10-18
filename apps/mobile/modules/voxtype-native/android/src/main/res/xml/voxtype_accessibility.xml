@@ -2,6 +2,6 @@
   android:description="@string/voxtype_accessibility_description"
   android:accessibilityEventTypes="typeViewFocused|typeWindowsChanged|typeWindowStateChanged|typeWindowContentChanged|typeViewTextSelectionChanged"
   android:accessibilityFeedbackType="feedbackGeneric"
-  android:accessibilityFlags="flagInputMethodEditor|flagRetrieveInteractiveWindows"
+  android:accessibilityFlags="flagInputMethodEditor|flagRetrieveInteractiveWindows|flagIncludeNotImportantViews"
   android:canRetrieveWindowContent="true"
   android:notificationTimeout="100" />

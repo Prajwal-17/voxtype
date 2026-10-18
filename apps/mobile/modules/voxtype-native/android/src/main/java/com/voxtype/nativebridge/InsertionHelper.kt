@@ -60,6 +60,12 @@ object InsertionHelper {
       // TextView/WebView can omit ACTION_PASTE while the clipboard is empty.
       // Try after populating it instead of trusting the earlier action list.
       if (node.performAction(AccessibilityNodeInfo.ACTION_PASTE)) return true
+      // Rich editors can retain Android focus while their internal text cursor
+      // is inactive after touching the overlay. Restore this already-validated
+      // field before retrying an explicitly rejected paste. No click, selection
+      // change, or whole-field replacement is used.
+      if (node.performAction(AccessibilityNodeInfo.ACTION_FOCUS) &&
+        node.performAction(AccessibilityNodeInfo.ACTION_PASTE)) return true
     } catch (error: Exception) {
       // The outcome after dispatch is unknown. Retrying could duplicate text.
       VoxLog.w("paste action failed", error)

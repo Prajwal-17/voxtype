@@ -119,7 +119,7 @@ class BubbleLifecycleTest {
     try {
       set(service, "connected", true)
       val retry = service.javaClass.getDeclaredMethod("needsBubbleRetry").apply { isAccessible = true }
-      for (reason in listOf("keyboard_closed", "unsupported_field", "waiting_for_editor")) {
+      for (reason in listOf("keyboard_closed", "unsupported_field", "waiting_for_editor", "waiting_for_editor_info")) {
         set(service, "hiddenReason", reason)
         assertEquals(reason, true, retry.invoke(service))
       }

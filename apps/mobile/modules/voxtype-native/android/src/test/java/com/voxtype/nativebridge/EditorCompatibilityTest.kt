@@ -114,6 +114,64 @@ class EditorCompatibilityTest {
     })
   }
 
+  @Test fun aRichEditorCanRestoreItsCursorBeforeRetryingARejectedPaste() {
+    val node = mock(AccessibilityNodeInfo::class.java)
+    `when`(node.actionList).thenReturn(listOf(
+      AccessibilityNodeInfo.AccessibilityAction.ACTION_PASTE,
+    ))
+    `when`(node.performAction(AccessibilityNodeInfo.ACTION_PASTE)).thenReturn(false, true)
+    `when`(node.performAction(AccessibilityNodeInfo.ACTION_FOCUS)).thenReturn(true)
+    assertTrue(InsertionHelper.insert(context, node, "hello") {
+      fail("A successful paste after restoring the cursor must not commit again")
+      false
+    })
+    val order = inOrder(node)
+    order.verify(node).performAction(AccessibilityNodeInfo.ACTION_PASTE)
+    order.verify(node).performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+    order.verify(node).performAction(AccessibilityNodeInfo.ACTION_PASTE)
+  }
+
+  @Test fun imeFallbackRunsAfterTheRichEditorHasRestoredInputFocus() {
+    val node = mock(AccessibilityNodeInfo::class.java)
+    var restored = false
+    var commits = 0
+    `when`(node.performAction(AccessibilityNodeInfo.ACTION_PASTE)).thenReturn(false)
+    `when`(node.performAction(AccessibilityNodeInfo.ACTION_FOCUS)).thenAnswer { restored = true; true }
+    assertTrue(InsertionHelper.insert(context, node, "hello") {
+      assertTrue("Resolve the input connection after restoring focus", restored)
+      commits++
+      true
+    })
+    assertEquals(1, commits)
+  }
+
+  @Test fun pasteOnlyVirtualEditorsStillRequireSafeMatchingTextMetadata() {
+    val node = node().apply {
+      isEditable = false
+      addAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_PASTE)
+    }
+    try {
+      assertTrue(FocusGuard.isEditableTextField(node, "voxtype", editor()))
+      assertFalse(FocusGuard.isEditableTextField(node, "voxtype", editor(InputType.TYPE_CLASS_NUMBER)))
+      assertFalse(FocusGuard.isEditableTextField(node, "voxtype", editor().apply { hintText = "Verification code" }))
+      assertFalse(FocusGuard.isEditableTextField(node, "voxtype", editor().apply { packageName = "other.app" }))
+      node.isPassword = true
+      assertFalse(FocusGuard.isEditableTextField(node, "voxtype", editor()))
+      node.isPassword = false
+      node.isFocused = false
+      assertFalse(FocusGuard.isEditableTextField(node, "voxtype", editor()))
+    } finally { node.recycle() }
+  }
+
+  @Test fun anAcceptedPasteDoesNotRefocusOrPasteTwice() {
+    val node = mock(AccessibilityNodeInfo::class.java)
+    `when`(node.actionList).thenReturn(listOf(AccessibilityNodeInfo.AccessibilityAction.ACTION_FOCUS))
+    `when`(node.performAction(AccessibilityNodeInfo.ACTION_PASTE)).thenReturn(true)
+    assertTrue(InsertionHelper.insert(context, node, "hello") { fail("No duplicate commit"); false })
+    verify(node, times(1)).performAction(AccessibilityNodeInfo.ACTION_PASTE)
+    verify(node, never()).performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+  }
+
   @Test fun rejectedPasteFallsBackToImeCommitAtTheCursor() {
     val node = mock(AccessibilityNodeInfo::class.java)
     `when`(node.actionList).thenReturn(listOf(AccessibilityNodeInfo.AccessibilityAction.ACTION_PASTE))
