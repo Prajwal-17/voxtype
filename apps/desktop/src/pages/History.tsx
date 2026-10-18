@@ -1,13 +1,13 @@
-import { useState, useDeferredValue, useRef } from 'react';
+import { useState, useDeferredValue, useEffect, useId, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
-  ArrowLeftIcon,
   ArrowsClockwiseIcon,
   CopyIcon,
   DotsThreeIcon,
   DownloadSimpleIcon,
   FileTextIcon,
+  PlayIcon,
   MicrophoneIcon,
   MagnifyingGlassIcon,
   TrashSimpleIcon,
@@ -36,6 +36,198 @@ import { api, native, useAuthUser, useHistory, useCopy, useSession } from '../li
 import { duration, errorMessage, isActive } from '../lib/types';
 import { libraryItems, type LibraryItem } from '../lib/transcript-library';
 
+function TranscriptRow({
+  item,
+  initialFocus,
+  userId,
+  audioOpen,
+  onToggleAudio,
+  playbackDisabled,
+  pending,
+  onConfirm,
+}: {
+  item: LibraryItem;
+  initialFocus: boolean;
+  userId?: string;
+  audioOpen: boolean;
+  onToggleAudio: () => void;
+  playbackDisabled: boolean;
+  pending: boolean;
+  onConfirm: (kind: 'delete' | 'regenerate', item: LibraryItem, target: HTMLElement | null) => void;
+}) {
+  const id = useId();
+  const row = useRef<HTMLElement>(null);
+  const [expanded, setExpanded] = useState(initialFocus);
+  const [originalOpen, setOriginalOpen] = useState(false);
+  const copy = useCopy();
+  const original = item.recording?.originalText;
+  const hasAudio = !!item.recording?.audioFile;
+  const longText = item.text.length > 360;
+  useEffect(() => {
+    if (initialFocus) {
+      row.current?.focus({ preventScroll: true });
+      row.current?.scrollIntoView({ block: 'nearest' });
+    }
+  }, [initialFocus]);
+  return (
+    <article ref={row} className="transcript-entry" tabIndex={-1} aria-labelledby={`${id}-date`}>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pr-10 text-caption text-muted">
+        <h2 id={`${id}-date`} className="font-medium">
+          <time dateTime={new Date(item.createdAt).toISOString()}>
+            {new Date(item.createdAt).toLocaleString(undefined, {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+            })}
+          </time>
+        </h2>
+        <span>{duration(item.durationMs)}</span>
+        <span>{item.words} words</span>
+        {!item.transcript && <span className="text-accent">Original</span>}
+      </div>
+      <p id={`${id}-text`} className="transcript-entry-text">
+        {item.text
+          ? longText && !expanded
+            ? `${item.text.slice(0, 360).trimEnd()}…`
+            : item.text
+          : 'No transcript yet. Listen to the recording or regenerate its text.'}
+      </p>
+      {longText && (
+        <Button
+          variant="link"
+          size="sm"
+          className="mt-1 px-0"
+          aria-expanded={expanded}
+          aria-controls={`${id}-text`}
+          onClick={() => setExpanded(!expanded)}
+        >
+          {expanded ? 'Show less' : 'Show more'}
+        </Button>
+      )}
+      <div className="transcript-actions">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={!item.text || copy.isPending}
+          onClick={() => copy.mutate(item.text)}
+        >
+          <CopyIcon size={16} aria-hidden="true" />
+          Copy
+        </Button>
+        {original && (
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-expanded={originalOpen}
+            aria-controls={`${id}-original`}
+            onClick={() => setOriginalOpen(!originalOpen)}
+          >
+            <FileTextIcon size={16} aria-hidden="true" />
+            {originalOpen ? 'Hide original' : 'View original'}
+          </Button>
+        )}
+        {hasAudio && (
+          <>
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-expanded={audioOpen}
+              aria-controls={`${id}-audio`}
+              onClick={onToggleAudio}
+            >
+              <PlayIcon size={16} aria-hidden="true" />
+              {audioOpen ? 'Hide audio' : 'Listen'}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={!native || playbackDisabled}
+              onClick={() => onConfirm('regenerate', item, row.current)}
+            >
+              <ArrowsClockwiseIcon size={16} aria-hidden="true" />
+              Regenerate
+            </Button>
+          </>
+        )}
+        {(hasAudio || item.transcript) && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="transcript-more"
+                aria-label="More transcript actions"
+              >
+                <DotsThreeIcon size={20} aria-hidden="true" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {hasAudio && (
+                <DropdownMenuItem
+                  disabled={!native}
+                  onSelect={() =>
+                    void api.exportRecording(item.id).catch((e) => toast.error(errorMessage(e)))
+                  }
+                >
+                  <DownloadSimpleIcon />
+                  Export audio
+                </DropdownMenuItem>
+              )}
+              {hasAudio && item.transcript && <DropdownMenuSeparator />}
+              {item.transcript && (
+                <DropdownMenuItem
+                  className="text-danger focus:text-danger"
+                  disabled={!native || pending}
+                  onSelect={() => onConfirm('delete', item, row.current)}
+                >
+                  <TrashSimpleIcon />
+                  Delete transcript
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
+      {audioOpen && hasAudio && userId && (
+        <div id={`${id}-audio`} className="mt-3">
+          <RecordingPlayer
+            key={`${userId}:${item.id}`}
+            id={item.id}
+            userId={userId}
+            disabled={playbackDisabled}
+            durationMs={item.durationMs}
+          />
+        </div>
+      )}
+      {originalOpen && original && (
+        <section
+          id={`${id}-original`}
+          className="transcript-original"
+          aria-labelledby={`${id}-original-heading`}
+        >
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <h3 id={`${id}-original-heading`} className="text-ui font-semibold">
+              Original text
+            </h3>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={copy.isPending}
+              onClick={() => copy.mutate(original)}
+            >
+              <CopyIcon size={16} aria-hidden="true" />
+              Copy original
+            </Button>
+          </div>
+          <p className="transcript-entry-text">{original}</p>
+        </section>
+      )}
+    </article>
+  );
+}
+
 export function HistoryPage({
   onRecord,
   initialId,
@@ -44,15 +236,14 @@ export function HistoryPage({
   initialId?: string | null;
 }) {
   const [search, setSearch] = useState('');
-  const [selectedId, setSelectedId] = useState<string | null>(initialId ?? null);
+  const [audioId, setAudioId] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<{
     kind: 'delete' | 'regenerate';
     item: LibraryItem;
   } | null>(null);
   const query = useDeferredValue(search);
   const auth = useAuthUser(),
-    history = useHistory(query),
-    copy = useCopy();
+    history = useHistory(query);
   const client = useQueryClient();
   const { data: session } = useSession();
   const active = isActive(session.phase);
@@ -61,9 +252,8 @@ export function HistoryPage({
     queryFn: api.localRecordings,
     enabled: !!auth.data,
   });
-  const readerHeading = useRef<HTMLHeadingElement>(null);
+  const confirmationTarget = useRef<HTMLElement | null>(null);
   const searchInput = useRef<HTMLInputElement>(null);
-  const selectedButton = useRef<HTMLButtonElement | null>(null);
   const mutation = useMutation({
     meta: { suppressErrorToast: true },
     mutationFn: async (action: NonNullable<typeof confirmation>) => {
@@ -71,8 +261,7 @@ export function HistoryPage({
       else await api.regenerateTranscript(action.item.id, auth.data!.id);
     },
     onSuccess: (_, action) => {
-      if (action.kind === 'delete') setSelectedId(null);
-      else toast.success('Transcript regenerated');
+      if (action.kind === 'regenerate') toast.success('Transcript regenerated');
       setConfirmation(null);
       void client.invalidateQueries({ queryKey: ['history'] });
       void client.invalidateQueries({ queryKey: ['local-recordings'] });
@@ -83,7 +272,6 @@ export function HistoryPage({
     recordings.data ?? [],
     query,
   );
-  const selected = items.find((item) => item.id === selectedId);
   const searching = search !== query || history.isPlaceholderData;
   const loading = history.isPending || recordings.isPending;
   const failed = history.isError || recordings.isError;
@@ -91,12 +279,12 @@ export function HistoryPage({
     void history.refetch();
     void recordings.refetch();
   };
-  const select = (item: LibraryItem, button: HTMLButtonElement) => {
-    selectedButton.current = button;
-    setSelectedId(item.id);
-    requestAnimationFrame(() => readerHeading.current?.focus({ preventScroll: true }));
-  };
-  const showConfirmation = (kind: 'delete' | 'regenerate', item: LibraryItem) => {
+  const showConfirmation = (
+    kind: 'delete' | 'regenerate',
+    item: LibraryItem,
+    target: HTMLElement | null,
+  ) => {
+    confirmationTarget.current = target;
     mutation.reset();
     setConfirmation({ kind, item });
   };
@@ -126,7 +314,7 @@ export function HistoryPage({
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
-              setSelectedId(null);
+              setAudioId(null);
             }}
             className="pl-9"
           />
@@ -135,7 +323,7 @@ export function HistoryPage({
       <span className="sr-only" role="status">
         {searching ? 'Searching…' : ''}
       </span>
-      <div className="transcript-workspace" data-selected={!!selected} data-empty={!items.length}>
+      <div className="transcript-library">
         <section
           className="transcript-list"
           aria-label="Transcript list"
@@ -181,33 +369,16 @@ export function HistoryPage({
               <ul>
                 {items.map((item) => (
                   <li key={item.id}>
-                    <button
-                      className="transcript-row"
-                      aria-pressed={selectedId === item.id}
-                      onClick={(e) => select(item, e.currentTarget)}
-                    >
-                      <span className="line-clamp-2 text-ui font-medium text-ink [overflow-wrap:anywhere]">
-                        {item.text || 'Recording without a transcript'}
-                      </span>
-                      <span className="mt-2 flex items-center gap-2 text-caption text-muted">
-                        <time dateTime={new Date(item.createdAt).toISOString()}>
-                          {new Date(item.createdAt).toLocaleDateString(undefined, {
-                            month: 'short',
-                            day: 'numeric',
-                          })}
-                        </time>
-                        <span>·</span>
-                        <span>{duration(item.durationMs)}</span>
-                        {!item.transcript && <span>Original</span>}
-                        <span className="ml-auto">
-                          {item.recording?.audioFile ? (
-                            <MicrophoneIcon size={14} aria-label="Audio available" />
-                          ) : (
-                            `${item.words} words`
-                          )}
-                        </span>
-                      </span>
-                    </button>
+                    <TranscriptRow
+                      item={item}
+                      initialFocus={initialId === item.id}
+                      userId={auth.data?.id}
+                      audioOpen={audioId === item.id}
+                      onToggleAudio={() => setAudioId(audioId === item.id ? null : item.id)}
+                      playbackDisabled={active || mutation.isPending}
+                      pending={mutation.isPending}
+                      onConfirm={showConfirmation}
+                    />
                   </li>
                 ))}
               </ul>
@@ -226,136 +397,6 @@ export function HistoryPage({
             </>
           )}
         </section>
-        <section className="transcript-reader" aria-label="Transcript reader">
-          {selected ? (
-            <>
-              <div className="reader-toolbar">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="reader-back"
-                  onClick={() => {
-                    setSelectedId(null);
-                    requestAnimationFrame(() =>
-                      (selectedButton.current?.isConnected
-                        ? selectedButton.current
-                        : searchInput.current
-                      )?.focus(),
-                    );
-                  }}
-                >
-                  <ArrowLeftIcon size={16} />
-                  Back
-                </Button>
-                <div className="min-w-0 flex-1">
-                  <h2
-                    ref={readerHeading}
-                    tabIndex={-1}
-                    className="text-ui font-semibold outline-none"
-                  >
-                    {new Date(selected.createdAt).toLocaleDateString(undefined, {
-                      month: 'long',
-                      day: 'numeric',
-                      year: 'numeric',
-                    })}
-                  </h2>
-                  <p className="mt-1 text-caption text-muted">
-                    {new Date(selected.createdAt).toLocaleTimeString(undefined, {
-                      hour: 'numeric',
-                      minute: '2-digit',
-                    })}{' '}
-                    · {selected.words} words · {duration(selected.durationMs)}
-                  </p>
-                </div>
-                <Button
-                  variant="ghost"
-                  disabled={!selected.text || copy.isPending}
-                  onClick={() => copy.mutate(selected.text)}
-                >
-                  <CopyIcon size={16} />
-                  Copy
-                </Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" aria-label="More transcript actions">
-                      <DotsThreeIcon size={20} />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    {selected.recording?.originalText && (
-                      <DropdownMenuItem
-                        disabled={copy.isPending}
-                        onSelect={() => copy.mutate(selected.recording!.originalText)}
-                      >
-                        <CopyIcon />
-                        Copy original text
-                      </DropdownMenuItem>
-                    )}
-                    {selected.recording?.audioFile && (
-                      <DropdownMenuItem
-                        disabled={!native}
-                        onSelect={() =>
-                          void api
-                            .exportRecording(selected.id)
-                            .catch((e) => toast.error(errorMessage(e)))
-                        }
-                      >
-                        <DownloadSimpleIcon />
-                        Export audio
-                      </DropdownMenuItem>
-                    )}
-                    {selected.recording && selected.transcript && <DropdownMenuSeparator />}
-                    {selected.transcript && (
-                      <DropdownMenuItem
-                        className="text-danger focus:text-danger"
-                        disabled={!native || !selected.transcript || mutation.isPending}
-                        onSelect={() => showConfirmation('delete', selected)}
-                      >
-                        <TrashSimpleIcon />
-                        Delete transcript
-                      </DropdownMenuItem>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-              {selected.recording?.audioFile && auth.data && (
-                <div className="px-5 pt-4">
-                  <RecordingPlayer
-                    key={`${auth.data.id}:${selected.id}`}
-                    id={selected.id}
-                    userId={auth.data.id}
-                    disabled={active || mutation.isPending}
-                    durationMs={selected.durationMs}
-                  />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="mt-1"
-                    disabled={!native || active || mutation.isPending}
-                    onClick={() => showConfirmation('regenerate', selected)}
-                  >
-                    <ArrowsClockwiseIcon size={16} />
-                    Regenerate
-                  </Button>
-                </div>
-              )}
-              <div className="reader-content">
-                <p className="select-text whitespace-pre-wrap text-transcript [overflow-wrap:anywhere]">
-                  {selected.text ||
-                    'No text was received. Play the recording or regenerate its transcript above.'}
-                </p>
-              </div>
-            </>
-          ) : (
-            <div className="library-empty">
-              <FileTextIcon size={28} className="text-muted" aria-hidden="true" />
-              <h2 className="text-title font-medium">Select a transcript</h2>
-              <p className="max-w-[25ch] text-ui text-muted">
-                Choose a transcript to read, copy, or listen to its recording.
-              </p>
-            </div>
-          )}
-        </section>
       </div>
       <AlertDialog
         open={!!confirmation}
@@ -366,7 +407,7 @@ export function HistoryPage({
         <AlertDialogContent
           onCloseAutoFocus={(e) => {
             e.preventDefault();
-            if (readerHeading.current) readerHeading.current.focus();
+            if (confirmationTarget.current?.isConnected) confirmationTarget.current.focus();
             else searchInput.current?.focus();
           }}
         >

@@ -4,13 +4,13 @@ VoxType uses the same compact, quiet green direction as its mobile app. Keep Mon
 
 ## Workspace
 
-The 196px sidebar has 40px navigation rows and a compact shortcut entry. At browser widths of 650px or less it becomes a 64px icon rail; every navigation control retains an accessible name. The native title bar is 32px high (44px for coarse pointers) with drag, minimize, maximize/restore, and close behavior. Closing the window preserves the tray and global shortcut listener.
+The 196px sidebar has 40px navigation rows and a compact shortcut entry. At browser widths of 650px or less it becomes a 64px icon rail; every navigation control retains an accessible name. The native title bar uses the dark green overlay palette with white controls, distinct hover and pressed backgrounds, and a red close action. It is 32px high (44px for coarse pointers) with drag, minimize, maximize/restore, and close behavior. Closing the window preserves the tray and global shortcut listener.
 
 Page content is at most 1120px wide. Standard controls have a minimum height of 36px; icon buttons and compact actions are 32px. Buttons and tabs expand to at least 44px targets for coarse pointers, except for the compact activity calendar cells. Switches keep their compact visual size with an extended hit area. Keyboard focus, caret, selection, scrollbars, and numeric alignment use the existing theme.
 
 ## Recording
 
-Home gives one clear recording action, followed by a small activity overview and recent transcripts. The recorder puts its state, elapsed time, finish, and cancel controls together. Finished text remains selectable and copyable in a bounded scrolling region. Recent transcript rows open the reader directly.
+Home gives one clear recording action, followed by a small activity overview and recent transcripts. The recorder puts its state, elapsed time, finish, and cancel controls together. Finished text remains selectable and copyable in a bounded scrolling region. Recent transcript rows focus and expand the matching library entry.
 
 App-owned recording remains mounted across navigation. Secondary pages show a compact Finish/Cancel bar. External shortcut sessions remain in the native overlay and never become Home's recorder session. The 288px overlay canvas and its 52px capsule retain existing recording, focus, tray, monitor placement, and recovery behavior.
 
@@ -18,9 +18,9 @@ App-owned recording remains mounted across navigation. Secondary pages show a co
 
 Transcripts is one list, without separate transcript/recording tabs. It combines saved transcripts and the latest ten local takes by ID, deduplicates rows and sorts newest first. Unfinished takes without a saved transcript remain recoverable and carry an Original label. Search matches cleaned text and retained originals. A take's original text and audio join only its matching transcript; audio never crosses between records.
 
-At wide content widths the library shows a compact list beside a reader. At 740px of available content or less it shows either the list or the selected reader with Back. There are no per-row expand/collapse controls. List rows show a two-line excerpt, date, duration, and audio availability. The reader keeps metadata, Copy, and one action menu together. Copy original appears when original text is retained, Export audio when audio exists, and Delete when a saved transcript exists. Older text-only takes omit unavailable recording commands. Regenerate is visible beside the player rather than inside the menu. Regeneration and deleting a synced transcript require confirmation. Failures preserve the saved content and expose retry.
+The library is a single full-width list at every window size, using the page scroll. Each entry shows date/time, duration, word count, selectable text, and inline Copy, View original, Listen, and Regenerate actions when available. Long text expands in place with Show more/Show less. Original text opens beneath its entry with a separate Copy original action. Export audio and Delete remain in the entry's action menu. Older text-only takes omit unavailable recording commands. Regeneration and deleting a synced transcript require confirmation. Failures preserve the saved content and expose retry.
 
-A single compact player and Regenerate action mount only for the selected take with local audio. The player provides play/pause, seeking, elapsed/total time, and retry. Switching records or leaving the library releases the audio URL and pauses playback. Recording and regeneration pause and disable playback.
+Listen opens the existing compact player beneath its entry. Only one player mounts at a time, with play/pause, seeking, elapsed/total time, and retry. Opening another entry's audio, hiding audio, searching, or leaving the library releases the audio URL and pauses playback. Recording and regeneration pause and disable playback.
 
 History is read from the current account's local store in cursor pages of 12. Search runs before pagination. Background refresh preserves visible content. Search can keep the previous query's data only within the same account. A future SQLite migration can reduce the existing JSON store's internal document-read cost without changing the UI contract.
 

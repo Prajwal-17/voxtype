@@ -38,10 +38,10 @@ export function TitleBar() {
   const run = (action: () => Promise<void>) =>
     void action().catch(() => toast.error('Couldn’t change the window. Try again.'));
   const control =
-    'flex h-8 w-10 items-center justify-center text-muted transition-colors hover:bg-subtle hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-accent';
+    'title-bar-control flex h-8 w-10 items-center justify-center transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-overlay-wave';
   return (
     <header
-      className="flex h-8 shrink-0 select-none items-center border-b border-line bg-surface text-muted"
+      className="flex h-8 shrink-0 select-none items-center bg-overlay text-overlay-text"
       aria-label="Window title bar"
     >
       <div
@@ -74,7 +74,7 @@ export function TitleBar() {
       </button>
       <button
         type="button"
-        className={`${control} hover:bg-danger hover:text-white`}
+        className={`${control} title-bar-close`}
         aria-label="Close window"
         onClick={() => run(() => window.close())}
       >
