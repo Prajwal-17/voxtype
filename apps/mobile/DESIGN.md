@@ -132,7 +132,7 @@ The application inherits its palette from `packages/shared/theme.ts`; mobile com
 
 - Forest green accents on light neutral surfaces.
 - Compact typography with generous touch targets.
-- Flat groups, restrained dividers and contextual action sheets.
+- Flat groups, restrained dividers and inline transcript tools.
 - Selectable transcript reading with a persistent playback strip when local audio is available.
 
 ## Colors
@@ -221,15 +221,16 @@ Transcripts has one list without transcript/recording filters. Analytics segment
 
 ### Contextual sheets
 
-The explicit Actions text trigger on transcript rows and the reader opens a bottom sheet. Copy text, Copy original, Export audio and Delete transcript are contextual command rows with minimum height (52dp), plain labels and pressed feedback, without navigation chevrons or toggle styling. Original/audio commands appear for retained local takes; Delete appears for saved transcripts. Regenerate remains beside the player. Confirmation sheets place Cancel and the confirming action side by side at equal widths and aligned heights, retaining the filled primary action.
+Transcript rows expose Copy text, Play recording, Regenerate transcript and Delete transcript as quiet Phosphor icons. Play and Regenerate appear only when local audio is available; Delete appears for saved transcripts. Metadata occupies its own line above the toolbar so it never competes with the controls at narrow widths. Every icon has a 48dp touch target, an accessible action label and at least 8dp spacing. There is no Actions trigger or command drawer.
 
+The reader keeps Copy text, Copy original, Export audio, Regenerate transcript and Delete transcript directly available in a wrapping icon toolbar; original/audio tools appear only when their data exists. Playback retains its own play/pause control. Only Delete and Regenerate use confirmation sheets, with Cancel and the confirming action at equal widths and aligned heights.
 Sheets include a title, an accessible close control, a dismissible backdrop and scrollable content. Their modal transition is instant. The reader modal also opens without animation, and the app configures system reduced-motion support.
 
 ### Transcript reader and playback
 
 The single Transcripts list joins account transcripts with retained local audio and originals by take ID, deduplicates rows and sorts newest first. Search matches cleaned text and retained originals. Unfinished local takes remain recoverable in the same list and carry an Original label. Rows show three-line previews and open a dedicated reader. There are no expand/collapse controls.
 
-Play appears on rows with local audio. The reader mounts its playback strip and visible Regenerate action only when that take has local audio; older text-only takes receive a brief availability explanation. The reader keeps playback outside the transcript text scroller and keys its player by recording identity. The text remains selectable.
+Play appears on rows with local audio. The reader mounts its playback strip and Regenerate icon only when that take has local audio; older text-only takes receive a brief availability explanation. The reader keeps playback outside the transcript text scroller and keys its player by recording identity. The text remains selectable.
 
 Playback exposes play/pause, restart, a progress bar, elapsed/total time, loading or buffering state, and failure copy with retry. It pauses when the app backgrounds or recording becomes active. Missing local audio gets a direct explanation. These are implemented behaviors, not a claim that device playback QA has passed.
 
@@ -245,7 +246,7 @@ The sidecar contains HTML/CSS translations for design-panel previews of native c
 - **Do** keep compact text paired with at least 48dp action targets and 52dp setting rows.
 - **Do** retain visible transcript content during background refresh.
 - **Do** keep playback outside the reader text scroller and expose its state and failures.
-- **Do** use contextual sheets for occasional actions and account for safe-area insets.
+- **Do** expose transcript tools inline, reserve sheets for confirmations and account for safe-area insets.
 
 ### Don't:
 

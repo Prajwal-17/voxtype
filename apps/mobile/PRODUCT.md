@@ -22,7 +22,7 @@ The user chose a compact, quiet interface retaining the green accent. Preserve V
 
 ## Product Principles
 
-Keep reading and recording immediate. Put occasional tools in contextual menus. Keep content visible during background refresh. Make playback state and failures understandable.
+Keep reading and recording immediate. Keep transcript tools directly accessible as quiet icons; reserve sheets for confirmations. Keep content visible during background refresh. Make playback state and failures understandable.
 
 ## Evidence on Hand
 
