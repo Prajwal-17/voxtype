@@ -15,11 +15,11 @@ import org.json.JSONArray
 class VoxTypeStore(
   private val context: Context,
   private val readSql: (String) -> String = { name -> context.assets.open(name).bufferedReader().use { it.readText() } },
-  private val onChanged: () -> Unit = { VoxTypeNativeModule.changed() },
+  private val onChanged: () -> Unit = { VoxTypeNativeModule.changed("history") },
 ) : SQLiteOpenHelper(context, DB_NAME, null, DB_VERSION), java.io.Closeable {
   companion object {
     private const val DB_NAME = "voxtype.db"
-    private const val DB_VERSION = 2
+    private const val DB_VERSION = 3
     private const val KEY_BUBBLE = "bubble_enabled"
     private const val KEY_CLEANUP = "cleanup_enabled"
     const val AUDIO_LIMIT = 10
@@ -31,6 +31,7 @@ class VoxTypeStore(
   }
   override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
     if (oldVersion < 2) executeAsset(db, "voxtype_upgrade_2.sql")
+    if (oldVersion < 3) executeAsset(db, "voxtype_upgrade_3.sql")
   }
 
   private fun asset(name: String) = readSql(name)
@@ -54,7 +55,8 @@ class VoxTypeStore(
   var cleanupEnabled: Boolean
     get() = setting(KEY_CLEANUP, "0") == "1"
     set(value) = putSetting(KEY_CLEANUP, if (value) "1" else "0")
-  var vocabulary: List<String>
+  val vocabulary: List<String> get() = DictionarySync.cached(context)
+  internal var legacyVocabulary: List<String>
     get() {
       val entries = JSONArray(setting("vocabulary", "[]"))
       return List(entries.length()) { entries.getString(it) }
@@ -66,17 +68,21 @@ class VoxTypeStore(
       }
       putSetting("vocabulary", JSONArray(terms).toString())
     }
-  fun save(userId: String, text: String, original: String, duration: Long, audio: File?, apiUrl: String?): String {
-    val id = UUID.randomUUID().toString()
-    val now = System.currentTimeMillis()
+  fun save(userId: String, text: String, original: String, duration: Long, audio: File?, apiUrl: String?, id: String = UUID.randomUUID().toString(), createdAt: Long = System.currentTimeMillis()): String {
+    val now = createdAt
     val words = if (text.isBlank()) 0 else text.trim().split(Regex("\\s+")).count { it.isNotBlank() }
-    writableDatabase.insertOrThrow("dictations", null, ContentValues().apply {
-      put("id", id); put("user_id", userId); put("text", text); put("original_text", original)
+    val db = writableDatabase
+    db.beginTransaction()
+    try { db.insertOrThrow("dictations", null, ContentValues().apply {
+      put("id", id); put("user_id", userId); put("text", text)
       put("created_at", now); put("updated_at", now); put("duration_ms", duration)
       put("word_count", words)
       put("delivery", "saved"); put("audio_file", audio?.absolutePath)
       put("upload_api_url", apiUrl)
     })
+    saveRecovery(id, userId, original, now, duration, audio)
+    db.setTransactionSuccessful()
+    } finally { db.endTransaction() }
     pruneAudio()
     onChanged()
     return id
@@ -85,6 +91,7 @@ class VoxTypeStore(
   /** Cloud IDs are idempotent. Never replace pending local edits or local audio paths. */
   fun restore(userId: String, apiUrl: String, rows: JSONArray) {
     val db = writableDatabase
+    var changed = false
     db.beginTransaction()
     try {
       for (i in 0 until rows.length()) {
@@ -92,16 +99,17 @@ class VoxTypeStore(
         val id = row.getString("id")
         require(id.isNotBlank() && id.length <= 200)
         val text = row.getString("text")
-        db.insertWithOnConflict("dictations", null, ContentValues().apply {
+        val inserted = db.insertWithOnConflict("dictations", null, ContentValues().apply {
           put("id", id); put("user_id", userId); put("text", text)
-          put("original_text", row.optString("originalText").takeUnless { it == "null" })
           put("created_at", row.getLong("createdAt")); put("updated_at", row.getLong("updatedAt"))
           put("duration_ms", row.getLong("durationMs")); put("word_count", row.getInt("words"))
           put("delivery", "saved"); put("upload_api_url", apiUrl); put("uploaded", 1)
         }, SQLiteDatabase.CONFLICT_IGNORE)
+        changed = changed || inserted != -1L
       }
       db.setTransactionSuccessful()
     } finally { db.endTransaction() }
+    if (changed) { onChanged(); VoxTypeNativeModule.changed("analytics") }
   }
 
   /** A complete successful cloud listing reconciles deletions; pending uploads are never removed. */
@@ -113,6 +121,7 @@ class VoxTypeStore(
       db.rawQuery("SELECT id,audio_file FROM dictations WHERE user_id = ? AND upload_api_url = ? AND uploaded = 1", arrayOf(userId, apiUrl)).use { cursor ->
         while (cursor.moveToNext()) if (cursor.getString(0) !in cloudIds) removed += cursor.getString(0) to cursor.getString(1)
       }
+      if (removed.isNotEmpty()) { onChanged(); VoxTypeNativeModule.changed("analytics") }
       removed.forEach { (id, _) -> db.delete("dictations", "id = ? AND user_id = ? AND uploaded = 1", arrayOf(id, userId)) }
       db.setTransactionSuccessful()
       // Recordings are pruned separately; never follow paths received from the cloud.
@@ -167,9 +176,72 @@ class VoxTypeStore(
       setDelivery(id, "copied")
       true
     } catch (e: Exception) {
+      LocalDiagnostics.record(context, LocalDiagnostics.Event.clipboard_failed)
       VoxLog.e("copyToClipboard failed for $id", e)
       false
     }
+  }
+
+  fun saveRecovery(id: String, userId: String, original: String, createdAt: Long, duration: Long, audio: File?) {
+    val db = writableDatabase
+    db.beginTransaction()
+    try {
+      db.insertWithOnConflict("local_recordings", null, ContentValues().apply {
+        put("id", id); put("user_id", userId); put("original_text", original)
+        put("created_at", createdAt); put("duration_ms", duration); put("audio_file", audio?.absolutePath)
+      }, SQLiteDatabase.CONFLICT_REPLACE)
+      db.execSQL("DELETE FROM local_recordings WHERE id NOT IN (SELECT id FROM local_recordings ORDER BY created_at DESC,id DESC LIMIT 10)")
+      db.setTransactionSuccessful()
+    } finally { db.endTransaction() }
+  }
+
+  fun discardRecovery(userId: String, id: String) {
+    writableDatabase.delete("local_recordings", "user_id = ? AND id = ?", arrayOf(userId, id))
+    onChanged()
+  }
+
+  /** One transaction replaces the existing ID, raw original and upload revision. Failed retries never call this. */
+  fun replaceTranscript(userId: String, id: String, raw: String, text: String, apiUrl: String) {
+    require(raw.isNotBlank() && text.isNotBlank() && raw.length <= 100_000 && text.length <= 100_000) { "No usable transcript received. The previous text is unchanged." }
+    val db = writableDatabase
+    db.beginTransaction()
+    try {
+      val take = db.rawQuery("SELECT created_at,duration_ms,audio_file FROM local_recordings WHERE user_id = ? AND id = ?", arrayOf(userId,id)).use {
+        check(it.moveToFirst()) { "Recording no longer available" }
+        Triple(it.getLong(0), it.getLong(1), it.getString(2))
+      }
+      db.rawQuery("SELECT user_id FROM dictations WHERE id = ?", arrayOf(id)).use {
+        check(!it.moveToFirst() || it.getString(0) == userId) { "Account changed" }
+      }
+      db.delete("dictations", "id = ? AND user_id = ?", arrayOf(id,userId))
+      db.insertOrThrow("dictations", null, ContentValues().apply {
+        put("id", id); put("user_id", userId); put("text", text)
+        put("created_at", take.first); put("updated_at", System.currentTimeMillis()); put("duration_ms", take.second)
+        put("word_count", text.trim().split(Regex("\\s+")).size); put("delivery", "saved")
+        put("audio_file", take.third); put("upload_api_url", apiUrl); put("uploaded", 0)
+      })
+      db.execSQL("UPDATE local_recordings SET original_text = ? WHERE id = ? AND user_id = ?", arrayOf(raw,id,userId))
+      db.setTransactionSuccessful()
+    } finally { db.endTransaction() }
+    onChanged()
+  }
+
+  fun localRecordings(userId: String): List<Map<String, Any?>> {
+    val rows = mutableListOf<Map<String, Any?>>()
+    readableDatabase.rawQuery("SELECT id,original_text,created_at,duration_ms,audio_file FROM local_recordings WHERE user_id = ? ORDER BY created_at DESC,id DESC LIMIT 10", arrayOf(userId)).use { cursor ->
+      while (cursor.moveToNext()) rows += mapOf("id" to cursor.getString(0), "originalText" to cursor.getString(1),
+        "createdAt" to cursor.getLong(2), "durationMs" to cursor.getLong(3),
+        "audioAvailable" to (cursor.getString(4)?.let { File(it).isFile } == true))
+    }
+    return rows
+  }
+
+  fun recoveryAudio(userId: String, id: String): File? = readableDatabase.rawQuery(
+    "SELECT audio_file FROM local_recordings WHERE id = ? AND user_id = ?", arrayOf(id, userId)
+  ).use { cursor ->
+    if (!cursor.moveToFirst()) return@use null
+    val file = cursor.getString(0)?.let { File(it) } ?: return@use null
+    if (file.canonicalFile.parentFile == File(context.filesDir, "recordings").canonicalFile && file.isFile) file else null
   }
 
   fun pruneAudio() {
@@ -185,6 +257,7 @@ class VoxTypeStore(
         if (file.canonicalFile.parentFile != directory) continue
         if (!file.exists() || file.delete()) {
           writableDatabase.execSQL("UPDATE dictations SET audio_file = NULL WHERE id = ?", arrayOf(id))
+          writableDatabase.execSQL("UPDATE local_recordings SET audio_file = NULL WHERE audio_file = ?", arrayOf(path))
         } else VoxLog.w("could not delete old recording")
       }
       // Include completed files left without a row after a crash or failed save.
@@ -196,6 +269,7 @@ class VoxTypeStore(
       for (file in completed.drop(AUDIO_LIMIT)) {
         if (file.delete()) {
           writableDatabase.execSQL("UPDATE dictations SET audio_file = NULL WHERE audio_file = ?", arrayOf(file.absolutePath))
+          writableDatabase.execSQL("UPDATE local_recordings SET audio_file = NULL WHERE audio_file = ?", arrayOf(file.absolutePath))
         } else VoxLog.w("could not delete old recording")
       }
     } catch (e: Exception) {
@@ -215,8 +289,7 @@ class VoxTypeStore(
       while (cursor.moveToNext()) {
         val text = cursor.getString(2)
         if (text.isBlank()) continue
-        val original = cursor.getString(3)?.takeIf { it.isNotBlank() }
-        val payload = JSONObject().put("text", text).put("originalText", original ?: JSONObject.NULL)
+        val payload = JSONObject().put("text", text)
           .put("createdAt", cursor.getLong(4)).put("durationMs", cursor.getLong(5))
           .put("source", "mobile")
         result += PendingDictation(cursor.getString(0), payload)

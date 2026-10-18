@@ -1,6 +1,5 @@
 import { useWindowDimensions } from 'react-native';
 import { Tabs } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WaveformIcon } from 'phosphor-react-native/src/icons/Waveform';
 import { FileTextIcon } from 'phosphor-react-native/src/icons/FileText';
@@ -16,7 +15,6 @@ export default function TabLayout() {
   if (!app.user || app.loading) return <SignInScreen />;
   return (
     <>
-      <StatusBar style="dark" />
       <Tabs
         screenOptions={{
           headerShown: false,
@@ -25,8 +23,8 @@ export default function TabLayout() {
           tabBarStyle: {
             backgroundColor: theme.colors.surface,
             borderTopColor: theme.colors.border,
-            height: 70 + insets.bottom + Math.max(0, (fontScale - 1) * 18),
-            paddingTop: 8,
+            height: 64 + insets.bottom + Math.max(0, (fontScale - 1) * 18),
+            paddingTop: 4,
             paddingBottom: Math.max(insets.bottom, 6),
           },
           tabBarLabelStyle: { fontFamily: 'MonaSansMedium', fontSize: 12, lineHeight: 18 },

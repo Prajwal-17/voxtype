@@ -18,7 +18,7 @@ export function PageHeader({
   }, []);
 
   return (
-    <div className="mb-6 flex items-end justify-between gap-5 max-md:flex-wrap max-md:items-start max-md:gap-3">
+    <div className="mb-5 flex items-center justify-between gap-5 max-md:flex-wrap max-md:items-start max-md:gap-3">
       <div>
         <h1
           ref={headingRef}
@@ -27,7 +27,7 @@ export function PageHeader({
         >
           {title}
         </h1>
-        {description && <p className="mt-1.5 text-body text-muted">{description}</p>}
+        {description && <p className="mt-1.5 text-ui text-muted">{description}</p>}
       </div>
       {actions}
     </div>
@@ -71,7 +71,7 @@ export function FieldRow({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-8 border-b border-line py-4 last:border-b-0 last:pb-0 max-md:flex-wrap max-md:gap-3">
+    <div className="flex items-center justify-between gap-8 py-3 max-md:flex-wrap max-md:gap-3">
       <div className="min-w-0">
         {typeof label === 'string' ? (
           <label htmlFor={htmlFor} className="text-ui font-medium text-ink">

@@ -38,17 +38,17 @@ export function TitleBar() {
   const run = (action: () => Promise<void>) =>
     void action().catch(() => toast.error('Couldn’t change the window. Try again.'));
   const control =
-    'flex h-11 w-12 items-center justify-center text-inverse/80 transition-colors hover:bg-white/10 hover:text-inverse focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-inverse';
+    'flex h-8 w-10 items-center justify-center text-muted transition-colors hover:bg-subtle hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-accent';
   return (
     <header
-      className="flex h-11 shrink-0 select-none items-center bg-accent text-inverse"
+      className="flex h-8 shrink-0 select-none items-center border-b border-line bg-surface text-muted"
       aria-label="Window title bar"
     >
       <div
         data-tauri-drag-region
         className="flex h-full flex-1 items-center gap-2.5 px-5 text-caption font-semibold tracking-wide"
       >
-        <img src="/voxtype.svg" alt="" className="pointer-events-none size-5" />
+        <img src="/voxtype.svg" alt="" className="pointer-events-none size-4" />
         <span className="pointer-events-none">{appName}</span>
       </div>
       <button
@@ -57,7 +57,7 @@ export function TitleBar() {
         aria-label="Minimize window"
         onClick={() => run(() => window.minimize())}
       >
-        <MinusIcon size={16} weight="bold" />
+        <MinusIcon size={14} weight="regular" />
       </button>
       <button
         type="button"
@@ -66,7 +66,11 @@ export function TitleBar() {
         title={maximized ? 'Restore window' : 'Maximize window'}
         onClick={() => run(() => window.toggleMaximize())}
       >
-        {maximized ? <CopyIcon size={16} weight="bold" /> : <SquareIcon size={15} weight="bold" />}
+        {maximized ? (
+          <CopyIcon size={14} weight="regular" />
+        ) : (
+          <SquareIcon size={14} weight="regular" />
+        )}
       </button>
       <button
         type="button"
@@ -74,7 +78,7 @@ export function TitleBar() {
         aria-label="Close window"
         onClick={() => run(() => window.close())}
       >
-        <XIcon size={16} weight="bold" />
+        <XIcon size={14} weight="regular" />
       </button>
     </header>
   );

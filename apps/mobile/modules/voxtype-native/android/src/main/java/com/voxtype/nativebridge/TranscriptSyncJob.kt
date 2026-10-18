@@ -13,7 +13,13 @@ class TranscriptSyncJob : JobService() {
   private var task: Job? = null
   override fun onStartJob(params: JobParameters): Boolean {
     task = CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
-      val retry = try { TranscriptUploads.sync(applicationContext); false }
+      val retry = try {
+        var failure: Exception? = null
+        try { DictionarySync.sync(applicationContext) } catch (e: Exception) { failure = e }
+        TranscriptUploads.sync(applicationContext)
+        failure?.let { throw it }
+        false
+      }
         catch (_: CancellationException) { return@launch }
         catch (error: Exception) { VoxLog.w("cloud sync will retry", error); true }
       withContext(Dispatchers.Main) { jobFinished(params, retry) }

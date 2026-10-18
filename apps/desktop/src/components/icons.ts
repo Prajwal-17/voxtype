@@ -34,3 +34,9 @@ export { SidebarSimpleIcon } from '@phosphor-icons/react/dist/csr/SidebarSimple'
 
 export { ChartBarIcon } from '@phosphor-icons/react/dist/csr/ChartBar';
 export { DownloadSimpleIcon } from '@phosphor-icons/react/dist/csr/DownloadSimple';
+
+export { ArrowLeftIcon } from '@phosphor-icons/react/dist/csr/ArrowLeft';
+export { DotsThreeIcon } from '@phosphor-icons/react/dist/csr/DotsThree';
+export { PlayIcon } from '@phosphor-icons/react/dist/csr/Play';
+export { PauseIcon } from '@phosphor-icons/react/dist/csr/Pause';
+export { ArrowCounterClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowCounterClockwise';

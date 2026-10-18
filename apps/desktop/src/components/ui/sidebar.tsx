@@ -10,7 +10,7 @@ export function SidebarProvider({ className, style, ...props }: React.ComponentP
   return (
     <div
       className={cn('flex h-full min-h-0 w-full bg-canvas text-ink', className)}
-      style={{ '--sidebar-width': '232px', ...style } as React.CSSProperties}
+      style={{ '--sidebar-width': '196px', ...style } as React.CSSProperties}
       {...props}
     />
   );
@@ -56,7 +56,7 @@ export function SidebarContent({ className, ...props }: React.ComponentProps<'di
   return (
     <div
       data-sidebar="content"
-      className={cn('flex min-h-0 flex-1 flex-col gap-2 px-4 py-2', className)}
+      className={cn('flex min-h-0 flex-1 flex-col gap-2 px-3 py-2', className)}
       {...props}
     />
   );
@@ -65,7 +65,7 @@ export function SidebarFooter({ className, ...props }: React.ComponentProps<'div
   return (
     <div
       data-sidebar="footer"
-      className={cn('flex shrink-0 flex-col gap-3 px-4 py-5', className)}
+      className={cn('flex shrink-0 flex-col gap-2 px-3 py-4', className)}
       {...props}
     />
   );
@@ -92,7 +92,7 @@ export function SidebarMenu({ className, ...props }: React.ComponentProps<'ul'>)
   return (
     <ul
       data-sidebar="menu"
-      className={cn('flex w-full min-w-0 flex-col gap-1.5', className)}
+      className={cn('flex w-full min-w-0 flex-col gap-1', className)}
       {...props}
     />
   );
@@ -116,7 +116,7 @@ export const SidebarMenuButton = React.forwardRef<
       data-active={isActive}
       aria-current={isActive ? 'page' : undefined}
       className={cn(
-        'flex min-h-12 w-full items-center gap-3 overflow-hidden rounded-control px-3.5 py-3 text-left text-ui font-medium text-muted transition-[background-color,color] duration-150 hover:bg-accent-soft hover:text-accent-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-50 data-[active=true]:bg-accent-soft data-[active=true]:text-accent-ink data-[active=true]:hover:bg-accent-soft data-[active=true]:hover:text-accent-ink [&>svg]:shrink-0 [&>span:last-child]:truncate motion-reduce:transition-none',
+        'flex min-h-10 w-full items-center gap-3 overflow-hidden rounded-control px-3 py-2 text-left text-ui font-medium text-muted transition-[background-color,color] duration-150 hover:bg-accent-soft hover:text-accent-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-50 data-[active=true]:bg-accent-soft data-[active=true]:text-accent-ink data-[active=true]:hover:bg-accent-soft data-[active=true]:hover:text-accent-ink [&>svg]:shrink-0 [&>span:last-child]:truncate motion-reduce:transition-none',
         className,
       )}
       {...props}

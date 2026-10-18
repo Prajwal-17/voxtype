@@ -2,10 +2,13 @@ mod audio;
 mod auth;
 mod cleanup;
 mod desktop;
+mod dictionary;
 mod display;
 mod environment;
+mod local;
 mod model;
 mod recordings;
+mod recovery;
 mod session;
 mod speech;
 mod startup;
@@ -25,7 +28,9 @@ pub struct AppState {
     pub authenticated: AtomicBool,
     pub user: Mutex<Option<AuthUser>>,
     pub local_data: Mutex<()>,
+    pub dictionary_lock: tokio::sync::Mutex<()>,
     pub upload_lock: tokio::sync::Mutex<()>,
+    pub regeneration_lock: tokio::sync::Mutex<()>,
     pub shortcut_registered: AtomicBool,
 }
 impl Default for AppState {
@@ -36,7 +41,9 @@ impl Default for AppState {
             authenticated: AtomicBool::new(false),
             user: Mutex::new(None),
             local_data: Mutex::new(()),
+            dictionary_lock: tokio::sync::Mutex::new(()),
             upload_lock: tokio::sync::Mutex::new(()),
+            regeneration_lock: tokio::sync::Mutex::new(()),
             shortcut_registered: AtomicBool::new(false),
         }
     }
@@ -117,6 +124,7 @@ async fn get_auth_user(app: tauri::AppHandle) -> Result<Option<AuthUser>, String
         .store(user.is_some(), Ordering::Release);
     if user.is_some() {
         uploads::send_pending(app.clone());
+        dictionary::refresh(app.clone());
     }
     Ok(user)
 }
@@ -131,6 +139,7 @@ async fn sign_in_with_google(app: tauri::AppHandle) -> Result<AuthUser, String> 
         .authenticated
         .store(true, Ordering::Release);
     uploads::send_pending(app.clone());
+    dictionary::refresh(app.clone());
     Ok(user)
 }
 #[tauri::command]
@@ -149,6 +158,7 @@ async fn sign_out(app: tauri::AppHandle) -> Result<(), String> {
         .user
         .lock()
         .map_err(|_| "Account unavailable.")? = None;
+    publish(&app, &Snapshot::default());
     Ok(())
 }
 #[tauri::command]
@@ -172,6 +182,7 @@ fn get_history(
     app: tauri::AppHandle,
     cursor: Option<String>,
     query: Option<String>,
+    expected_user_id: Option<String>,
 ) -> Result<serde_json::Value, String> {
     require_authenticated(&app)?;
     let user_id = app
@@ -182,6 +193,9 @@ fn get_history(
         .as_ref()
         .map(|u| u.id.clone())
         .ok_or("Sign in again.")?;
+    if expected_user_id.as_deref().is_some_and(|id| id != user_id) {
+        return Err("Account changed.".into());
+    }
     storage::claim_legacy_history(&app, &user_id)?;
     storage::history_page(
         storage::history(&app)?,
@@ -195,9 +209,13 @@ async fn get_analytics(
     app: tauri::AppHandle,
     range: Option<String>,
     timezone: Option<String>,
+    expected_user_id: Option<String>,
 ) -> Result<serde_json::Value, String> {
     require_authenticated(&app)?;
-    let (_, bearer, client) = auth::upload_session().await?.ok_or("Sign in again.")?;
+    let (user, bearer, client) = auth::upload_session().await?.ok_or("Sign in again.")?;
+    if expected_user_id.as_deref().is_some_and(|id| id != user.id) {
+        return Err("Account changed.".into());
+    }
     let response = client
         .get(format!("{}/v1/analytics", auth::api_url()))
         .query(&[
@@ -212,6 +230,9 @@ async fn get_analytics(
         return Err("Couldn’t load analytics.".into());
     }
     let body: serde_json::Value = speech::read_json(response, 256_000).await?;
+    if account_id(&app)? != user.id {
+        return Err("Account changed.".into());
+    }
     Ok(body["data"].clone())
 }
 #[tauri::command]
@@ -304,7 +325,95 @@ async fn delete_history(app: tauri::AppHandle, id: Option<String>) -> Result<(),
     if !response.status().is_success() && response.status().as_u16() != 404 {
         return Err("Couldn’t delete cloud transcript.".into());
     }
-    storage::delete_history(&app, &user.id, id.as_deref())
+    storage::delete_history(&app, &user.id, id.as_deref())?;
+    let _ = app.emit("analytics-changed", ());
+    Ok(())
+}
+fn account_id(app: &tauri::AppHandle) -> Result<String, String> {
+    require_authenticated(app)?;
+    app.state::<AppState>()
+        .user
+        .lock()
+        .map_err(|_| "Account unavailable.")?
+        .as_ref()
+        .map(|user| user.id.clone())
+        .ok_or("Sign in again.".into())
+}
+#[tauri::command]
+fn get_local_recordings(app: tauri::AppHandle) -> Result<Vec<local::LocalRecording>, String> {
+    local::recordings(&app, &account_id(&app)?)
+}
+#[tauri::command]
+fn get_local_diagnostics(app: tauri::AppHandle) -> Result<String, String> {
+    local::diagnostics(&app, &account_id(&app)?)
+}
+#[tauri::command]
+async fn export_local_diagnostics(app: tauri::AppHandle) -> Result<(), String> {
+    let user = account_id(&app)?;
+    let report = local::diagnostics(&app, &user)?;
+    let output = tokio::process::Command::new("zenity")
+        .args([
+            "--file-selection",
+            "--save",
+            "--confirm-overwrite",
+            "--filename=voxtype-diagnostics.json",
+        ])
+        .output()
+        .await
+        .map_err(|_| "Install zenity to export diagnostics.")?;
+    if !output.status.success() {
+        return Ok(());
+    }
+    if account_id(&app)? != user {
+        return Err("Account changed.".into());
+    }
+    let destination = String::from_utf8(output.stdout).map_err(|_| "Invalid export path.")?;
+    let destination = destination.trim();
+    if !destination.is_empty() {
+        std::fs::write(destination, report).map_err(|_| "Could not export diagnostics.")?;
+    }
+    Ok(())
+}
+#[tauri::command]
+async fn export_recording(app: tauri::AppHandle, id: String) -> Result<(), String> {
+    let user = account_id(&app)?;
+    let row = local::recordings(&app, &user)?
+        .into_iter()
+        .find(|row| row.id == id)
+        .ok_or("Recording no longer available.")?;
+    let path = row.audio_file.ok_or("Audio no longer available.")?;
+    let directory = recordings::directory(&app)?
+        .canonicalize()
+        .map_err(|_| "Recording unavailable.")?;
+    let source = std::path::Path::new(&path)
+        .canonicalize()
+        .map_err(|_| "Recording unavailable.")?;
+    if source.parent() != Some(directory.as_path()) {
+        return Err("Recording unavailable.".into());
+    }
+    let output = tokio::process::Command::new("zenity")
+        .args([
+            "--file-selection",
+            "--save",
+            "--confirm-overwrite",
+            "--filename=voxtype-recording.wav",
+        ])
+        .output()
+        .await
+        .map_err(|_| "Install zenity to export a recording.")?;
+    if !output.status.success() {
+        return Ok(());
+    }
+    if account_id(&app)? != user {
+        return Err("Account changed.".into());
+    }
+    let destination = String::from_utf8(output.stdout).map_err(|_| "Invalid export path.")?;
+    let destination = destination.trim();
+    if destination.is_empty() {
+        return Ok(());
+    }
+    std::fs::copy(source, destination).map_err(|_| "Could not export recording.")?;
+    Ok(())
 }
 #[tauri::command]
 async fn get_microphones() -> Result<Vec<Microphone>, String> {
@@ -448,6 +557,8 @@ pub fn run() {
         )
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
+            dictionary::get_dictionary,
+            dictionary::update_dictionary,
             bootstrap,
             get_auth_user,
             sign_in_with_google,
@@ -457,6 +568,12 @@ pub fn run() {
             get_analytics,
             export_analytics,
             delete_history,
+            get_local_recordings,
+            recovery::get_recording_audio,
+            recovery::regenerate_transcript,
+            get_local_diagnostics,
+            export_recording,
+            export_local_diagnostics,
             get_microphones,
             get_diagnostics,
             copy_text,
@@ -469,12 +586,18 @@ pub fn run() {
         ])
         .setup(|app| {
             let handle = app.handle();
+            if let Err(error) = storage::migrate_originals(handle) {
+                let _ = handle.emit("app-error", error);
+            }
+            let _ = local::diagnostics(handle, "");
             let sync_app = handle.clone();
             tauri::async_runtime::spawn(async move {
                 let mut interval = tokio::time::interval(std::time::Duration::from_secs(120));
                 loop {
                     interval.tick().await;
                     uploads::send_pending(sync_app.clone());
+                    dictionary::refresh(sync_app.clone());
+                    let _ = local::diagnostics(&sync_app, "");
                 }
             });
             if let Err(error) = storage::settings(handle)

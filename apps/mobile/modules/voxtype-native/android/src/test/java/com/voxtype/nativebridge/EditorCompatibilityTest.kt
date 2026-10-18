@@ -1,0 +1,219 @@
+package com.voxtype.nativebridge
+
+import android.content.ClipDescription
+import android.content.ClipboardManager
+import android.content.Context
+import android.text.InputType
+import android.view.accessibility.AccessibilityNodeInfo
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.SurroundingText
+import org.junit.Assert.*
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.mockito.Mockito.*
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [33, 35])
+class EditorCompatibilityTest {
+  private val context: Context get() = RuntimeEnvironment.getApplication()
+  private fun node() = AccessibilityNodeInfo.obtain().apply {
+    packageName = "chat.example"
+    isEditable = true
+    isFocused = true
+    isVisibleToUser = true
+    isEnabled = true
+  }
+  private fun editor(type: Int = InputType.TYPE_CLASS_TEXT) = EditorInfo().apply {
+    packageName = "chat.example"
+    inputType = type
+    imeOptions = EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
+  }
+
+  @Test fun privateChatEditorsCanDictateWithoutEnablingKeyboardLearning() {
+    val node = node()
+    try {
+      node.hintText = "Shipping instructions"
+      assertTrue(FocusGuard.isEditableTextField(node, "voxtype", editor()))
+    }
+    finally { node.recycle() }
+  }
+
+  @Test fun passwordsNumericPaymentAndVerificationFieldsStayExcluded() {
+    val node = node()
+    try {
+      for (type in listOf(InputType.TYPE_NULL, InputType.TYPE_CLASS_NUMBER,
+        InputType.TYPE_CLASS_PHONE, InputType.TYPE_CLASS_DATETIME,
+        InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD,
+        InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD,
+        InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD)) {
+        assertFalse("inputType=$type", FocusGuard.isEditableTextField(node, "voxtype", editor(type)))
+      }
+      for (hint in listOf("OTP", "Verification code", "Card number", "PIN code", "PIN", "UPI PIN", "MPIN")) {
+        node.hintText = hint
+        assertFalse(hint, FocusGuard.isEditableTextField(node, "voxtype", editor()))
+      }
+      node.hintText = null
+      node.isPassword = true
+      assertFalse(FocusGuard.isEditableTextField(node, "voxtype", editor()))
+      node.isPassword = false
+      assertFalse(FocusGuard.isEditableTextField(node, "chat.example", editor()))
+      assertFalse(FocusGuard.isEditableTextField(node, "voxtype", editor().apply { packageName = "other.app" }))
+    } finally { node.recycle() }
+  }
+
+  @Test fun focusedSetTextEditorsAreSupportedWithoutTheEditableFlag() {
+    val node = node()
+    try {
+      node.isEditable = false
+      assertFalse(FocusGuard.isEditableTextField(node, "voxtype", editor()))
+      node.addAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SET_TEXT)
+      assertTrue(FocusGuard.isEditableTextField(node, "voxtype", editor()))
+      node.isFocused = false
+      assertFalse(FocusGuard.isEditableTextField(node, "voxtype", editor()))
+      node.isFocused = true
+      node.isPassword = true
+      assertFalse(FocusGuard.isEditableTextField(node, "voxtype", editor()))
+      node.isPassword = false
+      assertFalse(FocusGuard.isEditableTextField(node, "voxtype", editor(InputType.TYPE_CLASS_NUMBER)))
+      assertFalse(FocusGuard.isEditableTextField(node, "voxtype", editor().apply { packageName = "other.app" }))
+      node.hintText = "UPI PIN"
+      assertFalse(FocusGuard.isEditableTextField(node, "voxtype", editor()))
+    } finally { node.recycle() }
+  }
+
+  @Test fun richEditorPasteWorksWithoutAnImeConnectionOrSurroundingText() {
+    val node = mock(AccessibilityNodeInfo::class.java)
+    `when`(node.actionList).thenReturn(listOf(AccessibilityNodeInfo.AccessibilityAction.ACTION_PASTE))
+    `when`(node.performAction(AccessibilityNodeInfo.ACTION_PASTE)).thenReturn(true)
+    assertTrue(InsertionHelper.insert(context, node, null, "A chat message"))
+    verify(node, times(1)).performAction(AccessibilityNodeInfo.ACTION_PASTE)
+    val clip = context.getSystemService(ClipboardManager::class.java).primaryClip!!
+    assertEquals("A chat message", clip.getItemAt(0).text.toString())
+    assertTrue(clip.description.extras!!.getBoolean(ClipDescription.EXTRA_IS_SENSITIVE))
+  }
+
+  @Test fun pasteCanBecomeAvailableOnlyAfterTheClipboardIsPopulated() {
+    val node = mock(AccessibilityNodeInfo::class.java)
+    `when`(node.actionList).thenReturn(emptyList())
+    `when`(node.performAction(AccessibilityNodeInfo.ACTION_PASTE)).thenAnswer {
+      context.getSystemService(ClipboardManager::class.java).primaryClip?.getItemAt(0)?.text == "hello"
+    }
+    assertTrue(InsertionHelper.insert(context, node, null, "hello"))
+  }
+
+  @Test fun acceptedAsyncPasteIsNeverFollowedByAnImeCommit() {
+    val node = mock(AccessibilityNodeInfo::class.java)
+    `when`(node.actionList).thenReturn(listOf(AccessibilityNodeInfo.AccessibilityAction.ACTION_PASTE))
+    `when`(node.performAction(AccessibilityNodeInfo.ACTION_PASTE)).thenReturn(true)
+    assertTrue(InsertionHelper.insert(context, node, "hello") {
+      fail("An accepted paste must not also commit through the IME")
+      false
+    })
+  }
+
+  @Test fun aRichEditorCanRestoreItsCursorBeforeRetryingARejectedPaste() {
+    val node = mock(AccessibilityNodeInfo::class.java)
+    `when`(node.actionList).thenReturn(listOf(
+      AccessibilityNodeInfo.AccessibilityAction.ACTION_PASTE,
+    ))
+    `when`(node.performAction(AccessibilityNodeInfo.ACTION_PASTE)).thenReturn(false, true)
+    `when`(node.performAction(AccessibilityNodeInfo.ACTION_FOCUS)).thenReturn(true)
+    assertTrue(InsertionHelper.insert(context, node, "hello") {
+      fail("A successful paste after restoring the cursor must not commit again")
+      false
+    })
+    val order = inOrder(node)
+    order.verify(node).performAction(AccessibilityNodeInfo.ACTION_PASTE)
+    order.verify(node).performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+    order.verify(node).performAction(AccessibilityNodeInfo.ACTION_PASTE)
+  }
+
+  @Test fun imeFallbackRunsAfterTheRichEditorHasRestoredInputFocus() {
+    val node = mock(AccessibilityNodeInfo::class.java)
+    var restored = false
+    var commits = 0
+    `when`(node.performAction(AccessibilityNodeInfo.ACTION_PASTE)).thenReturn(false)
+    `when`(node.performAction(AccessibilityNodeInfo.ACTION_FOCUS)).thenAnswer { restored = true; true }
+    assertTrue(InsertionHelper.insert(context, node, "hello") {
+      assertTrue("Resolve the input connection after restoring focus", restored)
+      commits++
+      true
+    })
+    assertEquals(1, commits)
+  }
+
+  @Test fun pasteOnlyVirtualEditorsStillRequireSafeMatchingTextMetadata() {
+    val node = node().apply {
+      isEditable = false
+      addAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_PASTE)
+    }
+    try {
+      assertTrue(FocusGuard.isEditableTextField(node, "voxtype", editor()))
+      assertFalse(FocusGuard.isEditableTextField(node, "voxtype", editor(InputType.TYPE_CLASS_NUMBER)))
+      assertFalse(FocusGuard.isEditableTextField(node, "voxtype", editor().apply { hintText = "Verification code" }))
+      assertFalse(FocusGuard.isEditableTextField(node, "voxtype", editor().apply { packageName = "other.app" }))
+      node.isPassword = true
+      assertFalse(FocusGuard.isEditableTextField(node, "voxtype", editor()))
+      node.isPassword = false
+      node.isFocused = false
+      assertFalse(FocusGuard.isEditableTextField(node, "voxtype", editor()))
+    } finally { node.recycle() }
+  }
+
+  @Test fun anAcceptedPasteDoesNotRefocusOrPasteTwice() {
+    val node = mock(AccessibilityNodeInfo::class.java)
+    `when`(node.actionList).thenReturn(listOf(AccessibilityNodeInfo.AccessibilityAction.ACTION_FOCUS))
+    `when`(node.performAction(AccessibilityNodeInfo.ACTION_PASTE)).thenReturn(true)
+    assertTrue(InsertionHelper.insert(context, node, "hello") { fail("No duplicate commit"); false })
+    verify(node, times(1)).performAction(AccessibilityNodeInfo.ACTION_PASTE)
+    verify(node, never()).performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+  }
+
+  @Test fun rejectedPasteFallsBackToImeCommitAtTheCursor() {
+    val node = mock(AccessibilityNodeInfo::class.java)
+    `when`(node.actionList).thenReturn(listOf(AccessibilityNodeInfo.AccessibilityAction.ACTION_PASTE))
+    `when`(node.performAction(AccessibilityNodeInfo.ACTION_PASTE)).thenReturn(false)
+    val surrounding = ArrayDeque(listOf(SurroundingText("", 0, 0, 0), SurroundingText("hello", 5, 5, 0)))
+    var commits = 0
+    assertTrue(InsertionHelper.insert(context, node, "hello") {
+      InsertionHelper.commitAndVerify("hello", { surrounding.removeFirst() }) { commits++ }
+    })
+    assertEquals(1, commits)
+  }
+
+  @Test fun repeatedTextIsVerifiedUsingAbsoluteCursorMovement() {
+    val surrounding = ArrayDeque(listOf(SurroundingText("hello", 5, 5, 0), SurroundingText("hello", 5, 5, 5)))
+    var commits = 0
+    assertTrue(InsertionHelper.commitAndVerify("hello", { surrounding.removeFirst() }) { commits++ })
+    assertEquals(1, commits)
+  }
+
+  @Test fun unavailableSurroundingTextDoesNotPreventOrRepeatACommit() {
+    var commits = 0
+    assertFalse(InsertionHelper.commitAndVerify("hello", { throw UnsupportedOperationException() }) { commits++ })
+    assertEquals(1, commits)
+  }
+
+  @Test fun aPasteExceptionWithUnknownOutcomeDoesNotTriggerAnotherInsertion() {
+    val node = mock(AccessibilityNodeInfo::class.java)
+    `when`(node.actionList).thenReturn(listOf(AccessibilityNodeInfo.AccessibilityAction.ACTION_PASTE))
+    `when`(node.performAction(AccessibilityNodeInfo.ACTION_PASTE)).thenThrow(IllegalStateException())
+    assertFalse(InsertionHelper.insert(context, node, "hello") {
+      fail("An uncertain paste must not be followed by another insertion")
+      false
+    })
+  }
+
+  @Test fun matchingClassAndResourceIdDoNotMakeDifferentFieldsTheSameTarget() {
+    val first = node().apply { className = "android.widget.EditText"; viewIdResourceName = "chat:id/input" }
+    val second = node().apply { className = first.className; viewIdResourceName = first.viewIdResourceName }
+    val copy = AccessibilityNodeInfo.obtain(first)
+    try {
+      assertTrue(InsertionHelper.isSameField(first, copy))
+      assertFalse(InsertionHelper.isSameField(first, second))
+    } finally { first.recycle(); second.recycle(); copy.recycle() }
+  }
+}

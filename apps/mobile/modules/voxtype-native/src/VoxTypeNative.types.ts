@@ -1,3 +1,10 @@
+export type LocalRecording = {
+  id: string;
+  originalText: string;
+  createdAt: number;
+  durationMs: number;
+  audioAvailable: boolean;
+};
 export type Dictation = {
   id: string;
   userId: string;
@@ -18,6 +25,8 @@ export type Snapshot = {
   bubbleEnabled: boolean;
   cleanupEnabled: boolean;
   vocabulary?: string[];
+  dictionarySyncError?: string;
+  dictionaryUserId?: string | null;
   syncing: boolean;
   syncError: string;
   audioLimit: 10;
@@ -25,6 +34,7 @@ export type Snapshot = {
     appName: string | null;
     packageName: string;
     appVersion: string | null;
+    versionCode?: number;
     manufacturer: string;
     model: string;
     androidVersion: string;
@@ -38,6 +48,7 @@ export type Snapshot = {
       model: string;
       androidVersion: string;
       appVersion: string | null;
+      versionCode?: number;
     };
     foregroundMode: 'none' | 'bubble' | 'microphone';
     foregroundError: string | null;
@@ -65,7 +76,7 @@ export type Snapshot = {
 };
 
 export type VoxTypeNativeModuleEvents = {
-  onChange: (params: { changed: boolean }) => void;
+  onChange: (params: { changed: boolean; kind?: 'state' | 'history' | 'analytics' }) => void;
   onAudioLevel: (params: { level: number }) => void;
 };
 

@@ -63,7 +63,7 @@ export function Toggle({
 }) {
   const id = useId();
   return (
-    <div className="flex items-center justify-between gap-6 border-b border-line py-4 last:border-b-0 last:pb-0 max-lg:gap-4 max-md:flex-wrap">
+    <div className="flex items-center justify-between gap-6 py-3 max-lg:gap-4 max-md:flex-wrap">
       <div className="min-w-0">
         <Label htmlFor={id}>{label}</Label>
         {description && (
@@ -74,7 +74,7 @@ export function Toggle({
       </div>
       <Switch
         id={id}
-        aria-describedby={`${id}-description`}
+        aria-describedby={description ? `${id}-description` : undefined}
         checked={checked}
         onCheckedChange={onChange}
         disabled={disabled}

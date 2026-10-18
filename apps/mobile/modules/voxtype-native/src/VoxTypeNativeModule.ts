@@ -1,9 +1,15 @@
 import { NativeModule, requireNativeModule } from 'expo';
 
-import type { Snapshot, TranscriptPage, VoxTypeNativeModuleEvents } from './VoxTypeNative.types';
+import type {
+  LocalRecording,
+  Snapshot,
+  TranscriptPage,
+  VoxTypeNativeModuleEvents,
+} from './VoxTypeNative.types';
 
 declare class VoxTypeNativeModule extends NativeModule<VoxTypeNativeModuleEvents> {
-  setVocabulary(terms: string[]): Promise<void>;
+  setAccountVocabulary?: (terms: string[], base: string[], expectedUserId: string) => Promise<void>;
+  syncVocabulary?: () => Promise<void>;
   setAuthState(state: string): Promise<void>;
   getAuthState(): Promise<string | null>;
   getSnapshot(): Promise<Snapshot>;
@@ -11,6 +17,7 @@ declare class VoxTypeNativeModule extends NativeModule<VoxTypeNativeModuleEvents
   setSession(token: string, userId: string, apiUrl: string): Promise<void>;
   signOut(): Promise<void>;
   openAccessibilitySettings(): Promise<void>;
+  pauseForPayments?: () => Promise<void>;
   setPreference(key: 'bubbleEnabled' | 'cleanupEnabled', value: string): Promise<void>;
   // Typed alternatives (added natively, optional on older builds).
   setBubbleEnabled?: (enabled: boolean) => Promise<void>;
@@ -19,9 +26,19 @@ declare class VoxTypeNativeModule extends NativeModule<VoxTypeNativeModuleEvents
   startRecording(): Promise<void>;
   stopRecording(): Promise<void>;
   cancelRecording(): Promise<void>;
-  getTranscripts(cursor: string | null, query: string): Promise<TranscriptPage>;
+  getTranscripts(
+    cursor: string | null,
+    query: string,
+    expectedUserId?: string,
+  ): Promise<TranscriptPage>;
   syncTranscripts(): Promise<void>;
   deleteTranscript(id: string): Promise<void>;
+  getLocalRecordings(): Promise<LocalRecording[]>;
+  shareRecording(id: string): Promise<void>;
+  getRecordingUri(id: string, expectedUserId: string): Promise<string>;
+  regenerateTranscript(id: string, expectedUserId: string): Promise<string>;
+  getLocalDiagnostics(): Promise<string>;
+  shareLocalDiagnostics(): Promise<void>;
   shareInsights(csv: string): Promise<void>;
 }
 
@@ -62,7 +79,18 @@ function requireVoxTypeModule(): VoxTypeNativeModule {
  * when the native side is absent.
  */
 const VoxTypeNative = {
-  setVocabulary: (terms: string[]) => requireVoxTypeModule().setVocabulary(terms),
+  setVocabulary: async (terms: string[], base: string[], expectedUserId: string) => {
+    const module = requireVoxTypeModule();
+    if (!module.setAccountVocabulary)
+      throw new Error('Update VoxType to sync your dictionary across devices.');
+    await module.setAccountVocabulary(terms, base, expectedUserId);
+  },
+  syncVocabulary: async () => {
+    const module = requireVoxTypeModule();
+    if (!module.syncVocabulary)
+      throw new Error('Update VoxType to sync your dictionary across devices.');
+    await module.syncVocabulary();
+  },
   setAuthState: (state: string) => requireVoxTypeModule().setAuthState(state),
   getAuthState: () => requireVoxTypeModule().getAuthState(),
   getSnapshot: (): Promise<Snapshot> => requireVoxTypeModule().getSnapshot(),
@@ -71,6 +99,9 @@ const VoxTypeNative = {
     requireVoxTypeModule().setSession(token, userId, apiUrl),
   signOut: () => requireVoxTypeModule().signOut(),
   openAccessibilitySettings: () => requireVoxTypeModule().openAccessibilitySettings(),
+  pauseForPayments: () =>
+    requireVoxTypeModule().pauseForPayments?.() ??
+    requireVoxTypeModule().openAccessibilitySettings(),
   setPreference: (key: 'bubbleEnabled' | 'cleanupEnabled', value: string) =>
     requireVoxTypeModule().setPreference(key, value),
   setBubbleEnabled: (enabled: boolean) =>
@@ -80,14 +111,22 @@ const VoxTypeNative = {
     requireVoxTypeModule().setCleanupEnabled?.(enabled) ??
     requireVoxTypeModule().setPreference('cleanupEnabled', String(enabled)),
   copyTranscript: (id: string) => requireVoxTypeModule().copyTranscript(id),
-  getTranscripts: (cursor: string | null, query = '') =>
-    requireVoxTypeModule().getTranscripts(cursor, query),
+  getTranscripts: (cursor: string | null, query = '', expectedUserId?: string) =>
+    requireVoxTypeModule().getTranscripts(cursor, query, expectedUserId),
   deleteTranscript: (id: string) => requireVoxTypeModule().deleteTranscript(id),
   shareInsights: (csv: string) => requireVoxTypeModule().shareInsights(csv),
   syncTranscripts: () => requireVoxTypeModule().syncTranscripts(),
   startRecording: () => requireVoxTypeModule().startRecording(),
   cancelRecording: () => requireVoxTypeModule().cancelRecording(),
   stopRecording: () => requireVoxTypeModule().stopRecording(),
+  getLocalRecordings: () => requireVoxTypeModule().getLocalRecordings(),
+  getRecordingUri: (id: string, expectedUserId: string) =>
+    requireVoxTypeModule().getRecordingUri(id, expectedUserId),
+  regenerateTranscript: (id: string, expectedUserId: string) =>
+    requireVoxTypeModule().regenerateTranscript(id, expectedUserId),
+  shareRecording: (id: string) => requireVoxTypeModule().shareRecording(id),
+  getLocalDiagnostics: () => requireVoxTypeModule().getLocalDiagnostics(),
+  shareLocalDiagnostics: () => requireVoxTypeModule().shareLocalDiagnostics(),
   addListener: <EventName extends keyof VoxTypeNativeModuleEvents>(
     eventName: EventName,
     listener: VoxTypeNativeModuleEvents[EventName],

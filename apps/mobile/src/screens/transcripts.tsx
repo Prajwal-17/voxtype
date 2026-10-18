@@ -1,234 +1,393 @@
-import { useState } from 'react';
-import { FlatList, Modal, Pressable, TextInput, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { FlatList, Modal, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
-import { CopyIcon } from 'phosphor-react-native/src/icons/Copy';
+import { ArrowClockwiseIcon } from 'phosphor-react-native/src/icons/ArrowClockwise';
+import { DownloadSimpleIcon } from 'phosphor-react-native/src/icons/DownloadSimple';
+import { FileTextIcon } from 'phosphor-react-native/src/icons/FileText';
 import { TrashIcon } from 'phosphor-react-native/src/icons/Trash';
+import { CopyIcon } from 'phosphor-react-native/src/icons/Copy';
+import { MagnifyingGlassIcon } from 'phosphor-react-native/src/icons/MagnifyingGlass';
+import { PlayIcon } from 'phosphor-react-native/src/icons/Play';
+import { XIcon } from 'phosphor-react-native/src/icons/X';
 import { nativeTheme as theme } from '@voxtype/shared';
+import { RecordingPlayer } from '../components/recording-player';
+import { audioTime } from '../lib/audio-time';
 import { Screen } from '../components/screen';
-import { Action, Card, Loader, Text } from '../components/primitives';
+import { Sheet } from '../components/sheet';
+import { Action, IconButton, Loader, Text } from '../components/primitives';
 import { styles as ui } from '../components/styles';
 import { useAppState, useTranscripts } from '../state/app-state';
 import Native from '../../modules/voxtype-native/src/VoxTypeNativeModule';
-import type { Dictation } from '../../modules/voxtype-native/src/VoxTypeNative.types';
+import type { LocalRecording } from '../../modules/voxtype-native/src/VoxTypeNative.types';
+import { transcriptEntries, type TranscriptEntry as Entry } from '../lib/transcript-library';
 const c = theme.colors;
+function dateLabel(time: number) {
+  return new Date(time).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    ...(new Date(time).getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}),
+  });
+}
 export default function TranscriptsScreen() {
-  const app = useAppState(),
-    [search, setSearch] = useState(''),
-    query = useTranscripts(search),
-    [deleting, setDeleting] = useState<Dictation | null>(null),
-    [deleteError, setDeleteError] = useState('');
+  const app = useAppState();
+  const [search, setSearch] = useState('');
+  const query = useTranscripts(search);
+  const [local, setLocal] = useState<LocalRecording[]>([]),
+    [localError, setLocalError] = useState(false),
+    [localLoading, setLocalLoading] = useState(true),
+    [retry, setRetry] = useState(0);
+  const [selected, setSelected] = useState<Entry | null>(null),
+    [autoPlay, setAutoPlay] = useState(false);
+  const [confirmation, setConfirmation] = useState<{
+      action: 'delete' | 'regenerate';
+      item: Entry;
+    } | null>(null),
+    [actionError, setActionError] = useState('');
+  const userId = app.user?.id;
+  const active =
+    ['listening', 'processing'].includes(app.snapshot?.inApp.status ?? '') ||
+    ['listening', 'connecting', 'processing'].includes(app.snapshot?.status ?? '');
+  useEffect(() => {
+    let disposed = false;
+    const request = app.available && userId ? Native.getLocalRecordings() : Promise.resolve([]);
+    void request
+      .then((rows) => {
+        if (!disposed) {
+          setLocal(rows);
+          setLocalError(false);
+        }
+      })
+      .catch(() => {
+        if (!disposed) setLocalError(true);
+      })
+      .finally(() => {
+        if (!disposed) setLocalLoading(false);
+      });
+    return () => {
+      disposed = true;
+    };
+  }, [app.available, app.revision, userId, retry]);
+  const rows = transcriptEntries(query.items, local, search);
+  const loading = query.loading || localLoading;
+  const error = query.error || localError;
+  const refresh = () => {
+    setRetry((n) => n + 1);
+    void query.refresh();
+  };
+  const copy = (text: string) =>
+    void app.run(async () => {
+      await Clipboard.setStringAsync(text);
+      app.notify('Copied');
+    });
+  const open = (item: Entry, play = false) => {
+    setAutoPlay(play);
+    setSelected(item);
+  };
+  const ask = (action: 'delete' | 'regenerate', item: Entry) => {
+    setActionError('');
+    setConfirmation({ action, item });
+  };
   const confirm = () =>
     void app.run(async () => {
-      if (!deleting) return;
+      if (!confirmation || !userId) return;
       try {
-        await Native.deleteTranscript(deleting.id);
-        setDeleting(null);
-        setDeleteError('');
-        await query.refresh();
-        app.notify('Deleted');
+        if (confirmation.action === 'delete') await Native.deleteTranscript(confirmation.item.id);
+        else await Native.regenerateTranscript(confirmation.item.id, userId);
+        setSelected(null);
+        setConfirmation(null);
+        refresh();
+        app.notify(
+          confirmation.action === 'delete' ? 'Transcript deleted' : 'Transcript regenerated',
+        );
       } catch {
-        setDeleteError('Couldn’t delete. Check your connection and retry.');
+        setActionError(
+          confirmation.action === 'delete'
+            ? 'Couldn’t delete. Check your connection and try again.'
+            : 'Couldn’t regenerate. Your existing text is unchanged. Try again.',
+        );
       }
     });
-  return (
-    <Screen title="Transcripts" scroll={false}>
-      <FlatList
-        data={query.items}
-        keyExtractor={(item) => item.id}
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24, gap: 12 }}
-        ListHeaderComponent={
-          <TextInput
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Search transcripts"
-            placeholderTextColor={c.textMuted}
-            accessibilityLabel="Search transcripts"
-            autoCapitalize="none"
-            style={{
-              minHeight: 48,
-              borderWidth: 1,
-              borderColor: c.borderStrong,
-              borderRadius: 10,
-              paddingHorizontal: 14,
-              color: c.text,
-              fontFamily: 'MonaSansRegular',
-              fontSize: 16,
-              backgroundColor: c.surface,
-            }}
-          />
-        }
-        renderItem={({ item }) => (
-          <TranscriptRow
-            item={item}
-            onCopy={() =>
-              void app.run(async () => {
-                await Clipboard.setStringAsync(item.text);
-                app.notify('Copied');
-              })
-            }
-            onDelete={() => {
-              setDeleteError('');
-              setDeleting(item);
-            }}
-          />
-        )}
-        ListEmptyComponent={
-          query.loading ? (
-            <Loader />
-          ) : (
-            <View style={{ gap: 16, paddingVertical: 24 }}>
-              <Text style={ui.muted}>
-                {query.error
-                  ? 'Transcripts unavailable'
-                  : search
-                    ? 'No matches'
-                    : 'No transcripts yet'}
-              </Text>
-              <Action
-                label={query.error ? 'Retry' : search ? 'Clear search' : 'Start recording'}
-                secondary
-                onPress={
-                  query.error
-                    ? () => void query.refresh()
-                    : search
-                      ? () => setSearch('')
-                      : () => router.navigate('/(tabs)/home')
-                }
-              />
-            </View>
-          )
-        }
-        ListFooterComponent={
-          query.items.length > 0 && (query.cursor || query.error || query.loading) ? (
-            <View style={{ gap: 12 }}>
-              {query.error && (
-                <Text accessibilityLiveRegion="polite" style={{ color: c.danger }}>
-                  Couldn’t load more transcripts
-                </Text>
-              )}
-              <Action
-                label={query.loading ? 'Loading' : query.error ? 'Retry' : 'Load more'}
-                secondary
-                disabled={query.loading}
-                onPress={() => void query.more()}
-              />
-            </View>
-          ) : null
-        }
-      />
-      <Modal
-        visible={!!deleting}
-        transparent
-        animationType="none"
-        onRequestClose={() => {
-          if (!app.busy) setDeleting(null);
-        }}
-      >
-        <View
-          style={{ flex: 1, justifyContent: 'center', padding: 24, backgroundColor: '#23332d88' }}
-        >
-          <Card style={{ gap: 16 }}>
-            <View accessibilityViewIsModal>
-              <Text accessibilityRole="header" style={ui.title}>
-                Delete this transcript?
-              </Text>
-              <Text style={[ui.muted, { marginTop: 12 }]}>
-                This removes the transcript from your account and this device’s cache. Other devices
-                update after sync.
-              </Text>
-              <Text numberOfLines={2} style={{ marginTop: 12 }}>
-                {deleting?.text}
-              </Text>
-              {!!deleteError && (
-                <Text accessibilityLiveRegion="polite" style={{ marginTop: 12, color: c.danger }}>
-                  {deleteError}
-                </Text>
-              )}
-            </View>
-            <Action
-              label="Keep transcript"
-              secondary
+  const transcriptActions = (item: Entry, reader = false) => (
+    <View
+      style={{
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+        gap: 8,
+      }}
+    >
+      <IconButton label="Copy text" disabled={!item.text} onPress={() => copy(item.text)}>
+        <CopyIcon size={20} color={c.primary} />
+      </IconButton>
+      {reader && !!item.local?.originalText && (
+        <IconButton label="Copy original" onPress={() => copy(item.local!.originalText)}>
+          <FileTextIcon size={20} color={c.primary} />
+        </IconButton>
+      )}
+      {item.local?.audioAvailable && (
+        <>
+          {!reader && (
+            <IconButton label="Play recording" disabled={active} onPress={() => open(item, true)}>
+              <PlayIcon size={20} color={c.primary} weight="fill" />
+            </IconButton>
+          )}
+          {reader && (
+            <IconButton
+              label="Export audio"
               disabled={app.busy}
-              onPress={() => setDeleting(null)}
-            />
-            <Action
-              label={app.busy ? 'Deleting' : 'Delete transcript'}
-              disabled={app.busy || !app.available}
-              onPress={confirm}
-            />
-          </Card>
-        </View>
-      </Modal>
-    </Screen>
+              onPress={() => void app.run(() => Native.shareRecording(item.id))}
+            >
+              <DownloadSimpleIcon size={20} color={c.primary} />
+            </IconButton>
+          )}
+          <IconButton
+            label="Regenerate transcript"
+            disabled={app.busy || active}
+            onPress={() => ask('regenerate', item)}
+          >
+            <ArrowClockwiseIcon size={20} color={c.primary} />
+          </IconButton>
+        </>
+      )}
+      {item.transcript && (
+        <IconButton
+          label="Delete transcript"
+          disabled={app.busy}
+          onPress={() => ask('delete', item)}
+        >
+          <TrashIcon size={20} color={c.danger} />
+        </IconButton>
+      )}
+    </View>
   );
-}
-function TranscriptRow({
-  item,
-  onCopy,
-  onDelete,
-}: {
-  item: Dictation;
-  onCopy: () => void;
-  onDelete: () => void;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  return (
-    <Card>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={expanded ? 'Collapse transcript' : 'Expand transcript'}
-        accessibilityState={{ expanded }}
-        onPress={() => setExpanded(!expanded)}
-        style={{ minHeight: 44, justifyContent: 'center' }}
-      >
-        {!expanded && <Text numberOfLines={2}>{item.text || 'Empty transcript'}</Text>}
-        <Text style={[ui.muted, { marginTop: 6, color: c.primary }]}>
-          {expanded ? 'Collapse ↑' : 'Expand ↓'}
-        </Text>
-      </Pressable>
-      {expanded && (
-        <Text selectable style={{ marginTop: 8 }}>
-          {item.text || 'Empty transcript'}
+  const confirmationContent = (
+    <Sheet
+      title={confirmation?.action === 'delete' ? 'Delete transcript?' : 'Regenerate transcript?'}
+      visible={!!confirmation}
+      onClose={() => {
+        if (!app.busy) setConfirmation(null);
+      }}
+    >
+      <Text style={[ui.muted, { marginBottom: 16 }]}>
+        {confirmation?.action === 'delete'
+          ? 'Deletes this transcript from your account. The recording stays on this device.'
+          : 'Transcribes the recording again and replaces this text. If it fails, your text stays unchanged.'}
+      </Text>
+      {!!actionError && (
+        <Text accessibilityRole="alert" style={{ color: c.danger, marginBottom: 12 }}>
+          {actionError}
         </Text>
       )}
-      <View
-        style={{
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginTop: 8,
-          gap: 8,
+      <View style={{ flexDirection: 'row', alignItems: 'stretch', gap: 8 }}>
+        <Action
+          label="Cancel"
+          secondary
+          style={{ flex: 1, alignSelf: 'stretch', paddingHorizontal: 14 }}
+          disabled={app.busy}
+          onPress={() => setConfirmation(null)}
+        />
+        <Action
+          style={{ flex: 1 }}
+          label={
+            app.busy
+              ? 'Please wait…'
+              : confirmation?.action === 'delete'
+                ? 'Delete transcript'
+                : 'Regenerate'
+          }
+          disabled={app.busy || !app.available}
+          onPress={confirm}
+        />
+      </View>
+    </Sheet>
+  );
+  return (
+    <>
+      <Screen title="Transcripts" scroll={false}>
+        <View style={{ paddingHorizontal: 20, gap: 8, paddingBottom: 8 }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingLeft: 12,
+              backgroundColor: c.surfaceSubtle,
+              borderRadius: 12,
+            }}
+          >
+            <MagnifyingGlassIcon size={19} color={c.textMuted} />
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Search transcripts"
+              placeholderTextColor={c.textMuted}
+              accessibilityLabel="Search transcripts"
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={{
+                flex: 1,
+                minHeight: 48,
+                paddingHorizontal: 10,
+                color: c.text,
+                fontFamily: 'MonaSansRegular',
+                fontSize: 15,
+              }}
+            />
+            {!!search && (
+              <IconButton label="Clear search" onPress={() => setSearch('')}>
+                <XIcon size={18} color={c.textMuted} />
+              </IconButton>
+            )}
+          </View>
+        </View>
+        <FlatList
+          data={rows}
+          keyExtractor={(item) => item.id}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 24 }}
+          renderItem={({ item, index }) => (
+            <View>
+              {(index === 0 ||
+                new Date(rows[index - 1].createdAt).toDateString() !==
+                  new Date(item.createdAt).toDateString()) && (
+                <Text style={[ui.muted, { paddingTop: 16, paddingBottom: 4, fontWeight: '500' }]}>
+                  {dateLabel(item.createdAt)}
+                </Text>
+              )}
+              <View style={{ paddingVertical: 12, borderBottomWidth: 1, borderColor: c.border }}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Read transcript: ${item.text || 'No transcript yet'}`}
+                  onPress={() => open(item)}
+                  style={{ minHeight: 48, justifyContent: 'center' }}
+                >
+                  <Text numberOfLines={3} style={{ fontSize: 15, lineHeight: 23 }}>
+                    {item.text || 'No transcript yet. Open to recover this recording.'}
+                  </Text>
+                </Pressable>
+                <View style={{ gap: 4, paddingTop: 8 }}>
+                  <Text style={[ui.muted, { fontSize: 12 }]}>
+                    {new Date(item.createdAt).toLocaleTimeString(undefined, {
+                      hour: 'numeric',
+                      minute: '2-digit',
+                    })}{' '}
+                    · {item.wordCount} words · {audioTime(item.durationMs / 1000)}
+                    {!item.transcript ? ' · Original' : ''}
+                  </Text>
+                  {transcriptActions(item)}
+                </View>
+              </View>
+            </View>
+          )}
+          ListEmptyComponent={
+            loading ? (
+              <Loader label="Loading transcripts" />
+            ) : (
+              <View style={{ paddingVertical: 40, gap: 8 }}>
+                <Text style={ui.title}>
+                  {error
+                    ? 'Couldn’t load transcripts'
+                    : search
+                      ? 'No matching transcripts'
+                      : 'Your words, saved here'}
+                </Text>
+                <Text style={ui.muted}>
+                  {error
+                    ? 'Check your connection and try again.'
+                    : search
+                      ? 'Try a different word or clear your search.'
+                      : 'Record your first thought to get started.'}
+                </Text>
+                <Action
+                  label={error ? 'Retry' : search ? 'Clear search' : 'Start recording'}
+                  secondary
+                  onPress={
+                    error
+                      ? refresh
+                      : search
+                        ? () => setSearch('')
+                        : () => router.navigate('/(tabs)/home')
+                  }
+                />
+              </View>
+            )
+          }
+          ListFooterComponent={
+            rows.length > 0 ? (
+              <View style={{ paddingVertical: 8 }}>
+                {error && (
+                  <>
+                    <Text style={ui.muted}>
+                      Couldn’t refresh everything. Your saved transcripts are still here.
+                    </Text>
+                    <Action label="Retry" secondary onPress={refresh} />
+                  </>
+                )}
+                {query.cursor && !query.error && (
+                  <Action
+                    label={query.loading ? 'Loading more…' : 'Load more'}
+                    secondary
+                    disabled={query.loading || query.refreshing}
+                    onPress={() => void query.more()}
+                  />
+                )}
+              </View>
+            ) : null
+          }
+        />
+      </Screen>
+      {!selected && confirmationContent}
+      <Modal
+        visible={!!selected}
+        animationType="none"
+        onRequestClose={() => {
+          setConfirmation(null);
+          setSelected(null);
         }}
       >
-        <Text style={[ui.muted, { flex: 1 }]}>
-          {new Date(item.createdAt).toLocaleString()} · {item.wordCount} words ·{' '}
-          {(item.durationMs / 60000).toFixed(1)} min
-        </Text>
-        <View style={{ flexDirection: 'row' }}>
-          {[
-            { label: 'Copy transcript', onPress: onCopy, icon: CopyIcon },
-            { label: 'Delete transcript', onPress: onDelete, icon: TrashIcon },
-          ].map(({ label, onPress, icon: Icon }) => (
-            <Pressable
-              key={label}
-              accessibilityRole="button"
-              accessibilityLabel={label}
-              onPress={onPress}
-              style={{
-                minWidth: 44,
-                minHeight: 44,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
+        {selected && (
+          <Screen
+            title="Transcript"
+            scroll={false}
+            onBack={() => {
+              setConfirmation(null);
+              setSelected(null);
+            }}
+          >
+            <View style={{ paddingHorizontal: 20, paddingBottom: 16, gap: 12 }}>
+              <Text style={ui.muted}>
+                {dateLabel(selected.createdAt)} ·{' '}
+                {new Date(selected.createdAt).toLocaleTimeString(undefined, {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                })}{' '}
+                · {selected.wordCount} words
+              </Text>
+              {selected.local?.audioAvailable ? (
+                <View style={{ gap: 4 }}>
+                  <RecordingPlayer key={selected.id} id={selected.id} autoPlay={autoPlay} />
+                  <Text style={ui.muted}>Audio stays on this device.</Text>
+                </View>
+              ) : (
+                <Text style={ui.muted}>Audio isn’t saved on this device.</Text>
+              )}
+              {transcriptActions(selected, true)}
+            </View>
+            <ScrollView
+              contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32, gap: 16 }}
             >
-              <Icon size={20} color={c.primary} />
-            </Pressable>
-          ))}
-        </View>
-      </View>
-    </Card>
+              <Text selectable style={{ fontSize: 17, lineHeight: 28 }}>
+                {selected.text || 'No transcript yet. Regenerate it from the recording above.'}
+              </Text>
+              {selected.local && !selected.transcript && (
+                <Text style={ui.muted}>Original text saved on this device.</Text>
+              )}
+            </ScrollView>
+            {confirmationContent}
+          </Screen>
+        )}
+      </Modal>
+    </>
   );
 }

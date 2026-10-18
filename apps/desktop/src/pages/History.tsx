@@ -1,11 +1,29 @@
 import { useState, useDeferredValue, useRef } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { CopyIcon, TrashSimpleIcon } from '../components/icons';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import {
+  ArrowLeftIcon,
+  ArrowsClockwiseIcon,
+  CopyIcon,
+  DotsThreeIcon,
+  DownloadSimpleIcon,
+  FileTextIcon,
+  MicrophoneIcon,
+  MagnifyingGlassIcon,
+  TrashSimpleIcon,
+} from '../components/icons';
 import { PageHeader } from '../components/layout';
 import { Loader } from '../components/loader';
-import { Button, IconButton } from '../components/ui';
-import { Card } from '../components/ui/card';
+import { Button } from '../components/ui';
 import { Input } from '../components/ui/input';
+import { RecordingPlayer } from '../components/recording-player';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -14,146 +32,369 @@ import {
   AlertDialogFooter,
   AlertDialogCancel,
 } from '../components/ui/alert-dialog';
-import { api, useHistory, useCopy } from '../lib/api';
-import { duration, type HistoryItem } from '../lib/types';
-export function HistoryPage({ onRecord }: { onRecord: () => void }) {
-  const [search, setSearch] = useState(''),
-    [deleting, setDeleting] = useState<HistoryItem | null>(null);
-  const query = useDeferredValue(search),
+import { api, native, useAuthUser, useHistory, useCopy, useSession } from '../lib/api';
+import { duration, errorMessage, isActive } from '../lib/types';
+import { libraryItems, type LibraryItem } from '../lib/transcript-library';
+
+export function HistoryPage({
+  onRecord,
+  initialId,
+}: {
+  onRecord: () => void;
+  initialId?: string | null;
+}) {
+  const [search, setSearch] = useState('');
+  const [selectedId, setSelectedId] = useState<string | null>(initialId ?? null);
+  const [confirmation, setConfirmation] = useState<{
+    kind: 'delete' | 'regenerate';
+    item: LibraryItem;
+  } | null>(null);
+  const query = useDeferredValue(search);
+  const auth = useAuthUser(),
     history = useHistory(query),
-    client = useQueryClient(),
     copy = useCopy();
-  const deleteTrigger = useRef<HTMLButtonElement | null>(null);
-  const remove = useMutation({
-    mutationFn: api.deleteHistory,
-    onSuccess: () => {
-      setDeleting(null);
+  const client = useQueryClient();
+  const { data: session } = useSession();
+  const active = isActive(session.phase);
+  const recordings = useQuery({
+    queryKey: ['local-recordings', auth.data?.id],
+    queryFn: api.localRecordings,
+    enabled: !!auth.data,
+  });
+  const readerHeading = useRef<HTMLHeadingElement>(null);
+  const searchInput = useRef<HTMLInputElement>(null);
+  const selectedButton = useRef<HTMLButtonElement | null>(null);
+  const mutation = useMutation({
+    meta: { suppressErrorToast: true },
+    mutationFn: async (action: NonNullable<typeof confirmation>) => {
+      if (action.kind === 'delete') await api.deleteHistory(action.item.id);
+      else await api.regenerateTranscript(action.item.id, auth.data!.id);
+    },
+    onSuccess: (_, action) => {
+      if (action.kind === 'delete') setSelectedId(null);
+      else toast.success('Transcript regenerated');
+      setConfirmation(null);
       void client.invalidateQueries({ queryKey: ['history'] });
-      void client.invalidateQueries({ queryKey: ['analytics'] });
+      void client.invalidateQueries({ queryKey: ['local-recordings'] });
     },
   });
-  const items = history.data?.pages.flatMap((p) => p.items) ?? [];
+  const items = libraryItems(
+    history.data?.pages.flatMap((page) => page.items) ?? [],
+    recordings.data ?? [],
+    query,
+  );
+  const selected = items.find((item) => item.id === selectedId);
+  const searching = search !== query || history.isPlaceholderData;
+  const loading = history.isPending || recordings.isPending;
+  const failed = history.isError || recordings.isError;
+  const refresh = () => {
+    void history.refetch();
+    void recordings.refetch();
+  };
+  const select = (item: LibraryItem, button: HTMLButtonElement) => {
+    selectedButton.current = button;
+    setSelectedId(item.id);
+    requestAnimationFrame(() => readerHeading.current?.focus({ preventScroll: true }));
+  };
+  const showConfirmation = (kind: 'delete' | 'regenerate', item: LibraryItem) => {
+    mutation.reset();
+    setConfirmation({ kind, item });
+  };
   return (
     <>
-      <PageHeader title="Transcripts" />
-      <Input
-        type="search"
-        placeholder="Search transcripts"
-        aria-label="Search transcripts"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="mb-5 max-w-sm"
+      <PageHeader
+        title="Transcripts"
+        actions={
+          <Button variant="primary" onClick={onRecord}>
+            <MicrophoneIcon size={16} />
+            New recording
+          </Button>
+        }
       />
-      <Card className="overflow-hidden shadow-none">
-        {history.isPending ? (
-          <Loader />
-        ) : history.isError && !items.length ? (
-          <div className="p-6" role="alert">
-            Couldn’t load transcripts. <Button onClick={() => void history.refetch()}>Retry</Button>
-          </div>
-        ) : !items.length ? (
-          <div className="py-12 text-center">
-            <p className="mb-4 text-ui text-muted">
-              {search ? 'No matches' : 'No transcripts yet'}
-            </p>
-            <Button onClick={search ? () => setSearch('') : onRecord}>
-              {search ? 'Clear search' : 'Start recording'}
-            </Button>
-          </div>
-        ) : (
-          <div className="divide-y divide-line">
-            {items.map((item) => (
-              <article key={item.id} className="px-5 py-4">
-                <div className="flex flex-wrap items-center justify-between gap-2 text-caption text-muted">
-                  <time dateTime={new Date(item.createdAt).toISOString()}>
-                    {new Date(item.createdAt).toLocaleString(undefined, {
-                      month: 'short',
+      <div className="library-toolbar">
+        <div className="relative min-w-0 flex-1 sm:max-w-xs">
+          <MagnifyingGlassIcon
+            size={16}
+            className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted"
+            aria-hidden="true"
+          />
+          <Input
+            ref={searchInput}
+            type="search"
+            placeholder="Search transcripts"
+            aria-label="Search library"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setSelectedId(null);
+            }}
+            className="pl-9"
+          />
+        </div>
+      </div>
+      <span className="sr-only" role="status">
+        {searching ? 'Searching…' : ''}
+      </span>
+      <div className="transcript-workspace" data-selected={!!selected} data-empty={!items.length}>
+        <section
+          className="transcript-list"
+          aria-label="Transcript list"
+          aria-busy={searching || loading}
+        >
+          {loading && !items.length ? (
+            <Loader />
+          ) : failed && !items.length ? (
+            <div className="library-empty" role="alert">
+              <p>Couldn’t load transcripts.</p>
+              <Button onClick={refresh}>Retry</Button>
+            </div>
+          ) : searching && !items.length ? (
+            <div className="library-empty">
+              <p className="text-ui text-muted">Searching…</p>
+            </div>
+          ) : !items.length ? (
+            <div className="library-empty">
+              <FileTextIcon size={26} className="text-muted" aria-hidden="true" />
+              <h2 className="text-title font-medium">
+                {search ? 'No matches' : 'No transcripts yet'}
+              </h2>
+              <p className="text-ui text-muted">
+                {search ? 'Try another word or phrase.' : 'Your next recording will appear here.'}
+              </p>
+              <Button variant="outline" onClick={search ? () => setSearch('') : onRecord}>
+                {search ? 'Clear search' : 'Start recording'}
+              </Button>
+            </div>
+          ) : (
+            <>
+              {failed && (
+                <div
+                  className="flex items-center justify-between gap-2 px-4 py-2 text-caption text-muted"
+                  role="status"
+                >
+                  Couldn’t refresh everything. Showing saved transcripts.
+                  <Button size="sm" variant="ghost" onClick={refresh}>
+                    Retry
+                  </Button>
+                </div>
+              )}
+              <ul>
+                {items.map((item) => (
+                  <li key={item.id}>
+                    <button
+                      className="transcript-row"
+                      aria-pressed={selectedId === item.id}
+                      onClick={(e) => select(item, e.currentTarget)}
+                    >
+                      <span className="line-clamp-2 text-ui font-medium text-ink [overflow-wrap:anywhere]">
+                        {item.text || 'Recording without a transcript'}
+                      </span>
+                      <span className="mt-2 flex items-center gap-2 text-caption text-muted">
+                        <time dateTime={new Date(item.createdAt).toISOString()}>
+                          {new Date(item.createdAt).toLocaleDateString(undefined, {
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </time>
+                        <span>·</span>
+                        <span>{duration(item.durationMs)}</span>
+                        {!item.transcript && <span>Original</span>}
+                        <span className="ml-auto">
+                          {item.recording?.audioFile ? (
+                            <MicrophoneIcon size={14} aria-label="Audio available" />
+                          ) : (
+                            `${item.words} words`
+                          )}
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {(history.hasNextPage || history.isFetchNextPageError) && (
+                <div className="p-3">
+                  <Button
+                    className="w-full"
+                    variant="ghost"
+                    loading={history.isFetchingNextPage}
+                    onClick={() => void history.fetchNextPage()}
+                  >
+                    {history.isFetchNextPageError ? 'Retry loading more' : 'Load more'}
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+        </section>
+        <section className="transcript-reader" aria-label="Transcript reader">
+          {selected ? (
+            <>
+              <div className="reader-toolbar">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="reader-back"
+                  onClick={() => {
+                    setSelectedId(null);
+                    requestAnimationFrame(() =>
+                      (selectedButton.current?.isConnected
+                        ? selectedButton.current
+                        : searchInput.current
+                      )?.focus(),
+                    );
+                  }}
+                >
+                  <ArrowLeftIcon size={16} />
+                  Back
+                </Button>
+                <div className="min-w-0 flex-1">
+                  <h2
+                    ref={readerHeading}
+                    tabIndex={-1}
+                    className="text-ui font-semibold outline-none"
+                  >
+                    {new Date(selected.createdAt).toLocaleDateString(undefined, {
+                      month: 'long',
                       day: 'numeric',
+                      year: 'numeric',
+                    })}
+                  </h2>
+                  <p className="mt-1 text-caption text-muted">
+                    {new Date(selected.createdAt).toLocaleTimeString(undefined, {
                       hour: 'numeric',
                       minute: '2-digit',
-                    })}
-                  </time>
-                  <span>
-                    {item.words} words · {duration(item.durationMs)}
-                  </span>
+                    })}{' '}
+                    · {selected.words} words · {duration(selected.durationMs)}
+                  </p>
                 </div>
-                <p className="mt-3 select-text whitespace-pre-wrap text-body leading-relaxed [overflow-wrap:anywhere]">
-                  {item.text || 'Empty transcript'}
+                <Button
+                  variant="ghost"
+                  disabled={!selected.text || copy.isPending}
+                  onClick={() => copy.mutate(selected.text)}
+                >
+                  <CopyIcon size={16} />
+                  Copy
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" aria-label="More transcript actions">
+                      <DotsThreeIcon size={20} />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {selected.recording?.originalText && (
+                      <DropdownMenuItem
+                        disabled={copy.isPending}
+                        onSelect={() => copy.mutate(selected.recording!.originalText)}
+                      >
+                        <CopyIcon />
+                        Copy original text
+                      </DropdownMenuItem>
+                    )}
+                    {selected.recording?.audioFile && (
+                      <DropdownMenuItem
+                        disabled={!native}
+                        onSelect={() =>
+                          void api
+                            .exportRecording(selected.id)
+                            .catch((e) => toast.error(errorMessage(e)))
+                        }
+                      >
+                        <DownloadSimpleIcon />
+                        Export audio
+                      </DropdownMenuItem>
+                    )}
+                    {selected.recording && selected.transcript && <DropdownMenuSeparator />}
+                    {selected.transcript && (
+                      <DropdownMenuItem
+                        className="text-danger focus:text-danger"
+                        disabled={!native || !selected.transcript || mutation.isPending}
+                        onSelect={() => showConfirmation('delete', selected)}
+                      >
+                        <TrashSimpleIcon />
+                        Delete transcript
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+              {selected.recording?.audioFile && auth.data && (
+                <div className="px-5 pt-4">
+                  <RecordingPlayer
+                    key={`${auth.data.id}:${selected.id}`}
+                    id={selected.id}
+                    userId={auth.data.id}
+                    disabled={active || mutation.isPending}
+                    durationMs={selected.durationMs}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="mt-1"
+                    disabled={!native || active || mutation.isPending}
+                    onClick={() => showConfirmation('regenerate', selected)}
+                  >
+                    <ArrowsClockwiseIcon size={16} />
+                    Regenerate
+                  </Button>
+                </div>
+              )}
+              <div className="reader-content">
+                <p className="select-text whitespace-pre-wrap text-transcript [overflow-wrap:anywhere]">
+                  {selected.text ||
+                    'No text was received. Play the recording or regenerate its transcript above.'}
                 </p>
-                <div className="mt-3 flex justify-end gap-2">
-                  <IconButton
-                    label="Copy transcript"
-                    disabled={copy.isPending}
-                    onClick={() => copy.mutate(item.text)}
-                  >
-                    <CopyIcon size={20} />
-                  </IconButton>
-                  <IconButton
-                    label="Delete transcript"
-                    disabled={remove.isPending}
-                    onClick={(e) => {
-                      deleteTrigger.current = e.currentTarget;
-                      remove.reset();
-                      setDeleting(item);
-                    }}
-                  >
-                    <TrashSimpleIcon size={20} />
-                  </IconButton>
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-      </Card>
-      {history.isFetchNextPageError && (
-        <p role="alert" className="mt-4 text-ui text-danger">
-          Couldn’t load more transcripts.
-        </p>
-      )}
-      {(history.hasNextPage || history.isFetchNextPageError) && (
-        <Button
-          className="mx-auto mt-4 flex"
-          variant="outline"
-          loading={history.isFetchingNextPage}
-          onClick={() => void history.fetchNextPage()}
-        >
-          {history.isFetchNextPageError ? 'Retry' : 'Load more'}
-        </Button>
-      )}
+              </div>
+            </>
+          ) : (
+            <div className="library-empty">
+              <FileTextIcon size={28} className="text-muted" aria-hidden="true" />
+              <h2 className="text-title font-medium">Select a transcript</h2>
+              <p className="max-w-[25ch] text-ui text-muted">
+                Choose a transcript to read, copy, or listen to its recording.
+              </p>
+            </div>
+          )}
+        </section>
+      </div>
       <AlertDialog
-        open={!!deleting}
+        open={!!confirmation}
         onOpenChange={(open) => {
-          if (!open && !remove.isPending) setDeleting(null);
+          if (!open && !mutation.isPending) setConfirmation(null);
         }}
       >
         <AlertDialogContent
           onCloseAutoFocus={(e) => {
             e.preventDefault();
-            if (deleteTrigger.current?.isConnected) deleteTrigger.current.focus();
-            else document.querySelector<HTMLInputElement>('input[type="search"]')?.focus();
+            if (readerHeading.current) readerHeading.current.focus();
+            else searchInput.current?.focus();
           }}
         >
-          <AlertDialogTitle>Delete this transcript?</AlertDialogTitle>
+          <AlertDialogTitle>
+            {confirmation?.kind === 'delete'
+              ? 'Delete this transcript?'
+              : 'Regenerate this transcript?'}
+          </AlertDialogTitle>
           <AlertDialogDescription>
-            This removes the transcript from your account and this device’s cache. Other devices
-            update after sync.
+            {confirmation?.kind === 'delete'
+              ? 'This removes the transcript from your account and synced devices. Its local audio and original text stay on this device until replaced by newer takes.'
+              : 'VoxType will transcribe the saved audio again and replace the current text. The recording stays on this device.'}
           </AlertDialogDescription>
-          <p className="line-clamp-2 text-ui text-muted">{deleting?.text}</p>
-          {remove.isError && (
+          {mutation.isError && (
             <p role="alert" className="text-ui text-danger">
-              Deletion failed. The transcript is still available. Check your connection and retry.
+              {errorMessage(mutation.error)}
             </p>
           )}
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={remove.isPending}>Keep transcript</AlertDialogCancel>
+            <AlertDialogCancel disabled={mutation.isPending}>Cancel</AlertDialogCancel>
             <Button
-              variant="danger"
-              loading={remove.isPending}
+              variant={confirmation?.kind === 'delete' ? 'danger' : 'primary'}
+              loading={mutation.isPending}
               onClick={() => {
-                if (deleting) remove.mutate(deleting.id);
+                if (confirmation) mutation.mutate(confirmation);
               }}
             >
-              Delete transcript
+              {confirmation?.kind === 'delete' ? 'Delete transcript' : 'Regenerate'}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

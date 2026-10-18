@@ -15,6 +15,8 @@ import okhttp3.RequestBody.Companion.toRequestBody
 object TranscriptUploads {
   private val lock = Mutex()
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+  private var lastAccount: Triple<String, String, String>? = null
+  private var lastSyncAt = 0L
   @Volatile var syncing = false; private set
   @Volatile var error = ""; private set
   fun request(context: Context) {
@@ -28,6 +30,8 @@ object TranscriptUploads {
     val user = session.userId ?: return@withLock
     val url = session.apiUrl ?: return@withLock
     val bearer = session.token ?: return@withLock
+    val account = Triple(user, url, bearer)
+    if (lastAccount == account && android.os.SystemClock.elapsedRealtime() - lastSyncAt < 120_000L) return@withLock
     fun sameAccount() = session.userId == user && session.apiUrl == url && session.token == bearer
     syncing = true; error = ""; VoxTypeNativeModule.changed()
     try {
@@ -57,6 +61,7 @@ object TranscriptUploads {
         if (sameAccount()) {
           store.reconcile(user, url, cloudIds)
           sendPending(store, user, url, bearer)
+          if (sameAccount()) { lastAccount = account; lastSyncAt = android.os.SystemClock.elapsedRealtime() }
         }
       }
     } catch (failure: Exception) {
@@ -64,6 +69,11 @@ object TranscriptUploads {
     } finally { syncing = false; VoxTypeNativeModule.changed() }
   }
 
+
+  fun sendPendingAsync(context: Context) {
+    val app = context.applicationContext
+    scope.launch { sendPending(app) }
+  }
 
   suspend fun sendPending(context: Context) = lock.withLock {
     TranscriptSyncJob.schedule(context)
@@ -77,6 +87,12 @@ object TranscriptUploads {
     } catch (e: Exception) {
       VoxLog.w("transcript queued for cloud retry", e)
     }
+  }
+
+  internal suspend fun replaceTranscript(context: Context, id: String, user: String, api: String,
+    raw: String, text: String, sameAccount: () -> Boolean) = lock.withLock {
+    check(sameAccount()) { "Account changed" }
+    VoxTypeStore(context).use { it.replaceTranscript(user,id,raw,text,api) }
   }
 
   /** Serialize delete with restore/upload so a queued PUT cannot resurrect the record. */
@@ -106,6 +122,7 @@ object TranscriptUploads {
     }
     if (currentAccount() != account) throw java.io.IOException("Account changed. Try again.")
     VoxTypeStore(context).use { it.delete(userId,id,apiUrl) }
+    VoxTypeNativeModule.changed("analytics")
   }
 
   internal fun sendPending(
@@ -116,14 +133,15 @@ object TranscriptUploads {
     client: OkHttpClient = HttpClients.uploads,
   ) {
     store.prepareUploads(userId, apiUrl)
-    for (item in store.pendingUploads(userId, apiUrl)) {
+    var uploaded = false
+    try { for (item in store.pendingUploads(userId, apiUrl)) {
       val request = Request.Builder().url("$apiUrl/v1/dictations/${item.id}")
         .header("Authorization", "Bearer $bearer")
         .put(item.payload.toString().toRequestBody("application/json".toMediaType())).build()
       client.newCall(request).execute().use { response ->
         if (!response.isSuccessful) throw java.io.IOException("Transcript upload HTTP ${response.code}")
-        store.acknowledgeUpload(item); VoxTypeNativeModule.changed()
+        store.acknowledgeUpload(item); uploaded = true
       }
-    }
+    } } finally { if (uploaded) VoxTypeNativeModule.changed("analytics") }
   }
 }

@@ -5,20 +5,20 @@ import { Screen } from '../components/screen';
 import { Action, Loader, Text } from '../components/primitives';
 import { RangeControl, Metrics, ActivityCalendar, TrendChart } from '../components/analytics';
 import { styles as ui } from '../components/styles';
-import { useAppState, useAnalyticsData } from '../state/app-state';
-import { exportInsights } from '../lib/mobile-api';
+import { useAnalyticsData } from '../state/app-state';
 export default function InsightsScreen() {
-  const app = useAppState(),
-    [range, setRange] = useState<AnalyticsRange>('30d'),
+  const [range, setRange] = useState<AnalyticsRange>('30d'),
     query = useAnalyticsData(range),
-    data = query.data,
-    [definitions, setDefinitions] = useState(false);
+    data = query.data;
   return (
     <Screen title="Insights">
       <RangeControl value={range} onChange={setRange} />
-      {query.loading ? (
+      {query.error && data && (
+        <Action label="Retry insights refresh" secondary onPress={query.retry} />
+      )}
+      {query.loading && !data ? (
         <Loader />
-      ) : query.error ? (
+      ) : query.error && !data ? (
         <>
           <Text style={ui.muted}>Insights unavailable</Text>
           <Action label="Retry" secondary onPress={query.retry} />
@@ -41,25 +41,6 @@ export default function InsightsScreen() {
             </View>
             <ActivityCalendar key={data.activity.start} data={data} />
             <TrendChart data={data} />
-            <Action
-              label={definitions ? 'Hide definitions' : 'Definitions'}
-              secondary
-              onPress={() => setDefinitions(!definitions)}
-            />
-            {definitions && (
-              <Text style={ui.muted}>
-                Speed is words divided by recorded minutes. Average session is minutes divided by
-                dictations. Streaks use full account history and end today or yesterday. Canceled
-                recordings and microphone tests are excluded. Dates use {data.timezone}. Pending
-                uploads appear after sync.
-              </Text>
-            )}
-            <Action
-              label="Export CSV"
-              secondary
-              disabled={!app.available || app.busy || !data.summary.dictations}
-              onPress={() => void app.run(() => exportInsights(range))}
-            />
           </>
         )
       )}

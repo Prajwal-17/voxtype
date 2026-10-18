@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
-import { CopyIcon, MicrophoneIcon, StopIcon, XIcon } from '../components/icons';
-import { PageHeader } from '../components/layout';
+import { ArrowRightIcon, CopyIcon, MicrophoneIcon, StopIcon, XIcon } from '../components/icons';
+import { PageHeader, StatusDot } from '../components/layout';
 import { Loader } from '../components/loader';
 import { Button, IconButton } from '../components/ui';
-import { Card } from '../components/ui/card';
 import { MetricStrip } from '../components/analytics';
 import { Waveform } from '../components/waveform';
 import {
@@ -17,12 +16,15 @@ import {
   useSession,
 } from '../lib/api';
 import { duration, isActive } from '../lib/types';
+
 export function HomePage({
   visible,
   onNavigate,
+  onOpenTranscript,
 }: {
   visible: boolean;
   onNavigate: (page: 'insights' | 'transcripts') => void;
+  onOpenTranscript: (id: string) => void;
 }) {
   const analytics = useAnalytics(),
     history = useHistory(),
@@ -44,67 +46,35 @@ export function HomePage({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [visible, active, recording.cancel]);
-  const start = async () => {
-    setOwnedId(await recording.start.mutateAsync(false));
-  };
+  const start = async () => setOwnedId(await recording.start.mutateAsync(false));
   return (
     <>
       <PageHeader title="Home" />
-      <Card className="overflow-hidden shadow-none">
-        <div className="flex min-h-[158px] items-center gap-5 p-[22px] max-sm:flex-wrap">
-          <div className="flex size-[60px] shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent">
-            <MicrophoneIcon size={28} />
+      <section className="home-recorder" aria-label="Recorder">
+        <div className="recorder-controls">
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-panel bg-accent-soft text-accent">
+            <MicrophoneIcon size={22} aria-hidden="true" />
           </div>
           <div className="min-w-0 flex-1">
-            <h2 className="text-[22px] font-semibold tracking-tight">Dictation</h2>
-            {active && (
-              <p role="status" className="mt-1 text-ui text-muted">
-                {take?.phase === 'listening'
-                  ? 'Recording'
+            <h2 className="text-subheading font-semibold tracking-tight">
+              {active
+                ? take?.phase === 'listening'
+                  ? 'Listening…'
                   : take?.phase === 'cleaning'
-                    ? 'Cleaning'
-                    : 'Transcribing'}{' '}
-                · {duration(take?.elapsedMs ?? 0)}
-              </p>
-            )}
-            <div className="mt-3 flex flex-wrap gap-2">
+                    ? 'Cleaning up…'
+                    : 'Transcribing…'
+                : 'Turn a thought into text'}
+            </h2>
+            <p className="mt-1 text-ui text-muted" role={active ? 'status' : undefined}>
               {active ? (
                 <>
-                  <Button
-                    variant="primary"
-                    onClick={() => recording.stop.mutate()}
-                    disabled={globalSession.phase !== 'listening'}
-                    loading={recording.pending}
-                  >
-                    <StopIcon size={16} />
-                    Finish recording
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    onClick={() => recording.cancel.mutate()}
-                    disabled={recording.pending}
-                  >
-                    <XIcon size={16} />
-                    Cancel
-                  </Button>
+                  <StatusDot live />{' '}
+                  <span className="ml-1 tabular-nums">{duration(take?.elapsedMs ?? 0)}</span>
                 </>
               ) : (
-                <Button
-                  variant="primary"
-                  onClick={() => void start().catch(() => {})}
-                  disabled={!native || isActive(globalSession.phase)}
-                  loading={recording.pending}
-                >
-                  <MicrophoneIcon size={17} />
-                  {take?.text ? 'Record again' : 'Start recording'}
-                </Button>
+                'Record, read, and get back to what you were doing.'
               )}
-            </div>
-            {!native && (
-              <p className="mt-2 text-caption text-muted">
-                Recording is available in the installed app.
-              </p>
-            )}
+            </p>
           </div>
           {active && (
             <Waveform
@@ -112,90 +82,153 @@ export function HomePage({
               active={visible && take?.phase === 'listening'}
             />
           )}
+          <div className="flex items-center gap-2">
+            {active ? (
+              <>
+                <Button
+                  variant="primary"
+                  onClick={() => recording.stop.mutate()}
+                  disabled={globalSession.phase !== 'listening'}
+                  loading={recording.pending}
+                >
+                  <StopIcon size={16} weight="fill" />
+                  Finish
+                </Button>
+                <IconButton
+                  label="Cancel recording"
+                  onClick={() => recording.cancel.mutate()}
+                  disabled={recording.pending}
+                >
+                  <XIcon size={18} />
+                </IconButton>
+              </>
+            ) : (
+              <Button
+                variant="primary"
+                onClick={() => void start().catch(() => {})}
+                disabled={!native || isActive(globalSession.phase)}
+                loading={recording.pending}
+              >
+                <MicrophoneIcon size={16} />
+                {take?.text ? 'Record again' : 'Start recording'}
+              </Button>
+            )}
+          </div>
         </div>
-        <div className="flex flex-wrap justify-between gap-2 border-t border-line bg-raised px-5 py-3 text-caption text-muted">
-          <span>{boot.data?.settings.microphone || 'System default'}</span>
+        <div className="recorder-context">
           <span>
+            {boot.data?.settings.microphone || 'System microphone'} ·{' '}
             {boot.data?.settings.language === 'multi'
               ? 'Multilingual'
               : boot.data?.settings.language.toUpperCase()}
           </span>
+          {!native && <span>Recording is available in the installed app.</span>}
         </div>
         {(take?.text || take?.interim) && (
-          <div className="border-t border-line p-5">
-            <p className="select-text whitespace-pre-wrap text-transcript [overflow-wrap:anywhere]">
-              {take.text} <span className="text-muted">{take.interim}</span>
-            </p>
+          <div className="recorder-result">
+            <div className="max-h-60 overflow-y-auto">
+              <p className="max-w-[70ch] select-text whitespace-pre-wrap text-transcript [overflow-wrap:anywhere]">
+                {take.text} <span className="text-muted">{take.interim}</span>
+              </p>
+            </div>
             {!active && take.text && (
-              <Button variant="outline" className="mt-4" onClick={() => copy.mutate(take.text)}>
-                <CopyIcon size={20} />
+              <Button variant="ghost" className="mt-3" onClick={() => copy.mutate(take.text)}>
+                <CopyIcon size={16} />
                 Copy text
               </Button>
             )}
           </div>
         )}
         {take?.phase === 'error' && (
-          <p role="alert" className="px-5 py-3 text-ui text-danger">
-            {take.message}
-          </p>
+          <div className="px-5 pb-4">
+            <p role="alert" className="mb-2 text-ui text-danger">
+              {take.message}
+            </p>
+            <Button variant="outline" onClick={() => onNavigate('transcripts')}>
+              Recover recording
+            </Button>
+          </div>
         )}
         {take?.cleanupWarning && (
-          <p role="status" className="px-5 py-3 text-ui text-warning">
+          <p role="status" className="px-5 pb-4 text-ui text-warning">
             {take.cleanupWarning}
           </p>
         )}
-      </Card>
-      <div className="mt-5 mb-2 flex items-center justify-between">
-        <span className="text-caption text-muted">Last 30 days</span>
-        <Button variant="link" onClick={() => onNavigate('insights')}>
-          Insights →
-        </Button>
-      </div>
-      {analytics.isPending ? (
-        <Loader />
-      ) : analytics.isError ? (
-        <p role="alert" className="text-ui text-muted">
-          Overview unavailable. <Button onClick={() => void analytics.refetch()}>Retry</Button>
-        </p>
-      ) : (
-        analytics.data && <MetricStrip data={analytics.data} />
-      )}
-      <div className="mt-5 flex items-center justify-between">
-        <h2 className="text-title font-semibold">Recent transcripts</h2>
-        <Button variant="link" onClick={() => onNavigate('transcripts')}>
-          View all →
-        </Button>
-      </div>
-      {history.isPending ? (
-        <Loader />
-      ) : history.isError ? (
-        <p role="alert" className="text-ui text-muted">
-          Transcripts unavailable. <Button onClick={() => void history.refetch()}>Retry</Button>
-        </p>
-      ) : !history.data?.pages[0]?.items.length ? (
-        <p className="py-5 text-ui text-muted">No transcripts yet</p>
-      ) : (
-        <div className="divide-y divide-line">
-          {history.data.pages[0].items.slice(0, 3).map((item) => (
-            <div key={item.id} className="flex items-center gap-3 py-3">
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-ui font-medium">{item.text || 'Empty transcript'}</p>
-                <p className="mt-1 text-caption text-muted">
-                  {new Date(item.createdAt).toLocaleString()} · {item.words} words ·{' '}
-                  {duration(item.durationMs)}
-                </p>
-              </div>
-              <IconButton
-                label="Copy transcript"
-                disabled={copy.isPending}
-                onClick={() => copy.mutate(item.text)}
-              >
-                <CopyIcon size={20} />
-              </IconButton>
-            </div>
-          ))}
+      </section>
+      <section className="home-section" aria-label="Recording overview">
+        <div className="section-heading">
+          <div className="flex items-baseline gap-3">
+            <h2 className="text-title font-semibold">Your activity</h2>
+            <span className="text-caption text-muted">Last 30 days</span>
+          </div>
+          <Button variant="link" size="sm" onClick={() => onNavigate('insights')}>
+            Insights
+            <ArrowRightIcon size={14} />
+          </Button>
         </div>
-      )}
+        {analytics.isPending ? (
+          <Loader />
+        ) : analytics.isError && !analytics.data ? (
+          <p role="alert" className="text-ui text-muted">
+            Overview unavailable.{' '}
+            <Button variant="ghost" size="sm" onClick={() => void analytics.refetch()}>
+              Retry
+            </Button>
+          </p>
+        ) : (
+          analytics.data && <MetricStrip data={analytics.data} />
+        )}
+      </section>
+      <section className="home-section" aria-label="Recent transcripts">
+        <div className="section-heading">
+          <h2 className="text-title font-semibold">Recent transcripts</h2>
+          <Button variant="link" size="sm" onClick={() => onNavigate('transcripts')}>
+            View all
+            <ArrowRightIcon size={14} />
+          </Button>
+        </div>
+        {history.isPending ? (
+          <Loader />
+        ) : history.isError && !history.data ? (
+          <p role="alert" className="text-ui text-muted">
+            Transcripts unavailable.{' '}
+            <Button variant="ghost" size="sm" onClick={() => void history.refetch()}>
+              Retry
+            </Button>
+          </p>
+        ) : !history.data?.pages[0]?.items.length ? (
+          <p className="py-6 text-ui text-muted">
+            Your transcripts will be here after your first recording.
+          </p>
+        ) : (
+          <div className="divide-y divide-line">
+            {history.data.pages[0].items.slice(0, 4).map((item) => (
+              <div key={item.id} className="recent-transcript">
+                <button
+                  className="min-w-0 flex-1 py-3 text-left"
+                  onClick={() => onOpenTranscript(item.id)}
+                >
+                  <p className="truncate text-ui font-medium">{item.text || 'Empty transcript'}</p>
+                  <p className="mt-1 text-caption text-muted">
+                    {new Date(item.createdAt).toLocaleDateString(undefined, {
+                      month: 'short',
+                      day: 'numeric',
+                    })}{' '}
+                    · {item.words} words · {duration(item.durationMs)}
+                  </p>
+                </button>
+                <IconButton
+                  label="Copy transcript"
+                  disabled={copy.isPending}
+                  onClick={() => copy.mutate(item.text)}
+                >
+                  <CopyIcon size={16} />
+                </IconButton>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
     </>
   );
 }

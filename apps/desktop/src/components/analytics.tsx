@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { color } from '@voxtype/shared';
 import {
   activityDescription,
@@ -15,11 +15,7 @@ export function RangeControl({
   onChange: (value: AnalyticsRange) => void;
 }) {
   return (
-    <div
-      className="inline-flex rounded-control bg-subtle p-1"
-      role="group"
-      aria-label="Insights period"
-    >
+    <div className="compact-tabs" role="group" aria-label="Insights period">
       {(
         [
           ['7d', '7 days'],
@@ -31,7 +27,7 @@ export function RangeControl({
           key={id}
           aria-pressed={value === id}
           onClick={() => onChange(id)}
-          className={`min-h-8 rounded-menu-item px-3 text-caption focus-visible:outline-2 focus-visible:outline-accent ${value === id ? 'bg-surface font-semibold text-accent' : 'text-muted'}`}
+          className={value === id ? 'is-current' : undefined}
         >
           {label}
         </button>
@@ -83,10 +79,7 @@ export function ActivityCalendar({ data }: { data: Analytics }) {
     if (focus) buttons.current[next]?.focus();
   };
   return (
-    <section
-      className="rounded-panel border border-line bg-surface p-5"
-      aria-label="Activity calendar"
-    >
+    <section className="insights-section" aria-label="Activity calendar">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-title font-semibold">Activity</h2>
         <span className="text-caption text-muted">
@@ -99,7 +92,7 @@ export function ActivityCalendar({ data }: { data: Analytics }) {
       </p>
       {days.length ? (
         <>
-          <div className="mt-5 flex flex-wrap items-start gap-x-10 gap-y-5">
+          <div className="mt-4 flex flex-wrap items-start gap-x-10 gap-y-4">
             <div className="w-[239px] shrink-0">
               <div className="flex">
                 <div className="w-8 pt-5 text-[11px] leading-[30px] text-muted" aria-hidden="true">
@@ -177,7 +170,7 @@ export function ActivityCalendar({ data }: { data: Analytics }) {
             </div>
             {day && (
               <div
-                className="min-w-[180px] flex-1 rounded-control bg-subtle p-5"
+                className="min-w-[180px] flex-1 py-2"
                 role="status"
                 aria-label={activityDescription(day)}
               >
@@ -188,7 +181,7 @@ export function ActivityCalendar({ data }: { data: Analytics }) {
                     timeZone: 'UTC',
                   })}
                 </h3>
-                <dl className="mt-4 grid grid-cols-3 gap-4">
+                <dl className="mt-3 grid grid-cols-3 gap-4">
                   <div>
                     <dt className="text-caption text-muted">Words</dt>
                     <dd className="mt-1 text-title font-semibold">{day.words.toLocaleString()}</dd>
@@ -213,18 +206,29 @@ export function ActivityCalendar({ data }: { data: Analytics }) {
     </section>
   );
 }
-export function TrendChart({ data, mode }: { data: Analytics; mode: 'words' | 'speed' }) {
+export function TrendChart({
+  data,
+  mode,
+  controls,
+}: {
+  data: Analytics;
+  mode: 'words' | 'speed';
+  controls?: ReactNode;
+}) {
   const rows = data.trend.days,
     values = rows.map((d) => (mode === 'words' ? d.words : d.wordsPerMinute)),
     axisMax = Math.max(0, ...values),
     max = Math.max(1, axisMax);
   return (
     <section
-      className="rounded-panel border border-line bg-surface p-5"
+      className="insights-section"
       aria-label={mode === 'words' ? 'Word trend' : 'Speed trend'}
     >
       <div className="flex items-center justify-between">
-        <h2 className="text-title font-semibold">{mode === 'words' ? 'Words' : 'Speed'}</h2>
+        <h2 className="text-title font-semibold">
+          {mode === 'words' ? 'Words over time' : 'Speaking speed'}
+        </h2>
+        {controls}
       </div>
       <div className="mt-6 flex gap-3">
         <div

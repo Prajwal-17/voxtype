@@ -5,11 +5,19 @@ import { toast } from 'sonner';
 import { PageHeader } from '../components/layout';
 import { Loader } from '../components/loader';
 import { Button } from '../components/ui';
-import { DownloadSimpleIcon } from '../components/icons';
+import { DotsThreeIcon, DownloadSimpleIcon } from '../components/icons';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu';
 import { MetricStrip, RangeControl, ActivityCalendar, TrendChart } from '../components/analytics';
 import { api, native, useAnalytics } from '../lib/api';
+
 export function InsightsPage() {
   const [range, setRange] = useState<AnalyticsRange>('30d');
+  const [mode, setMode] = useState<'words' | 'speed'>('words');
   const query = useAnalytics(range),
     data = query.data;
   const exportCsv = useMutation({
@@ -20,57 +28,93 @@ export function InsightsPage() {
   });
   return (
     <>
-      <PageHeader title="Insights" actions={<RangeControl value={range} onChange={setRange} />} />
+      <PageHeader
+        title="Insights"
+        actions={
+          <div className="flex items-center gap-2">
+            <RangeControl value={range} onChange={setRange} />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label="More insights actions">
+                  <DotsThreeIcon size={20} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  disabled={!native || !data?.summary.dictations || exportCsv.isPending}
+                  onSelect={() => exportCsv.mutate()}
+                >
+                  <DownloadSimpleIcon />
+                  Export CSV
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        }
+      />
       {query.isPending ? (
         <Loader />
-      ) : query.isError ? (
-        <div role="alert" className="rounded-panel border border-line bg-surface p-6">
-          Insights unavailable. <Button onClick={() => void query.refetch()}>Retry</Button>
+      ) : query.isError && !data ? (
+        <div role="alert" className="py-8 text-ui">
+          Insights unavailable.{' '}
+          <Button variant="ghost" onClick={() => void query.refetch()}>
+            Retry
+          </Button>
         </div>
       ) : (
         data && (
           <>
             <MetricStrip data={data} />
-            <div className="my-4 flex flex-wrap gap-x-5 gap-y-2 text-caption text-muted">
+            <div className="my-5 flex flex-wrap gap-x-5 gap-y-2 text-caption text-muted">
               <span>
-                <b className="text-ink">{data.summary.dictations}</b> dictations
+                <b className="font-medium text-ink">{data.summary.dictations}</b> dictations
               </span>
               <span>
-                <b className="text-ink">
+                <b className="font-medium text-ink">
                   {data.summary.dictations ? minutes(data.summary.averageDurationMs) : '—'} min
                 </b>{' '}
                 average session
               </span>
               <span>
-                <b className="text-ink">{data.summary.activeDays}</b> active days
+                <b className="font-medium text-ink">{data.summary.activeDays}</b> active days
               </span>
               <span>
-                <b className="text-ink">
+                <b className="font-medium text-ink">
                   {data.streaks.longest} {data.streaks.longest === 1 ? 'day' : 'days'}
                 </b>{' '}
                 longest streak
               </span>
             </div>
-            <ActivityCalendar key={data.activity.start} data={data} />
-            <div className="insights-panels mt-5">
-              <TrendChart data={data} mode="words" />
-              <TrendChart data={data} mode="speed" />
-            </div>
-            <div className="mt-5 flex flex-wrap items-start justify-between gap-5">
-              <p className="max-w-xl text-caption leading-relaxed text-muted">
-                Speed is words per recorded minute. Streaks use full account history. Dates use{' '}
-                {data.timezone}; pending uploads appear after sync.
+            {query.isError && (
+              <p role="status" className="mb-3 text-caption text-muted">
+                Couldn’t refresh. Showing saved activity.{' '}
+                <Button size="sm" variant="ghost" onClick={() => void query.refetch()}>
+                  Retry
+                </Button>
               </p>
-              <Button
-                variant="ghost"
-                disabled={!native || !data.summary.dictations}
-                loading={exportCsv.isPending}
-                onClick={() => exportCsv.mutate()}
-              >
-                <DownloadSimpleIcon size={16} />
-                Export CSV
-              </Button>
-            </div>
+            )}
+            <ActivityCalendar key={data.activity.start} data={data} />
+            <TrendChart
+              data={data}
+              mode={mode}
+              controls={
+                <div className="compact-tabs" role="group" aria-label="Trend metric">
+                  {(['words', 'speed'] as const).map((metric) => (
+                    <button
+                      key={metric}
+                      aria-pressed={mode === metric}
+                      onClick={() => setMode(metric)}
+                    >
+                      {metric === 'words' ? 'Words' : 'Speed'}
+                    </button>
+                  ))}
+                </div>
+              }
+            />
+            <p className="mt-5 max-w-[75ch] text-caption leading-relaxed text-muted">
+              Speed is words per recorded minute. Streaks use full account history. Dates use{' '}
+              {data.timezone}; pending uploads appear after sync.
+            </p>
           </>
         )
       )}

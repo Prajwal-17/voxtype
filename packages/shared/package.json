@@ -10,7 +10,9 @@
     ".": "./theme.ts",
     "./native": "./theme.ts",
     "./web.css": "./web.css",
-    "./analytics": "./analytics.ts"
+    "./analytics": "./analytics.ts",
+    "./request-cache": "./request-cache.ts",
+    "./data-events": "./data-events.ts"
   },
   "scripts": {
     "check-types": "tsc --noEmit",

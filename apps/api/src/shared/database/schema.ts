@@ -105,7 +105,16 @@ export const dictation = sqliteTable(
   (table) => [index('dictation_user_created_idx').on(table.userId, table.createdAt)],
 );
 
-export const schema = { account, dictation, session, user, verification };
+export const accountDictionary = sqliteTable('account_dictionary', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  terms: text('terms').notNull().default('[]'),
+  imports: text('imports').notNull().default('[]'),
+  revision: integer('revision').notNull().default(0),
+});
+
+export const schema = { account, accountDictionary, dictation, session, user, verification };
 
 export type Dictation = typeof dictation.$inferSelect;
 export type NewDictation = typeof dictation.$inferInsert;

@@ -107,9 +107,10 @@ export async function getAnalytics(
   range: AnalyticsRange = '30d',
   timezone = clientTimezone(),
   signal?: AbortSignal,
+  expectedUserId?: string,
 ): Promise<Analytics> {
-  const { token } = await VoxTypeNative.getSession();
-  if (!token) throw new Error('Sign in again');
+  const { token, userId } = await VoxTypeNative.getSession();
+  if (!token || (expectedUserId && userId !== expectedUserId)) throw new Error('Sign in again');
   const response = await fetch(
     `${API_URL}/v1/analytics?${new URLSearchParams({ range, timezone }).toString()}`,
     {
@@ -118,24 +119,8 @@ export async function getAnalytics(
     },
   );
   if (!response.ok) throw new Error('Analytics unavailable');
-  return parseAnalyticsResponse(await response.json());
-}
-
-export async function exportInsights(
-  range: AnalyticsRange,
-  timezone = clientTimezone(),
-): Promise<void> {
-  const { token, userId } = await VoxTypeNative.getSession();
-  if (!token) throw new Error('Sign in again');
-  const response = await fetch(
-    `${API_URL}/v1/analytics?${new URLSearchParams({ range, timezone, format: 'csv' }).toString()}`,
-    { headers: { Authorization: `Bearer ${token}` } },
-  );
-  if (!response.ok) throw new Error('Couldn’t export insights');
-  const csv = await response.text();
-  if (csv.length > 8_000_000) throw new Error('Export exceeds the file limit');
+  const body: unknown = await response.json();
   const current = await VoxTypeNative.getSession();
-  if (current.userId !== userId || current.token !== token)
-    throw new Error('Account changed. Try again.');
-  await VoxTypeNative.shareInsights(csv);
+  if (current.token !== token || current.userId !== userId) throw new Error('Account changed');
+  return parseAnalyticsResponse(body);
 }

@@ -113,6 +113,26 @@ class BubbleLifecycleTest {
     } finally { controller.destroy() }
   }
 
+  @Test fun transientKeyboardAndUnsupportedEditorStatesKeepTheBoundedRetryWindow() {
+    val controller = Robolectric.buildService(VoxTypeAccessibilityService::class.java).create()
+    val service = controller.get()
+    try {
+      set(service, "connected", true)
+      val retry = service.javaClass.getDeclaredMethod("needsBubbleRetry").apply { isAccessible = true }
+      for (reason in listOf("keyboard_closed", "unsupported_field", "waiting_for_editor", "waiting_for_editor_info")) {
+        set(service, "hiddenReason", reason)
+        assertEquals(reason, true, retry.invoke(service))
+      }
+      for (reason in listOf("visible", "disabled", "dismissed", "payments_paused", "sign_in_required")) {
+        set(service, "hiddenReason", reason)
+        assertEquals(reason, false, retry.invoke(service))
+      }
+      set(service, "hiddenReason", "keyboard_closed")
+      set(service, "connected", false)
+      assertEquals(false, retry.invoke(service))
+    } finally { controller.destroy() }
+  }
+
   @Test fun unbindRemovesOverlayAndNotificationWithoutDisablingPreference() {
     val controller = Robolectric.buildService(VoxTypeAccessibilityService::class.java).create()
     val service = controller.get()
