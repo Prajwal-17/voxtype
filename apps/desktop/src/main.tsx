@@ -34,7 +34,7 @@ function Root() {
         {overlay ? (
           <VoiceOverlay />
         ) : (
-          <IconContext.Provider value={{ weight: 'bold', size: 20 }}>
+          <IconContext.Provider value={{ weight: 'regular', size: 18 }}>
             <div className="desktop-shell">
               <TitleBar />
               <div className="desktop-body">

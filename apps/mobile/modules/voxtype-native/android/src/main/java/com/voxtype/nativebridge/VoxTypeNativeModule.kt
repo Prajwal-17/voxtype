@@ -67,13 +67,20 @@ class VoxTypeNativeModule : Module() {
       val context = requireNotNull(appContext.reactContext)
       VoxTypeStore(context).use { store ->
         val enabled = BubbleHealth.observeAccessibility(context)
+        val dictionarySession = NativeSession(context)
+        val dictionaryUser = dictionarySession.userId
+        val dictionaryUrl = dictionarySession.apiUrl
+        val dictionaryTerms = if (dictionaryUser != null && dictionaryUrl != null)
+          DictionarySync.cached(context, dictionaryUser, dictionaryUrl) else emptyList()
         mapOf(
           "accessibilityEnabled" to enabled,
           "accessibilityConnected" to (VoxTypeAccessibilityService.instance?.connected == true),
           "microphoneGranted" to (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED),
           "bubbleEnabled" to store.bubbleEnabled,
           "cleanupEnabled" to store.cleanupEnabled,
-          "vocabulary" to store.vocabulary,
+          "vocabulary" to dictionaryTerms,
+          "dictionaryUserId" to dictionaryUser,
+          "dictionarySyncError" to DictionarySync.error(context),
           "audioLimit" to VoxTypeStore.AUDIO_LIMIT,
           "syncing" to TranscriptUploads.syncing,
           "syncError" to TranscriptUploads.error,
@@ -115,17 +122,22 @@ class VoxTypeNativeModule : Module() {
       val age = System.currentTimeMillis() - prefs.getLong("created", 0)
       if (age >= 0 && age < 600_000) prefs.getString("state", null) else null
     }
-    AsyncFunction("setVocabulary") { terms: List<String> ->
-      VoxTypeStore(requireNotNull(appContext.reactContext)).use { it.vocabulary = terms }
-      // Drop any prewarmed socket so the next take uses the saved dictionary.
-      mainHandler.post { VoxTypeAccessibilityService.instance?.refreshVocabulary() }
-      changed()
+    AsyncFunction("setAccountVocabulary") { terms: List<String>, base: List<String>, expectedUserId: String ->
+      kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.IO) {
+        DictionarySync.update(requireNotNull(appContext.reactContext), expectedUserId, base, terms)
+      }
+    }
+    AsyncFunction("syncVocabulary") {
+      kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.IO) {
+        DictionarySync.sync(requireNotNull(appContext.reactContext), true)
+      }
     }
 
     AsyncFunction("setSession") { token: String, userId: String, apiUrl: String ->
       val context = requireNotNull(appContext.reactContext)
       NativeSession(context).save(token, userId, apiUrl)
       TranscriptUploads.request(context)
+      DictionarySync.request(context)
       refreshBubble()
     }
 

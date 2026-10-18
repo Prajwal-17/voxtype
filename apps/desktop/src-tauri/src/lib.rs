@@ -2,6 +2,7 @@ mod audio;
 mod auth;
 mod cleanup;
 mod desktop;
+mod dictionary;
 mod display;
 mod environment;
 mod local;
@@ -27,6 +28,7 @@ pub struct AppState {
     pub authenticated: AtomicBool,
     pub user: Mutex<Option<AuthUser>>,
     pub local_data: Mutex<()>,
+    pub dictionary_lock: tokio::sync::Mutex<()>,
     pub upload_lock: tokio::sync::Mutex<()>,
     pub regeneration_lock: tokio::sync::Mutex<()>,
     pub shortcut_registered: AtomicBool,
@@ -39,6 +41,7 @@ impl Default for AppState {
             authenticated: AtomicBool::new(false),
             user: Mutex::new(None),
             local_data: Mutex::new(()),
+            dictionary_lock: tokio::sync::Mutex::new(()),
             upload_lock: tokio::sync::Mutex::new(()),
             regeneration_lock: tokio::sync::Mutex::new(()),
             shortcut_registered: AtomicBool::new(false),
@@ -121,6 +124,7 @@ async fn get_auth_user(app: tauri::AppHandle) -> Result<Option<AuthUser>, String
         .store(user.is_some(), Ordering::Release);
     if user.is_some() {
         uploads::send_pending(app.clone());
+        dictionary::refresh(app.clone());
     }
     Ok(user)
 }
@@ -135,6 +139,7 @@ async fn sign_in_with_google(app: tauri::AppHandle) -> Result<AuthUser, String> 
         .authenticated
         .store(true, Ordering::Release);
     uploads::send_pending(app.clone());
+    dictionary::refresh(app.clone());
     Ok(user)
 }
 #[tauri::command]
@@ -552,6 +557,8 @@ pub fn run() {
         )
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
+            dictionary::get_dictionary,
+            dictionary::update_dictionary,
             bootstrap,
             get_auth_user,
             sign_in_with_google,
@@ -589,6 +596,7 @@ pub fn run() {
                 loop {
                     interval.tick().await;
                     uploads::send_pending(sync_app.clone());
+                    dictionary::refresh(sync_app.clone());
                     let _ = local::diagnostics(&sync_app, "");
                 }
             });

@@ -1,3 +1,5 @@
+import { CaretLeftIcon } from 'phosphor-react-native/src/icons/CaretLeft';
+import { CaretRightIcon } from 'phosphor-react-native/src/icons/CaretRight';
 import { useState } from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
 import { nativeTheme as theme, color } from '@voxtype/shared';
@@ -8,7 +10,7 @@ import {
   type Analytics,
   type AnalyticsRange,
 } from '@voxtype/shared/analytics';
-import { Action, Card, Text } from './primitives';
+import { Action, IconButton, Card, Text } from './primitives';
 import { styles as ui } from './styles';
 const c = theme.colors;
 export function RangeControl({
@@ -131,12 +133,10 @@ export function ActivityCalendar({ data }: { data: Analytics }) {
               <View style={{ flexDirection: 'row', gap: 3 }}>
                 {Array.from({ length: 14 }, (_, week) => (
                   <View key={week} style={{ gap: 3 }}>
-                    {days.slice(week * 7, week * 7 + 7).map((day, i) => (
-                      <Pressable
+                    {days.slice(week * 7, week * 7 + 7).map((day) => (
+                      <View
                         key={day.date}
                         accessible={false}
-                        disabled={day.date > data.period.end}
-                        onPress={() => select(week * 7 + i)}
                         style={{
                           width: 12,
                           height: 12,
@@ -175,19 +175,21 @@ export function ActivityCalendar({ data }: { data: Analytics }) {
             <Text accessibilityLiveRegion="polite" style={{ fontSize: 14 }}>
               {selected ? activityDescription(selected) : 'No activity'}
             </Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              <Action
-                label="← Previous day"
-                secondary
+            <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-end' }}>
+              <IconButton
+                label="Previous day"
                 disabled={index === 0}
                 onPress={() => select(index - 1)}
-              />
-              <Action
-                label="Next day →"
-                secondary
+              >
+                <CaretLeftIcon size={20} color={c.primary} />
+              </IconButton>
+              <IconButton
+                label="Next day"
                 disabled={index >= initial}
                 onPress={() => select(index + 1)}
-              />
+              >
+                <CaretRightIcon size={20} color={c.primary} />
+              </IconButton>
             </View>
           </View>
         </>
@@ -313,7 +315,7 @@ const s = StyleSheet.create({
     backgroundColor: c.surfaceSubtle,
   },
   segmentButton: {
-    minHeight: 44,
+    minHeight: 48,
     paddingHorizontal: 12,
     borderRadius: 7,
     justifyContent: 'center',
@@ -328,8 +330,8 @@ const s = StyleSheet.create({
   },
   metric: { width: '50%', paddingVertical: 8, paddingRight: 8 },
   value: {
-    fontSize: 29,
-    lineHeight: 38,
+    fontSize: 26,
+    lineHeight: 34,
     fontWeight: '500',
     fontVariant: ['tabular-nums'],
     letterSpacing: -0.7,

@@ -1,5 +1,5 @@
 import { View } from 'react-native';
-import { Redirect } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { Screen } from '../components/screen';
 import { Action, Card, Text } from '../components/primitives';
 import { styles as ui } from '../components/styles';
@@ -9,7 +9,7 @@ export default function AccountScreen() {
   const app = useAppState();
   if (!app.user) return <Redirect href="/(tabs)/home" />;
   return (
-    <Screen title="Account">
+    <Screen title="Account" onBack={() => router.back()}>
       <Card style={{ gap: 12 }}>
         <Text style={ui.title}>{app.user.name}</Text>
         {!!app.user.email && (

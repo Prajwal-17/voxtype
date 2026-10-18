@@ -22,18 +22,18 @@ class CloudRestoreTest {
 
   @Test fun dictionaryPersistsAndRejectsOversizedEditsWithoutLosingSavedTerms() {
     VoxTypeStore(context, onChanged = {}).use { store ->
-      assertTrue(store.vocabulary.isEmpty())
-      store.vocabulary = listOf(" VoxType ", "", "VoxType", "C++", "नमस्ते")
-      assertEquals(listOf("VoxType", "C++", "नमस्ते"), store.vocabulary)
+      assertTrue(store.legacyVocabulary.isEmpty())
+      store.legacyVocabulary = listOf(" VoxType ", "", "VoxType", "C++", "नमस्ते")
+      assertEquals(listOf("VoxType", "C++", "नमस्ते"), store.legacyVocabulary)
       for (invalid in listOf(List(101) { "term$it" }, listOf("x".repeat(101)))) {
-        try { store.vocabulary = invalid; fail("Invalid dictionary must fail") }
+        try { store.legacyVocabulary = invalid; fail("Invalid dictionary must fail") }
         catch (_: IllegalArgumentException) { }
       }
     }
     VoxTypeStore(context, onChanged = {}).use {
-      assertEquals(listOf("VoxType", "C++", "नमस्ते"), it.vocabulary)
-      it.vocabulary = emptyList()
-      assertTrue(it.vocabulary.isEmpty())
+      assertEquals(listOf("VoxType", "C++", "नमस्ते"), it.legacyVocabulary)
+      it.legacyVocabulary = emptyList()
+      assertTrue(it.legacyVocabulary.isEmpty())
     }
   }
 

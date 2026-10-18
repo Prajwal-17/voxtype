@@ -141,6 +141,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       .onFailure { VoxLog.w("accessibility observation failed", it) }
     BubbleHealth.record(this, "service_connected")
     refreshBubble()
+    DictionarySync.request(this)
     serviceScope.launch(Dispatchers.IO) { runCatching { store.pruneAudio() }.onFailure { VoxLog.w("audio pruning failed", it) } }
     VoxTypeNativeModule.changed()
   }
@@ -149,6 +150,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       super.onStartInput(attribute, restarting)
       // EditorInfo can arrive after the window/focus event that first showed the keyboard.
       requestBubbleRefresh()
+      DictionarySync.request(this@VoxTypeAccessibilityService)
     }
     override fun onFinishInput() {
       super.onFinishInput()
@@ -972,7 +974,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   }
 
   fun refreshVocabulary() {
-    if (status == DictationStatus.LISTENING.bridge || status == DictationStatus.PROCESSING.bridge) return
+    if (status in listOf("connecting", DictationStatus.LISTENING.bridge, DictationStatus.PROCESSING.bridge)) return
     engine?.close()
     engine = null
   }

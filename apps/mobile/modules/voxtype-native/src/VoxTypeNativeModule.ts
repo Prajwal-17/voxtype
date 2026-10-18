@@ -8,7 +8,8 @@ import type {
 } from './VoxTypeNative.types';
 
 declare class VoxTypeNativeModule extends NativeModule<VoxTypeNativeModuleEvents> {
-  setVocabulary(terms: string[]): Promise<void>;
+  setAccountVocabulary?: (terms: string[], base: string[], expectedUserId: string) => Promise<void>;
+  syncVocabulary?: () => Promise<void>;
   setAuthState(state: string): Promise<void>;
   getAuthState(): Promise<string | null>;
   getSnapshot(): Promise<Snapshot>;
@@ -78,7 +79,18 @@ function requireVoxTypeModule(): VoxTypeNativeModule {
  * when the native side is absent.
  */
 const VoxTypeNative = {
-  setVocabulary: (terms: string[]) => requireVoxTypeModule().setVocabulary(terms),
+  setVocabulary: async (terms: string[], base: string[], expectedUserId: string) => {
+    const module = requireVoxTypeModule();
+    if (!module.setAccountVocabulary)
+      throw new Error('Update VoxType to sync your dictionary across devices.');
+    await module.setAccountVocabulary(terms, base, expectedUserId);
+  },
+  syncVocabulary: async () => {
+    const module = requireVoxTypeModule();
+    if (!module.syncVocabulary)
+      throw new Error('Update VoxType to sync your dictionary across devices.');
+    await module.syncVocabulary();
+  },
   setAuthState: (state: string) => requireVoxTypeModule().setAuthState(state),
   getAuthState: () => requireVoxTypeModule().getAuthState(),
   getSnapshot: (): Promise<Snapshot> => requireVoxTypeModule().getSnapshot(),

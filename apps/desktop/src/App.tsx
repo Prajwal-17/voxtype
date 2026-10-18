@@ -5,6 +5,7 @@ import {
   FileTextIcon,
   SlidersHorizontalIcon,
   UserCircleIcon,
+  KeyboardIcon,
 } from './components/icons';
 import { Logo, Button } from './components/ui';
 import { Loader } from './components/loader';
@@ -46,6 +47,7 @@ const navigation = [
 export function App() {
   type Page = 'home' | 'transcripts' | 'insights' | 'settings' | 'profile';
   const [page, setPage] = useState<Page>('home');
+  const [transcriptId, setTranscriptId] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [destination, setDestination] = useState<Page | null>(null);
   const [settingsEpoch, setSettingsEpoch] = useState(0);
@@ -77,7 +79,7 @@ export function App() {
   return (
     <SidebarProvider>
       <Sidebar>
-        <SidebarHeader className="px-5 py-7">
+        <SidebarHeader className="px-5 py-6">
           <Logo tone="ink" collapse={false} />
         </SidebarHeader>
         <SidebarContent>
@@ -90,7 +92,7 @@ export function App() {
                     onClick={() => navigate(id)}
                     aria-label={label}
                   >
-                    <Icon size={22} weight="bold" aria-hidden="true" />
+                    <Icon size={18} weight={page === id ? 'fill' : 'regular'} aria-hidden="true" />
                     <span>{label}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -100,19 +102,21 @@ export function App() {
         </SidebarContent>
         <SidebarFooter>
           {boot.data && (
-            <div className="shortcut-footer mx-2 border-t border-line pt-4 text-caption text-muted">
-              <kbd className="inline-block rounded-[4px] border border-line bg-surface px-2 py-1 text-ink">
-                {boot.data.shortcutLabel}
-              </kbd>
-              <p className="mt-2">Recording shortcut</p>
-            </div>
+            <button
+              className="shortcut-footer"
+              onClick={() => navigate('settings')}
+              aria-label={`Recording shortcut: ${boot.data.shortcutLabel}. Open settings.`}
+            >
+              <KeyboardIcon size={16} aria-hidden="true" />
+              <kbd>{boot.data.shortcutLabel}</kbd>
+            </button>
           )}
           <SidebarMenuButton
             isActive={page === 'profile'}
             onClick={() => navigate('profile')}
             aria-label="Account"
           >
-            <UserCircleIcon size={22} aria-hidden="true" />
+            <UserCircleIcon size={18} aria-hidden="true" />
             <span>{auth.data.name.split(' ')[0]}</span>
           </SidebarMenuButton>
         </SidebarFooter>
@@ -148,9 +152,23 @@ export function App() {
             boot.data && (
               <>
                 <div hidden={page !== 'home'}>
-                  <HomePage key={auth.data.id} visible={page === 'home'} onNavigate={navigate} />
+                  <HomePage
+                    key={auth.data.id}
+                    visible={page === 'home'}
+                    onNavigate={navigate}
+                    onOpenTranscript={(id) => {
+                      setTranscriptId(id);
+                      navigate('transcripts');
+                    }}
+                  />
                 </div>
-                {page === 'transcripts' && <HistoryPage onRecord={() => navigate('home')} />}
+                {page === 'transcripts' && (
+                  <HistoryPage
+                    key={auth.data.id}
+                    initialId={transcriptId}
+                    onRecord={() => navigate('home')}
+                  />
+                )}
                 {page === 'insights' && <InsightsPage />}
                 {settingsVisited && (
                   <div hidden={page !== 'settings'}>

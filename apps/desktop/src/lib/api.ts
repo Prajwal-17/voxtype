@@ -6,6 +6,7 @@ import {
 } from '@voxtype/shared/analytics';
 import {
   QueryClient,
+  type InfiniteData,
   useInfiniteQuery,
   useMutation,
   useQuery,
@@ -62,7 +63,12 @@ async function command<T>(name: string, args?: Record<string, unknown>): Promise
   return invoke<T>(name, args);
 }
 
+export type AccountDictionary = { terms: string[]; syncError: string | null };
 export const api = {
+  dictionary: (expectedUserId: string) =>
+    command<AccountDictionary>('get_dictionary', { expectedUserId }),
+  updateDictionary: (expectedUserId: string, base: string[], terms: string[]) =>
+    command<AccountDictionary>('update_dictionary', { expectedUserId, base, terms }),
   authUser: () =>
     native
       ? command<AuthUser | null>('get_auth_user')
@@ -156,12 +162,21 @@ export const useAuthUser = () =>
   });
 export const useBootstrap = () =>
   useQuery({ queryKey: ['bootstrap'], queryFn: api.bootstrap, staleTime: Infinity });
+type HistoryPageData = { items: HistoryItem[]; nextCursor: string | null };
 export const useHistory = (query = '') => {
   const auth = useAuthUser();
-  return useInfiniteQuery({
+  return useInfiniteQuery<
+    HistoryPageData,
+    Error,
+    InfiniteData<HistoryPageData>,
+    readonly unknown[],
+    string | null
+  >({
     queryKey: ['history', auth.data?.id, query],
     enabled: !!auth.data,
     initialPageParam: null as string | null,
+    placeholderData: (previous, previousQuery) =>
+      previousQuery?.queryKey[1] === auth.data?.id ? previous : undefined,
     queryFn: ({ pageParam }) => api.history(pageParam, query, auth.data?.id),
     getNextPageParam: (page) => page.nextCursor ?? undefined,
   });

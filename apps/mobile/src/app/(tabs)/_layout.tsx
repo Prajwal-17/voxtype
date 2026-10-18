@@ -23,8 +23,8 @@ export default function TabLayout() {
           tabBarStyle: {
             backgroundColor: theme.colors.surface,
             borderTopColor: theme.colors.border,
-            height: 70 + insets.bottom + Math.max(0, (fontScale - 1) * 18),
-            paddingTop: 8,
+            height: 64 + insets.bottom + Math.max(0, (fontScale - 1) * 18),
+            paddingTop: 4,
             paddingBottom: Math.max(insets.bottom, 6),
           },
           tabBarLabelStyle: { fontFamily: 'MonaSansMedium', fontSize: 12, lineHeight: 18 },

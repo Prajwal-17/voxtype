@@ -13,6 +13,7 @@ import {
 } from './modules/auth/auth.controller';
 import { requireAuth } from './modules/auth/auth.middleware';
 import { dictationController } from './modules/dictations/dictation.controller';
+import { dictionaryController } from './modules/dictionary/dictionary.controller';
 import { speechController } from './modules/speech/speech.controller';
 import { ApiError } from './shared/errors/api-error';
 import type { ApiEnv } from './shared/http/api.types';
@@ -77,6 +78,7 @@ app.all('/api/auth/*', handleAuthRequest);
 app.use('/v1/*', requireAuth);
 app.get('/v1/me', getCurrentUser);
 app.route('/v1/dictations', dictationController);
+app.route('/v1/dictionary', dictionaryController);
 app.route('/v1/analytics', analyticsController);
 app.route('/v1/speech', speechController);
 

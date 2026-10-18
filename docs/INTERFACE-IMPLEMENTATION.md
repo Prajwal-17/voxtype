@@ -68,10 +68,12 @@ scaling/multi-monitor behavior still require the corresponding device/runtime ch
 
 - Existing Settings screens and real-data Insights (full-history streaks, 14-week
   activity grid, ranges and CSV) are retained. Desktop already had a persisted
-  personal vocabulary, sent as Deepgram keyterms. Android now has the same
-  device-local dictionary limit (100 terms, 100 characters each), explicit save,
-  discard and native validation. Both in-app and bubble streams use it; changing
-  it drops an idle prewarmed bubble socket so the next take uses the new terms.
+  personal vocabulary, sent as Deepgram keyterms. Desktop and Android now share
+  an account dictionary (100 terms, 100 characters each), edited as individual
+  word chips. Adds and removals save through the backend; account-scoped caches
+  serve recordings offline. Both in-app and bubble streams use it; changing it
+  drops an idle prewarmed bubble socket so the next take uses the new terms.
+  See [dictionary synchronization](DICTIONARY.md) for migration and rollout.
 - The desktop main window now has an app-owned draggable title bar with minimize,
   maximize/restore (including double-click) and close. Its capabilities are scoped
   to the main window; the recording capsule keeps its existing window behavior.

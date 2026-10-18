@@ -1,8 +1,11 @@
 import { useState } from 'react';
+import { DotsThreeIcon } from 'phosphor-react-native/src/icons/DotsThree';
+import { nativeTheme } from '@voxtype/shared';
+import { Sheet } from '../components/sheet';
 import { View } from 'react-native';
 import { minutes, type AnalyticsRange } from '@voxtype/shared/analytics';
 import { Screen } from '../components/screen';
-import { Action, Loader, Text } from '../components/primitives';
+import { Action, IconButton, SettingLink, Loader, Text } from '../components/primitives';
 import { RangeControl, Metrics, ActivityCalendar, TrendChart } from '../components/analytics';
 import { styles as ui } from '../components/styles';
 import { useAppState, useAnalyticsData } from '../state/app-state';
@@ -12,13 +15,24 @@ export default function InsightsScreen() {
     [range, setRange] = useState<AnalyticsRange>('30d'),
     query = useAnalyticsData(range),
     data = query.data,
-    [definitions, setDefinitions] = useState(false);
+    [definitions, setDefinitions] = useState(false),
+    [menu, setMenu] = useState(false);
   return (
-    <Screen title="Insights">
+    <Screen
+      title="Insights"
+      actions={
+        <IconButton label="Insights actions" onPress={() => setMenu(true)}>
+          <DotsThreeIcon size={24} weight="bold" color={nativeTheme.colors.textMuted} />
+        </IconButton>
+      }
+    >
       <RangeControl value={range} onChange={setRange} />
-      {query.loading ? (
+      {query.error && data && (
+        <Action label="Retry insights refresh" secondary onPress={query.retry} />
+      )}
+      {query.loading && !data ? (
         <Loader />
-      ) : query.error ? (
+      ) : query.error && !data ? (
         <>
           <Text style={ui.muted}>Insights unavailable</Text>
           <Action label="Retry" secondary onPress={query.retry} />
@@ -41,28 +55,38 @@ export default function InsightsScreen() {
             </View>
             <ActivityCalendar key={data.activity.start} data={data} />
             <TrendChart data={data} />
-            <Action
-              label={definitions ? 'Hide definitions' : 'Definitions'}
-              secondary
-              onPress={() => setDefinitions(!definitions)}
-            />
-            {definitions && (
-              <Text style={ui.muted}>
-                Speed is words divided by recorded minutes. Average session is minutes divided by
-                dictations. Streaks use full account history and end today or yesterday. Canceled
-                recordings and microphone tests are excluded. Dates use {data.timezone}. Pending
-                uploads appear after sync.
-              </Text>
-            )}
-            <Action
-              label="Export CSV"
-              secondary
-              disabled={!app.available || app.busy || !data.summary.dictations}
-              onPress={() => void app.run(() => exportInsights(range))}
-            />
           </>
         )
       )}
+      <Sheet title="Insights actions" visible={menu} onClose={() => setMenu(false)}>
+        <SettingLink
+          label="How metrics are calculated"
+          onPress={() => {
+            setMenu(false);
+            setDefinitions(true);
+          }}
+        />
+        <SettingLink
+          label="Export CSV"
+          disabled={!app.available || app.busy || !data?.summary.dictations}
+          onPress={() => {
+            setMenu(false);
+            void app.run(() => exportInsights(range));
+          }}
+        />
+      </Sheet>
+      <Sheet
+        title="About your insights"
+        visible={definitions}
+        onClose={() => setDefinitions(false)}
+      >
+        <Text style={[ui.muted, { paddingBottom: 20 }]}>
+          Speed is words divided by recorded minutes. Average session is minutes divided by
+          dictations. Streaks use full account history and end today or yesterday. Canceled
+          recordings and microphone tests are excluded. Dates use {data?.timezone}. Pending uploads
+          appear after sync.
+        </Text>
+      </Sheet>
     </Screen>
   );
 }

@@ -10,10 +10,10 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: 'bg-accent text-inverse shadow-action not-disabled:hover:bg-accent-hover',
-        primary: 'bg-accent text-inverse shadow-action not-disabled:hover:bg-accent-hover',
+        default: 'bg-accent text-inverse not-disabled:hover:bg-accent-hover',
+        primary: 'bg-accent text-inverse not-disabled:hover:bg-accent-hover',
         secondary:
-          'border-line bg-surface text-ink shadow-control not-disabled:hover:bg-accent-soft not-disabled:hover:text-accent-ink',
+          'border-line bg-surface text-ink not-disabled:hover:bg-accent-soft not-disabled:hover:text-accent-ink',
         outline:
           'border-line-strong bg-surface text-ink not-disabled:hover:bg-accent-soft not-disabled:hover:text-accent-ink',
         ghost:
@@ -23,13 +23,13 @@ const buttonVariants = cva(
         link: 'bg-transparent text-accent underline-offset-4 not-disabled:hover:text-accent-hover not-disabled:hover:underline',
       },
       size: {
-        sm: 'min-h-10 px-3 py-1.5 text-[length:var(--text-caption)] leading-[var(--text-caption--line-height)]',
+        sm: 'min-h-8 px-3 py-1.5 text-[length:var(--text-caption)] leading-[var(--text-caption--line-height)]',
         default:
-          'min-h-10 px-3.5 py-2 text-[length:var(--text-ui)] leading-[var(--text-ui--line-height)]',
-        md: 'min-h-10 px-3.5 py-2 text-[length:var(--text-ui)] leading-[var(--text-ui--line-height)]',
+          'min-h-9 px-3 py-1.5 text-[length:var(--text-ui)] leading-[var(--text-ui--line-height)]',
+        md: 'min-h-9 px-3 py-1.5 text-[length:var(--text-ui)] leading-[var(--text-ui--line-height)]',
         lg: 'min-h-11 px-5 py-2.5 text-[length:var(--text-body)] leading-[var(--text-body--line-height)]',
-        icon: 'size-10 p-0 [&_svg]:size-5',
-        'icon-sm': 'size-10 p-0 [&_svg]:size-3.5',
+        icon: 'size-8 p-0 [&_svg]:size-5',
+        'icon-sm': 'size-8 p-0 [&_svg]:size-3.5',
       },
     },
     defaultVariants: {
@@ -70,7 +70,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         disabled={disabled || loading}
         className={cn(
           buttonVariants({ variant, size }),
-          !isStatic && 'enabled:active:scale-[0.96]',
+          !isStatic && 'enabled:active:scale-[0.98]',
           className,
         )}
         {...props}

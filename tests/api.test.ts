@@ -1,3 +1,4 @@
+import { createDictionaryService } from '../apps/api/src/modules/dictionary/dictionary.service';
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { readFile, readdir } from 'node:fs/promises';
@@ -294,4 +295,54 @@ test('cleaned-only sync preserves existing remote originals and never creates ne
   assert.equal((await transcripts.get('alice', 'new-cleaned')).originalText, undefined);
   await transcripts.remove('alice', 'legacy-original');
   await transcripts.remove('alice', 'new-cleaned');
+});
+
+test('account dictionary merges desktop/mobile changes and isolates accounts', async () => {
+  const dictionary = createDictionaryService(db);
+  assert.deepEqual((await dictionary.get('alice')).terms, []);
+  await dictionary.update('alice', { base: [], terms: ['VoxType'] });
+  await dictionary.update('alice', { base: [], terms: ['Deepgram'] });
+  assert.deepEqual((await dictionary.get('alice')).terms, ['VoxType', 'Deepgram']);
+  // Removing a word from an old view preserves an unseen addition from the other device.
+  await dictionary.update('alice', { base: ['VoxType'], terms: [] });
+  assert.deepEqual((await dictionary.get('alice')).terms, ['Deepgram']);
+  await dictionary.update('alice', {
+    base: ['VoxType', 'Deepgram'],
+    terms: ['VoxType', 'Deepgram', 'नमस्ते'],
+  });
+  assert.deepEqual((await dictionary.get('alice')).terms, ['Deepgram', 'नमस्ते']);
+  assert.deepEqual((await dictionary.get('bob')).terms, []);
+  await dictionary.update('bob', { base: [], terms: ['Private'] });
+  assert.deepEqual((await dictionary.get('alice')).terms, ['Deepgram', 'नमस्ते']);
+});
+
+test('dictionary migration is idempotent even after a word is deleted', async () => {
+  const dictionary = createDictionaryService(db);
+  const patch = {
+    base: [],
+    terms: ['  Legacy  ', 'legacy'],
+    importId: '550e8400-e29b-41d4-a716-446655440000',
+  };
+  await dictionary.update('empty', patch);
+  assert.deepEqual((await dictionary.get('empty')).terms, ['Legacy']);
+  await dictionary.update('empty', { base: ['Legacy'], terms: [] });
+  await dictionary.update('empty', patch);
+  assert.deepEqual((await dictionary.get('empty')).terms, []);
+});
+
+test('dictionary concurrent updates do not lose words; capacity failure preserves data', async () => {
+  const dictionary = createDictionaryService(db);
+  await Promise.all(
+    ['A', 'B', 'C'].map((term) => dictionary.update('empty', { base: [], terms: [term] })),
+  );
+  assert.deepEqual(new Set((await dictionary.get('empty')).terms), new Set(['A', 'B', 'C']));
+  const full = Array.from({ length: 100 }, (_, i) => `term${i}`);
+  await dictionary.update('empty', { base: ['A', 'B', 'C'], terms: full });
+  await assert.rejects(
+    dictionary.update('empty', { base: [], terms: ['overflow'] }),
+    /dictionary is full/,
+  );
+  assert.deepEqual((await dictionary.get('empty')).terms, full);
+  await assert.rejects(dictionary.update('empty', { base: [], terms: ['x'.repeat(101)] }));
+  assert.deepEqual((await dictionary.get('empty')).terms, full);
 });

@@ -6,6 +6,8 @@ import {
   useContext,
   useEffect,
   useRef,
+  useMemo,
+  useSyncExternalStore,
   useState,
   type ReactNode,
 } from 'react';
@@ -17,12 +19,13 @@ import {
   type Analytics,
   type AnalyticsRange,
 } from '@voxtype/shared/analytics';
+import { createTranscriptQuery } from '../lib/transcript-query';
 import { RequestCache } from '@voxtype/shared/request-cache';
 import { API_URL, currentUser, getAnalytics, signIn, signOut, type User } from '../lib/mobile-api';
 import Native, {
   isVoxTypeNativeAvailable,
 } from '../../modules/voxtype-native/src/VoxTypeNativeModule';
-import type { Snapshot, Dictation } from '../../modules/voxtype-native/src/VoxTypeNative.types';
+import type { Snapshot } from '../../modules/voxtype-native/src/VoxTypeNative.types';
 const analyticsCache = new RequestCache<Analytics>();
 const preview = __DEV__ && Platform.OS === 'web';
 const previewSnapshot: Snapshot = {
@@ -64,6 +67,7 @@ function useAppStateValue() {
       if (account.current?.id !== next?.id) clear();
       account.current = next;
       setUser(next);
+      if (next) setMessage(null);
     },
     [clear],
   );
@@ -71,6 +75,11 @@ function useAppStateValue() {
     (text: string, kind: 'success' | 'error' = 'success') => setMessage({ text, kind }),
     [],
   );
+  useEffect(() => {
+    if (!message) return;
+    const timer = setTimeout(() => setMessage(null), message.kind === 'error' ? 8000 : 3000);
+    return () => clearTimeout(timer);
+  }, [message]);
   const refresh = useCallback(async () => {
     if (!available) return;
     const gen = generation.current;
@@ -113,6 +122,7 @@ function useAppStateValue() {
       applyUser(next);
       if (next) {
         await refresh();
+        void Native.syncVocabulary().catch(() => {});
         void Native.syncTranscripts().catch(() => {
           if (!disposed) notify('Cloud sync unavailable. Try again.', 'error');
         });
@@ -154,8 +164,12 @@ function useAppStateValue() {
         analyticsChanged = false;
       }, 180);
     });
+    const dictionaryTimer = setInterval(() => {
+      if (AppState.currentState === 'active') void Native.syncVocabulary().catch(() => {});
+    }, 30_000);
     const lifecycle = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
+        void Native.syncVocabulary().catch(() => {});
         void checkAccount().catch(() => {});
         void refresh().catch(() => {});
         setForegroundRevision((n) => n + 1);
@@ -168,6 +182,7 @@ function useAppStateValue() {
       alive.current = false;
       accountGeneration.current++;
       clearTimeout(timer);
+      clearInterval(dictionaryTimer);
       subscription.remove();
       lifecycle.remove();
     };
@@ -304,71 +319,29 @@ export function useAnalyticsData(range: AnalyticsRange) {
 }
 /** Query runs over the entire native account cache before the 12-row cursor limit. */
 export function useTranscripts(query = '') {
-  const { user, available, revision, generation } = useAppState();
+  const { user, available, revision } = useAppState();
   const userId = user?.id;
-  const [items, setItems] = useState<Dictation[]>([]),
-    [cursor, setCursor] = useState<string | null>(null),
-    [loading, setLoading] = useState(false),
-    [error, setError] = useState(false);
-  const request = useRef(0),
-    busy = useRef(false),
-    failedCursor = useRef<string | null>(null);
-  const load = useCallback(
-    async (next: string | null = null) => {
-      if (!available || !userId || busy.current) return;
-      const id = ++request.current,
-        gen = generation.current;
-      busy.current = true;
-      setLoading(true);
-      setError(false);
-      try {
-        const page = await Native.getTranscripts(next, query.trim(), userId);
-        if (id !== request.current || gen !== generation.current) return;
-        setItems((old) =>
-          next
-            ? [
-                ...old,
-                ...page.items.filter((item) => !old.some((previous) => previous.id === item.id)),
-              ]
-            : page.items,
-        );
-        setCursor(page.nextCursor);
-      } catch {
-        if (id === request.current && gen === generation.current) {
-          failedCursor.current = next;
-          setError(true);
-        }
-      } finally {
-        if (id === request.current) {
-          busy.current = false;
-          setLoading(false);
-        }
-      }
-    },
-    [available, userId, query, generation],
+  const search = query.trim();
+  const controller = useMemo(
+    () =>
+      createTranscriptQuery((cursor) =>
+        available && userId
+          ? Native.getTranscripts(cursor, search, userId)
+          : Promise.resolve({ items: [], nextCursor: null }),
+      ),
+    [available, userId, search],
+  );
+  const state = useSyncExternalStore(
+    controller.subscribe,
+    controller.getSnapshot,
+    controller.getSnapshot,
   );
   useEffect(() => {
-    const sequence = request;
-    sequence.current++;
-    busy.current = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- changing the native query invalidates its cursor and account-scoped rows
-    setItems([]);
-    setCursor(null);
-    setError(false);
-    setLoading(false);
-    const timer = setTimeout(() => void load(), 180);
+    const timer = setTimeout(() => void controller.refresh(), search ? 180 : 0);
     return () => {
       clearTimeout(timer);
-      sequence.current++;
-      busy.current = false;
+      controller.cancel();
     };
-  }, [load, revision]);
-  return {
-    items,
-    cursor,
-    loading,
-    error,
-    more: () => load(error ? failedCursor.current : cursor),
-    refresh: () => load(),
-  };
+  }, [controller, revision, search]);
+  return { ...state, refresh: controller.refresh, more: controller.more };
 }

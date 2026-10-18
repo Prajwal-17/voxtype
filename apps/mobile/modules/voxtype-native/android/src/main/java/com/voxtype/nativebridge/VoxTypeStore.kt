@@ -55,7 +55,8 @@ class VoxTypeStore(
   var cleanupEnabled: Boolean
     get() = setting(KEY_CLEANUP, "0") == "1"
     set(value) = putSetting(KEY_CLEANUP, if (value) "1" else "0")
-  var vocabulary: List<String>
+  val vocabulary: List<String> get() = DictionarySync.cached(context)
+  internal var legacyVocabulary: List<String>
     get() {
       val entries = JSONArray(setting("vocabulary", "[]"))
       return List(entries.length()) { entries.getString(it) }

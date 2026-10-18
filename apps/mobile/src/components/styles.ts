@@ -6,9 +6,7 @@ export const styles = StyleSheet.create({
   card: {
     backgroundColor: c.surface,
     borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: c.border,
+    padding: 16,
   },
   action: {
     minHeight: 48,
@@ -23,7 +21,13 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
-  secondary: { backgroundColor: c.primaryContainer, alignSelf: 'flex-start', flexShrink: 1 },
+  secondary: {
+    backgroundColor: 'transparent',
+    alignSelf: 'flex-start',
+    flexShrink: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+  },
   loader: {
     minHeight: 64,
     alignItems: 'center',
@@ -38,7 +42,7 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 12,
   },
-  heading: { fontSize: 24, lineHeight: 32, fontWeight: '600', letterSpacing: -0.8 },
+  heading: { fontSize: 22, lineHeight: 30, fontWeight: '600', letterSpacing: -0.4 },
   title: { fontSize: 18, lineHeight: 26, fontWeight: '600' },
   muted: { color: c.textMuted, fontSize: 13, lineHeight: 20 },
 });

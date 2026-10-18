@@ -42,6 +42,11 @@ pub fn delete_auth_token() -> Result<(), String> {
 }
 
 pub fn settings(app: &AppHandle) -> Result<Settings, String> {
+    let mut settings = device_settings(app)?;
+    settings.vocabulary = crate::dictionary::cached(app)?;
+    Ok(settings)
+}
+pub(crate) fn device_settings(app: &AppHandle) -> Result<Settings, String> {
     let store = app
         .store(environment::store_file())
         .map_err(|e| e.to_string())?;
@@ -54,6 +59,9 @@ pub fn settings(app: &AppHandle) -> Result<Settings, String> {
 }
 pub fn save_settings(app: &AppHandle, settings: &Settings) -> Result<(), String> {
     settings.validate()?;
+    let mut settings = settings.clone();
+    // Vocabulary is now an account resource; device preference saves cannot overwrite it.
+    settings.vocabulary = device_settings(app)?.vocabulary;
     let store = app
         .store(environment::store_file())
         .map_err(|e| e.to_string())?;

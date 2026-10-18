@@ -25,6 +25,8 @@ export type Snapshot = {
   bubbleEnabled: boolean;
   cleanupEnabled: boolean;
   vocabulary?: string[];
+  dictionarySyncError?: string;
+  dictionaryUserId?: string | null;
   syncing: boolean;
   syncError: string;
   audioLimit: 10;

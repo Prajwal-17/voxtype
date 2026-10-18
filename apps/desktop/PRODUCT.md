@@ -22,7 +22,7 @@ VoxType combines an app-level recording workspace with a system-wide Right Alt s
 
 - The primary environment is an Ubuntu desktop wrapped with Tauri.
 - Production and development can run together: development is a separately named and identified app with isolated credentials, settings, history, backend, and shortcut.
-- Users can record from the main Dictation page or through a configurable global shortcut.
+- Users can record from the Home page or through a configurable global shortcut.
 - The compact overlay communicates recording, finishing, success, and failure states while another app has focus.
 - History, diagnostics, account access, language, microphone, voice detection, cleanup, and paste behavior are managed inside the app.
 
@@ -36,13 +36,14 @@ VoxType combines an app-level recording workspace with a system-wide Right Alt s
 - All transcripts are stored locally. The newest 10 audio recordings are retained on the device.
 - New transcripts upload with a desktop source tag. Sign-in restores account history into the local cache, background retries synchronize pending uploads, and cloud deletion precedes local removal. Audio files are not stored by the account API.
 - The browser build is a preview and cannot record.
+- Personal dictionary words sync with the account across desktop and Android. Recording and regeneration read account-scoped native caches; edits require a successful backend save.
 - The redesign must preserve current behavior and use the existing React, Tailwind CSS, Radix/shadcn-style component, TanStack Query, Motion, and Tauri stack.
 
 ## Brand Commitments
 
 - Product name: VoxType.
 - Voice: concise, calm, direct, and operational.
-- The user requested a simple, clean, usable, premium application UI, a new palette centralized in global CSS, Tailwind throughout, and shadcn components as the base.
+- The user requested a compact, quiet interface with the existing green accent, consistent with the mobile redesign. Use Tailwind and the local shadcn/Radix components, with palette values centralized in shared theme tokens.
 
 ## Evidence on Hand
 

@@ -1,3 +1,4 @@
+import { CaretRightIcon } from 'phosphor-react-native/src/icons/CaretRight';
 import type { ReactNode } from 'react';
 import {
   ActivityIndicator,
@@ -48,7 +49,7 @@ export function Action({
         styles.action,
         secondary && styles.secondary,
         disabled && { opacity: 0.45 },
-        pressed && { opacity: 0.8, transform: [{ scale: 0.96 }] },
+        pressed && { opacity: 0.7 },
       ]}
     >
       {icon}
@@ -98,5 +99,77 @@ export function Setting({
         thumbColor={c.onPrimary}
       />
     </View>
+  );
+}
+
+export function IconButton({
+  label,
+  onPress,
+  disabled,
+  children,
+}: {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !!disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => ({
+        minWidth: 48,
+        minHeight: 48,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 24,
+        opacity: disabled ? 0.4 : 1,
+        backgroundColor: pressed ? c.surfaceSubtle : 'transparent',
+      })}
+    >
+      {children}
+    </Pressable>
+  );
+}
+
+export function SettingLink({
+  label,
+  detail,
+  onPress,
+  disabled,
+  destructive,
+}: {
+  label: string;
+  detail?: string;
+  onPress: () => void;
+  disabled?: boolean;
+  destructive?: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !!disabled }}
+      onPress={onPress}
+      disabled={disabled}
+      style={({ pressed }) => ({
+        minHeight: 52,
+        paddingVertical: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        opacity: disabled ? 0.4 : 1,
+        backgroundColor: pressed ? c.surfaceSubtle : 'transparent',
+      })}
+    >
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={{ color: destructive ? c.danger : c.text }}>{label}</Text>
+        {!!detail && <Text style={styles.muted}>{detail}</Text>}
+      </View>
+      <CaretRightIcon size={16} color={c.textMuted} />
+    </Pressable>
   );
 }

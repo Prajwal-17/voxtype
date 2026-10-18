@@ -1,73 +1,136 @@
-import { useState } from 'react';
-import { TextInput } from 'react-native';
+import { useEffect, useState } from 'react';
+import { TextInput, View } from 'react-native';
+import { PlusIcon } from 'phosphor-react-native/src/icons/Plus';
+import { XIcon } from 'phosphor-react-native/src/icons/X';
 import { nativeTheme as theme } from '@voxtype/shared';
-import { Action, Card, Text } from './primitives';
+import { IconButton, Text } from './primitives';
 import { styles } from './styles';
 import { useAppState } from '../state/app-state';
 import Native from '../../modules/voxtype-native/src/VoxTypeNativeModule';
+const c = theme.colors;
 
 export function Dictionary({ terms, disabled }: { terms: string[]; disabled: boolean }) {
   const app = useAppState();
-  const [draft, setDraft] = useState(terms.join('\n'));
-  const parsed = [
-    ...new Set(
-      draft
-        .split('\n')
-        .map((term) => term.trim())
-        .filter(Boolean),
-    ),
-  ];
-  const valid = parsed.length <= 100 && parsed.every((term) => term.length <= 100);
-  const dirty = JSON.stringify(parsed) !== JSON.stringify(terms);
+  const { available, refresh } = app;
+  const [draft, setDraft] = useState(''),
+    [error, setError] = useState(''),
+    [saving, setSaving] = useState(false);
+  useEffect(() => {
+    if (!available) return;
+    void Native.syncVocabulary()
+      .catch(() => {})
+      .then(() => refresh())
+      .catch(() => {});
+  }, [available, refresh]);
+  const locked = disabled || saving || !app.user;
+  const save = async (next: string[], added = false) => {
+    if (locked) return;
+    setSaving(true);
+    setError('');
+    try {
+      await Native.setVocabulary(next, terms, app.user!.id);
+      await app.refresh();
+      if (added) setDraft('');
+    } catch (failure) {
+      setError(
+        failure instanceof Error ? failure.message : 'Couldn’t sync your dictionary. Try again.',
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+  const add = () => {
+    const term = draft.trim();
+    if (!term || locked) return;
+    if (term.length > 100) return setError('Use up to 100 characters per word or phrase.');
+    if (terms.length >= 100)
+      return setError('Your dictionary is full. Remove a term to add another.');
+    if (terms.some((saved) => saved.toLocaleLowerCase() === term.toLocaleLowerCase()))
+      return setError('That term is already in your dictionary.');
+    void save([...terms, term], true);
+  };
   return (
-    <Card style={{ gap: 12 }}>
-      <Text accessibilityRole="header" style={styles.title}>
-        Personal dictionary
-      </Text>
+    <View style={{ gap: 16 }}>
       <Text style={styles.muted}>
-        Names and specialist terms, one per line. Saved on this device and used for both recording
-        modes.
+        Help VoxType recognize names and words you use. Synced with your account across desktop and
+        mobile, including the voice bubble.
       </Text>
-      <TextInput
-        accessibilityLabel="Personal dictionary terms"
-        multiline
-        editable={!disabled}
-        value={draft}
-        onChangeText={setDraft}
-        textAlignVertical="top"
-        autoCorrect={false}
-        style={{
-          minHeight: 140,
-          padding: 12,
-          borderWidth: 1,
-          borderRadius: 12,
-          borderColor: theme.colors.border,
-          color: theme.colors.text,
-        }}
-      />
-      <Text style={styles.muted}>{parsed.length} / 100 terms · Up to 100 characters each</Text>
-      {!valid && (
-        <Text accessibilityRole="alert">Use at most 100 terms, each up to 100 characters.</Text>
-      )}
-      <Action
-        label="Save dictionary"
-        disabled={disabled || !valid || !dirty}
-        onPress={() =>
-          void app.run(async () => {
-            await Native.setVocabulary(parsed);
-            await app.refresh();
-            app.notify('Dictionary saved');
-          })
-        }
-      />
-      {dirty && (
-        <Action
-          label="Discard changes"
-          secondary
-          disabled={disabled}
-          onPress={() => setDraft(terms.join('\n'))}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <TextInput
+          accessibilityLabel="Word or phrase to add"
+          placeholder="Add a word or phrase"
+          placeholderTextColor={c.textMuted}
+          editable={!locked}
+          value={draft}
+          onChangeText={(value) => {
+            setDraft(value);
+            setError('');
+          }}
+          onSubmitEditing={add}
+          submitBehavior="submit"
+          returnKeyType="done"
+          autoCorrect={false}
+          autoCapitalize="none"
+          style={{
+            flex: 1,
+            minHeight: 48,
+            paddingHorizontal: 12,
+            paddingVertical: 10,
+            borderRadius: 10,
+            backgroundColor: c.surfaceSubtle,
+            color: c.text,
+            fontFamily: 'MonaSansRegular',
+            fontSize: 15,
+          }}
         />
+        <IconButton label="Add term" disabled={locked || !draft.trim()} onPress={add}>
+          <PlusIcon size={22} color={c.primary} />
+        </IconButton>
+      </View>
+      {!!(error || app.snapshot?.dictionarySyncError) && (
+        <Text accessibilityRole="alert" style={{ color: c.danger, fontSize: 13 }}>
+          {error || app.snapshot?.dictionarySyncError}
+        </Text>
       )}
-    </Card>
+      <View style={{ gap: 8 }}>
+        <Text style={styles.muted}>
+          {terms.length} / 100 terms{saving ? ' · Saving…' : ''}
+        </Text>
+        {terms.length ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {terms.map((term) => (
+              <View
+                key={term}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  minWidth: 0,
+                  maxWidth: '100%',
+                  paddingLeft: 14,
+                  borderRadius: 24,
+                  backgroundColor: c.primaryContainer,
+                }}
+              >
+                <Text
+                  numberOfLines={1}
+                  style={{ minWidth: 0, flexShrink: 1, color: c.primary, paddingVertical: 8 }}
+                >
+                  {term}
+                </Text>
+                <IconButton
+                  label={`Remove ${term}`}
+                  disabled={locked}
+                  onPress={() => void save(terms.filter((saved) => saved !== term))}
+                >
+                  <XIcon size={16} color={c.primary} />
+                </IconButton>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <Text style={styles.muted}>Add a name, brand, or specialist term to get started.</Text>
+        )}
+      </View>
+    </View>
   );
 }

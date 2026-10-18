@@ -5,11 +5,11 @@ import { toast } from 'sonner';
 import { api, native, useRecording, useSession } from '../lib/api';
 import { captureShortcut } from '../lib/shortcuts';
 import { cn } from '../lib/utils';
-import { parseVocabulary, settingsSchema, type Bootstrap, type Settings } from '../lib/types';
+import { settingsSchema, type Bootstrap, type Settings } from '../lib/types';
 import { Button, IconButton, Toggle } from '../components/ui';
 import { FieldRow, PageHeader, SectionHeader } from '../components/layout';
 import { Label } from '../components/ui/label';
-import { Textarea } from '../components/ui/textarea';
+import { AccountDictionaryEditor } from '../components/account-dictionary';
 import {
   Select,
   SelectContent,
@@ -28,7 +28,7 @@ export function SettingsPage({
   active: boolean;
   onDirtyChange: (dirty: boolean) => void;
 }) {
-  const [tab, setTab] = useState<'voice' | 'workflow' | 'desktop'>('voice');
+  const [tab, setTab] = useState<'voice' | 'dictionary' | 'workflow' | 'desktop'>('voice');
   const [preferencesDirty, setPreferencesDirty] = useState(false),
     [shortcutDirty, setShortcutDirty] = useState(false);
   useEffect(() => {
@@ -45,15 +45,12 @@ export function SettingsPage({
   return (
     <>
       <PageHeader title="Settings" />
-      <div
-        className="mb-5 flex flex-wrap gap-1 rounded-control bg-subtle p-1"
-        role="tablist"
-        aria-label="Settings categories"
-      >
+      <div className="settings-tabs" role="tablist" aria-label="Settings categories">
         {(
           [
-            ['voice', 'Voice & language'],
-            ['workflow', 'Workflow'],
+            ['voice', 'Voice'],
+            ['dictionary', 'Dictionary'],
+            ['workflow', 'Behavior'],
             ['desktop', 'Desktop'],
           ] as const
         ).map(([id, label], index) => (
@@ -66,16 +63,16 @@ export function SettingsPage({
             tabIndex={tab === id ? 0 : -1}
             onClick={() => setTab(id)}
             onKeyDown={(e) => {
-              const tabs = ['voice', 'workflow', 'desktop'] as const;
+              const tabs = ['voice', 'dictionary', 'workflow', 'desktop'] as const;
               const next =
                 e.key === 'ArrowRight'
-                  ? (index + 1) % 3
+                  ? (index + 1) % tabs.length
                   : e.key === 'ArrowLeft'
-                    ? (index + 2) % 3
+                    ? (index + tabs.length - 1) % tabs.length
                     : e.key === 'Home'
                       ? 0
                       : e.key === 'End'
-                        ? 2
+                        ? tabs.length - 1
                         : -1;
               if (next >= 0) {
                 e.preventDefault();
@@ -83,7 +80,7 @@ export function SettingsPage({
                 document.getElementById(`tab-${tabs[next]}`)?.focus();
               }
             }}
-            className={`min-h-10 rounded-menu-item px-4 text-ui focus-visible:outline-2 focus-visible:outline-accent ${tab === id ? 'bg-surface font-semibold text-accent' : 'text-muted'}`}
+            className={`settings-tab ${tab === id ? 'is-current' : ''}`}
           >
             {label}
           </button>
@@ -133,11 +130,10 @@ function Preferences({
   settings: Settings;
   active: boolean;
   startupAvailable: boolean;
-  tab: 'voice' | 'workflow' | 'desktop';
+  tab: 'voice' | 'dictionary' | 'workflow' | 'desktop';
   onDirtyChange: (dirty: boolean) => void;
 }) {
   const [draft, setDraft] = useState(settings);
-  const [vocabulary, setVocabulary] = useState(settings.vocabulary.join('\n'));
   const client = useQueryClient();
   const recording = useRecording();
   const { data: session } = useSession();
@@ -150,7 +146,7 @@ function Preferences({
       toast.success('Preferences saved');
     },
   });
-  const value = { ...draft, vocabulary: parseVocabulary(vocabulary) };
+  const value = draft;
   const dirty = JSON.stringify(value) !== JSON.stringify(settings);
   useEffect(() => {
     onDirtyChange(dirty);
@@ -174,7 +170,7 @@ function Preferences({
         id="panel-voice"
         role="tabpanel"
         aria-labelledby="tab-voice"
-        className="mb-5 rounded-panel border border-line bg-surface p-5 max-md:p-4"
+        className="settings-section"
       >
         <SectionHeader title="Voice & language" />
         <FieldRow label="Microphone" htmlFor="microphone">
@@ -279,54 +275,46 @@ function Preferences({
         id="panel-workflow"
         role="tabpanel"
         aria-labelledby="tab-workflow"
-        className="mb-5 rounded-panel border border-line bg-surface p-5 max-md:p-4"
+        className="settings-section"
       >
-        <SectionHeader title="Workflow" />
+        <SectionHeader title="Recording behavior" />
         <Toggle
           label="Skip long pauses"
+          description="Ignore long pauses while recording."
           checked={draft.voiceDetection}
           onChange={(v) => set('voiceDetection', v)}
           disabled={active}
         />
         <Toggle
           label="Paste when I finish"
+          description="Send the finished text to the active app."
           checked={draft.autoPaste}
           onChange={(v) => set('autoPaste', v)}
           disabled={active}
         />
         <Toggle
           label="Clean up wording"
+          description="Tidy punctuation and phrasing after recording."
           checked={draft.cleanupEnabled}
           onChange={(v) => set('cleanupEnabled', v)}
           disabled={active}
         />
       </section>
       <section
-        hidden={tab !== 'voice'}
-        className="mb-5 rounded-panel border border-line bg-surface p-5 max-md:p-4"
+        hidden={tab !== 'dictionary'}
+        id="panel-dictionary"
+        role="tabpanel"
+        aria-labelledby="tab-dictionary"
+        className="settings-section"
       >
-        <SectionHeader title="Personal vocabulary" />
-        <Label className="sr-only" htmlFor="vocabulary">
-          Personal vocabulary
-        </Label>
-        <Textarea
-          id="vocabulary"
-          rows={4}
-          placeholder={'One word or phrase per line'}
-          value={vocabulary}
-          onChange={(e) => setVocabulary(e.target.value)}
-          disabled={active}
-        />
-        <div className="mt-2 flex justify-between gap-3 text-caption text-muted max-md:flex-col max-md:gap-1">
-          <span>{value.vocabulary.length} / 100 terms</span>
-        </div>
+        <AccountDictionaryEditor active={active} />
       </section>
       <section
         hidden={tab !== 'desktop'}
         id="panel-desktop"
         role="tabpanel"
         aria-labelledby="tab-desktop"
-        className="mb-5 rounded-panel border border-line bg-surface p-5"
+        className="settings-section"
       >
         <Toggle
           label="Launch at login"
@@ -350,7 +338,6 @@ function Preferences({
               disabled={save.isPending || active}
               onClick={() => {
                 setDraft(settings);
-                setVocabulary(settings.vocabulary.join('\n'));
               }}
             >
               Discard
@@ -405,7 +392,7 @@ function DesktopSetup({
     staleTime: 60_000,
   });
   return (
-    <section className="mb-7 rounded-panel border border-line bg-surface p-5 max-md:p-4">
+    <section className="settings-section">
       <div className="mb-5">
         <div className="flex items-center justify-between gap-4">
           <h2 className="text-title font-semibold tracking-[-.02em]">Shortcut</h2>
@@ -414,10 +401,10 @@ function DesktopSetup({
           </Button>
         </div>
       </div>
-      <div className="mb-5 flex items-center justify-between gap-6 rounded-control bg-subtle p-4 max-lg:gap-4 max-md:flex-wrap">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
           <Label>Recording shortcut</Label>
-          <div className="mt-3 flex items-center gap-3 max-md:flex-wrap">
+          <div className="mt-2 flex flex-wrap items-center gap-2">
             <Select
               value={shortcutId}
               onValueChange={setShortcutId}
@@ -466,7 +453,7 @@ function DesktopSetup({
                 }
               }}
             >
-              {recordingShortcut ? 'Press shortcut…' : 'Record custom shortcut'}
+              {recordingShortcut ? 'Press shortcut…' : 'Set custom shortcut'}
             </Button>
           </div>
           {recordingShortcut && (
@@ -510,8 +497,8 @@ function LocalDiagnostics() {
     }
   };
   return (
-    <section className="mb-5 rounded-panel border border-line bg-surface p-5">
-      <h2 className="text-title font-semibold">Local diagnostics</h2>
+    <details className="settings-section settings-support">
+      <summary className="cursor-pointer text-ui font-medium">Help &amp; diagnostics</summary>
       <p className="my-3 text-ui text-muted">
         Recording and delivery events from the last 14 days, up to 500 events. Text, credentials and
         target app details are excluded. Diagnostics stay on this device.
@@ -537,6 +524,6 @@ function LocalDiagnostics() {
           Export diagnostics
         </Button>
       </div>
-    </section>
+    </details>
   );
 }

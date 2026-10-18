@@ -1,7 +1,6 @@
 import { WarningCircleIcon } from '../components/icons';
 import { useEffect, useRef } from 'react';
 import { Button, Logo } from '../components/ui';
-import { Card } from '../components/ui/card';
 import { native } from '../lib/api';
 
 function GoogleMark() {
@@ -51,15 +50,18 @@ export function LoginPage({
       <div className="w-full max-w-[420px]">
         <Logo tone="ink" collapse={false} className="justify-center" />
 
-        <Card className="mt-7 overflow-hidden">
+        <section className="mt-7">
           <div className="px-7 pt-7 pb-6 text-center max-sm:px-5">
             <h1
               ref={headingRef}
               tabIndex={-1}
               className="text-heading font-semibold tracking-[-.02em] text-balance outline-none"
             >
-              Sign in
+              Welcome to VoxType
             </h1>
+            <p className="mt-3 text-ui text-muted">
+              Keep your transcripts and personal dictionary together.
+            </p>
 
             {error && (
               <div
@@ -72,9 +74,8 @@ export function LoginPage({
             )}
 
             <Button
-              variant="outline"
-              size="lg"
-              className="mt-6 w-full bg-surface"
+              variant="primary"
+              className="mt-6 w-full"
               onClick={onSignIn}
               loading={checking || pending}
               disabled={checking || !native}
@@ -86,7 +87,7 @@ export function LoginPage({
               {status}
             </span>
           </div>
-        </Card>
+        </section>
       </div>
     </main>
   );
