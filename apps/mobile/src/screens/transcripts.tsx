@@ -3,7 +3,6 @@ import { FlatList, Modal, Pressable, ScrollView, TextInput, View } from 'react-n
 import { router } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { CopyIcon } from 'phosphor-react-native/src/icons/Copy';
-import { DotsThreeIcon } from 'phosphor-react-native/src/icons/DotsThree';
 import { MagnifyingGlassIcon } from 'phosphor-react-native/src/icons/MagnifyingGlass';
 import { PlayIcon } from 'phosphor-react-native/src/icons/Play';
 import { XIcon } from 'phosphor-react-native/src/icons/X';
@@ -12,27 +11,13 @@ import { RecordingPlayer } from '../components/recording-player';
 import { audioTime } from '../lib/audio-time';
 import { Screen } from '../components/screen';
 import { Sheet } from '../components/sheet';
-import { Action, IconButton, Loader, SettingLink, Text } from '../components/primitives';
+import { Action, Command, IconButton, Loader, Text } from '../components/primitives';
 import { styles as ui } from '../components/styles';
 import { useAppState, useTranscripts } from '../state/app-state';
 import Native from '../../modules/voxtype-native/src/VoxTypeNativeModule';
-import type {
-  Dictation,
-  LocalRecording,
-} from '../../modules/voxtype-native/src/VoxTypeNative.types';
+import type { LocalRecording } from '../../modules/voxtype-native/src/VoxTypeNative.types';
+import { transcriptEntries, type TranscriptEntry as Entry } from '../lib/transcript-library';
 const c = theme.colors;
-type Entry = {
-  id: string;
-  text: string;
-  createdAt: number;
-  durationMs: number;
-  wordCount: number;
-  local?: LocalRecording;
-  transcript?: Dictation;
-};
-function entry(item: Dictation, local?: LocalRecording): Entry {
-  return { ...item, local, transcript: item };
-}
 function dateLabel(time: number) {
   return new Date(time).toLocaleDateString(undefined, {
     month: 'short',
@@ -42,8 +27,7 @@ function dateLabel(time: number) {
 }
 export default function TranscriptsScreen() {
   const app = useAppState();
-  const [search, setSearch] = useState(''),
-    [filter, setFilter] = useState<'all' | 'device'>('all');
+  const [search, setSearch] = useState('');
   const query = useTranscripts(search);
   const [local, setLocal] = useState<LocalRecording[]>([]),
     [localError, setLocalError] = useState(false),
@@ -81,31 +65,9 @@ export default function TranscriptsScreen() {
       disposed = true;
     };
   }, [app.available, app.revision, userId, retry]);
-  const rows: Entry[] =
-    filter === 'all'
-      ? query.items.map((item) =>
-          entry(
-            item,
-            local.find((take) => take.id === item.id),
-          ),
-        )
-      : local
-          .map((take) => {
-            const transcript = query.items.find((item) => item.id === take.id);
-            return transcript
-              ? entry(transcript, take)
-              : {
-                  ...take,
-                  text: take.originalText,
-                  wordCount: take.originalText.trim().split(/\s+/).filter(Boolean).length,
-                  local: take,
-                };
-          })
-          .filter((take) =>
-            take.text.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()),
-          );
-  const loading = filter === 'all' ? query.loading : localLoading;
-  const error = filter === 'all' ? query.error : localError;
+  const rows = transcriptEntries(query.items, local, search);
+  const loading = query.loading || localLoading;
+  const error = query.error || localError;
   const refresh = () => {
     setRetry((n) => n + 1);
     void query.refresh();
@@ -146,8 +108,9 @@ export default function TranscriptsScreen() {
     });
   const menuContent = (
     <Sheet title="Transcript actions" visible={!!menu} onClose={() => setMenu(null)}>
-      <SettingLink
+      <Command
         label="Copy text"
+        disabled={!menu?.text}
         onPress={() => {
           if (menu) copy(menu.text);
           setMenu(null);
@@ -155,7 +118,7 @@ export default function TranscriptsScreen() {
       />
       {menu?.local && (
         <>
-          <SettingLink
+          <Command
             label="Copy original"
             disabled={!menu.local.originalText}
             onPress={() => {
@@ -163,7 +126,7 @@ export default function TranscriptsScreen() {
               setMenu(null);
             }}
           />
-          <SettingLink
+          <Command
             label="Export audio"
             disabled={!menu.local.audioAvailable || app.busy}
             onPress={() => {
@@ -172,15 +135,10 @@ export default function TranscriptsScreen() {
               void app.run(() => Native.shareRecording(id));
             }}
           />
-          <SettingLink
-            label="Regenerate transcript"
-            disabled={!menu.local.audioAvailable || app.busy || active}
-            onPress={() => ask('regenerate', menu)}
-          />
         </>
       )}
       {menu?.transcript && (
-        <SettingLink
+        <Command
           label="Delete transcript"
           destructive
           disabled={app.busy}
@@ -199,26 +157,35 @@ export default function TranscriptsScreen() {
     >
       <Text style={[ui.muted, { marginBottom: 16 }]}>
         {confirmation?.action === 'delete'
-          ? 'Removes the text from your account and synced devices. The local recording and original remain until replaced by newer takes.'
-          : 'Sends this recording for transcription and replaces the current text. If it fails, your text stays unchanged.'}
+          ? 'Deletes this transcript from your account. The recording stays on this device.'
+          : 'Transcribes the recording again and replaces this text. If it fails, your text stays unchanged.'}
       </Text>
       {!!actionError && (
         <Text accessibilityRole="alert" style={{ color: c.danger, marginBottom: 12 }}>
           {actionError}
         </Text>
       )}
-      <Action
-        label={
-          app.busy
-            ? 'Please wait…'
-            : confirmation?.action === 'delete'
-              ? 'Delete transcript'
-              : 'Regenerate'
-        }
-        disabled={app.busy || !app.available}
-        onPress={confirm}
-      />
-      <Action label="Cancel" secondary disabled={app.busy} onPress={() => setConfirmation(null)} />
+      <View style={{ flexDirection: 'row', alignItems: 'stretch', gap: 8 }}>
+        <Action
+          label="Cancel"
+          secondary
+          style={{ flex: 1, alignSelf: 'stretch', paddingHorizontal: 14 }}
+          disabled={app.busy}
+          onPress={() => setConfirmation(null)}
+        />
+        <Action
+          style={{ flex: 1 }}
+          label={
+            app.busy
+              ? 'Please wait…'
+              : confirmation?.action === 'delete'
+                ? 'Delete transcript'
+                : 'Regenerate'
+          }
+          disabled={app.busy || !app.available}
+          onPress={confirm}
+        />
+      </View>
     </Sheet>
   );
   return (
@@ -258,43 +225,6 @@ export default function TranscriptsScreen() {
               </IconButton>
             )}
           </View>
-          <View style={{ flexDirection: 'row', gap: 16 }}>
-            {(['all', 'device'] as const).map((value) => (
-              <Pressable
-                key={value}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: filter === value }}
-                onPress={() => setFilter(value)}
-                style={{
-                  minHeight: 48,
-                  justifyContent: 'center',
-                  borderBottomWidth: 2,
-                  borderBottomColor: filter === value ? c.primary : 'transparent',
-                  paddingHorizontal: 4,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 13,
-                    fontWeight: filter === value ? '600' : '400',
-                    color: filter === value ? c.primary : c.textMuted,
-                  }}
-                >
-                  {value === 'all' ? 'All transcripts' : 'On this device'}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-          {filter === 'device' && (
-            <Text style={ui.muted}>Latest 10 recordings and originals saved here.</Text>
-          )}
-          {localError && filter === 'all' && (
-            <Action
-              label="Retry loading recordings"
-              secondary
-              onPress={() => setRetry((n) => n + 1)}
-            />
-          )}
         </View>
         <FlatList
           data={rows}
@@ -328,6 +258,7 @@ export default function TranscriptsScreen() {
                       minute: '2-digit',
                     })}{' '}
                     · {item.wordCount} words · {audioTime(item.durationMs / 1000)}
+                    {!item.transcript ? ' · Original' : ''}
                   </Text>
                   {item.local?.audioAvailable && (
                     <IconButton
@@ -338,9 +269,7 @@ export default function TranscriptsScreen() {
                       <PlayIcon size={19} color={c.primary} weight="fill" />
                     </IconButton>
                   )}
-                  <IconButton label="Transcript actions" onPress={() => setMenu(item)}>
-                    <DotsThreeIcon size={24} weight="bold" color={c.textMuted} />
-                  </IconButton>
+                  <Action label="Actions" secondary onPress={() => setMenu(item)} />
                 </View>
               </View>
             </View>
@@ -355,9 +284,7 @@ export default function TranscriptsScreen() {
                     ? 'Couldn’t load transcripts'
                     : search
                       ? 'No matching transcripts'
-                      : filter === 'device'
-                        ? 'No recordings on this device'
-                        : 'Your words, saved here'}
+                      : 'Your words, saved here'}
                 </Text>
                 <Text style={ui.muted}>
                   {error
@@ -381,12 +308,12 @@ export default function TranscriptsScreen() {
             )
           }
           ListFooterComponent={
-            rows.length > 0 && filter === 'all' ? (
+            rows.length > 0 ? (
               <View style={{ paddingVertical: 8 }}>
-                {query.error && (
+                {error && (
                   <>
                     <Text style={ui.muted}>
-                      Couldn’t refresh. Your saved transcripts are still here.
+                      Couldn’t refresh everything. Your saved transcripts are still here.
                     </Text>
                     <Action label="Retry" secondary onPress={refresh} />
                   </>
@@ -424,11 +351,7 @@ export default function TranscriptsScreen() {
               setConfirmation(null);
               setSelected(null);
             }}
-            actions={
-              <IconButton label="Transcript actions" onPress={() => setMenu(selected)}>
-                <DotsThreeIcon size={24} weight="bold" color={c.text} />
-              </IconButton>
-            }
+            actions={<Action label="Actions" secondary onPress={() => setMenu(selected)} />}
           >
             <View style={{ paddingHorizontal: 20, paddingBottom: 16, gap: 12 }}>
               <Text style={ui.muted}>
@@ -440,7 +363,16 @@ export default function TranscriptsScreen() {
                 · {selected.wordCount} words
               </Text>
               {selected.local?.audioAvailable ? (
-                <RecordingPlayer key={selected.id} id={selected.id} autoPlay={autoPlay} />
+                <View style={{ gap: 4 }}>
+                  <RecordingPlayer key={selected.id} id={selected.id} autoPlay={autoPlay} />
+                  <Action
+                    label="Regenerate"
+                    secondary
+                    disabled={app.busy || active}
+                    onPress={() => ask('regenerate', selected)}
+                  />
+                  <Text style={ui.muted}>Audio stays on this device.</Text>
+                </View>
               ) : (
                 <Text style={ui.muted}>Audio isn’t saved on this device.</Text>
               )}
@@ -449,8 +381,7 @@ export default function TranscriptsScreen() {
               contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32, gap: 16 }}
             >
               <Text selectable style={{ fontSize: 17, lineHeight: 28 }}>
-                {selected.text ||
-                  'No transcript yet. Use the actions menu to regenerate it from your recording.'}
+                {selected.text || 'No transcript yet. Regenerate it from the recording above.'}
               </Text>
               <Action
                 label="Copy text"

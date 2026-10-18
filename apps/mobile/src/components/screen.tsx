@@ -15,12 +15,14 @@ export function Screen({
   scroll = true,
   actions,
   onBack,
+  showAccount = true,
 }: {
   title: string;
   children: ReactNode;
   scroll?: boolean;
   actions?: ReactNode;
   onBack?: () => void;
+  showAccount?: boolean;
 }) {
   const insets = useSafeAreaInsets(),
     app = useAppState(),
@@ -48,11 +50,11 @@ export function Screen({
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           {actions}
-          {!onBack && (
+          {!onBack && showAccount && (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Account"
-              onPress={() => router.push('/account')}
+              accessibilityLabel="Profile and settings"
+              onPress={() => router.navigate('/(tabs)/settings')}
               style={s.avatar}
             >
               <Text style={{ color: c.primary, fontWeight: '600' }}>

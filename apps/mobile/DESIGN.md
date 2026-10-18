@@ -133,7 +133,7 @@ The application inherits its palette from `packages/shared/theme.ts`; mobile com
 - Forest green accents on light neutral surfaces.
 - Compact typography with generous touch targets.
 - Flat groups, restrained dividers and contextual action sheets.
-- Selectable transcript reading with a persistent playback strip.
+- Selectable transcript reading with a persistent playback strip when local audio is available.
 
 ## Colors
 
@@ -141,7 +141,7 @@ The palette pairs a muted forest green with warm, lightly green-tinted neutrals.
 
 ### Primary
 
-- **Forest green** (`primary`) marks primary actions, selected filters, active navigation and playback controls.
+- **Forest green** (`primary`) marks primary actions, selected controls, active navigation and playback controls.
 - **Soft green** (`primary-container`) supports the active recording banner.
 - **White on green** (`on-primary`) labels filled actions and colors native switch thumbs.
 
@@ -151,7 +151,7 @@ The palette pairs a muted forest green with warm, lightly green-tinted neutrals.
 - **White surface** (`surface`) supports grouped settings, sheets and bottom navigation.
 - **Subtle green gray** (`surface-subtle`) defines search, playback and segmented-control backgrounds.
 - **Deep ink** (`text`) carries content; **muted ink** (`text-muted`) carries metadata and supporting labels.
-- **Soft divider** (`border`) separates transcript rows and selected settings groups.
+- **Soft divider** (`border`) separates transcript rows.
 - **Muted red** (`danger`) identifies failures and destructive action labels; it is semantic feedback, not a secondary brand accent.
 - **Translucent black** (`scrim`) dims the application behind a bottom sheet.
 
@@ -191,7 +191,7 @@ Ordinary cards and groups have no default border or shadow. Surface tone, spacin
 
 ## Shapes
 
-Panels, search and the playback strip share softly rounded corners. Filled actions are slightly tighter, while icon controls are circular. Bottom sheets round their upper corners only. Filter tabs use an underline instead of a pill; analytics segments use compact rounded selected surfaces. Inputs may use borders, and transcript rows use dividers, so borderless cards are not a blanket ban on lines.
+Panels, search and the playback strip share softly rounded corners. Filled actions are slightly tighter, while icon controls are circular. Bottom sheets round their upper corners only. Analytics segments use compact rounded selected surfaces. Inputs may use borders, and transcript rows use dividers, so borderless cards are not a blanket ban on lines.
 
 ## Components
 
@@ -203,7 +203,7 @@ Icon buttons use minimum dimensions (48dp), an explicit accessible label, a subt
 
 ### Cards / Containers
 
-The common card has a white background, panel corners and padding from the frontmatter. It has no default stroke or elevation. Settings use a few grouped cards with sentence-case section labels and selective internal separators.
+The common card has a white background, panel corners and padding from the frontmatter. It has no default stroke or elevation. Settings use a few grouped cards with short sentence-case section labels and spacing between preference rows.
 
 ### Inputs / Fields
 
@@ -211,27 +211,31 @@ Search sits in a subtle surface with a leading search icon and a conditional cle
 
 ### Dictionary chips
 
-Saved words and phrases appear as individually removable chips in a wrapping row with gaps (8dp). Each chip pairs a soft green background with green body text, rounded corners (24dp), left padding (14dp) and a labeled remove control (48dp). Single-line labels truncate within the available width so the remove control stays visible, including at narrow phone widths. Each add or remove saves to the account backend immediately; the term count shows a saving state while controls are locked. Case-insensitive duplicates and limits of 100 terms and 100 characters per term produce inline feedback. The dictionary does not use a bulk editor or a separate save action. Copy explains that words sync across desktop and mobile, including the voice bubble. Sync failures appear inline while the account cache remains visible; failed additions keep the input so they can be retried.
+Saved words and phrases appear as individually removable chips in a wrapping row with gaps (8dp). Each chip pairs a soft green background with green body text, rounded corners (24dp), left padding (14dp) and a labeled remove control (48dp). Single-line labels truncate within the available width so the remove control stays visible, including at narrow phone widths. Each add or remove saves to the account backend immediately; the term count shows a saving state while controls are locked. Case-insensitive duplicates and limits of 100 terms and 100 characters per term produce inline feedback. The dictionary does not use a bulk editor or a separate save action. One short sentence explains desktop/mobile sync; the account dictionary still serves recording and the voice bubble. Sync failures appear inline while the account cache remains visible; failed additions keep the input so they can be retried.
 
-### Navigation and filters
+### Navigation and settings
 
-The four bottom tabs are Home, Transcripts, Insights and Settings. Green indicates the active destination and muted ink indicates others. Account access is a circular app-bar control. Deeper preference pages use a back control.
+The four bottom tabs are Home, Transcripts, Insights and Settings. Green indicates the active destination and muted ink indicates others. The circular profile control on other main screens opens Settings, and the existing `/account` route redirects there. Settings starts with profile details and Sign out, followed by Recording and App groups. Sync progress, errors and Retry sync remain in the profile group; there is no separate storage card or storage paragraph. Settings omits its own profile shortcut. Deeper preference pages use a back control.
 
-Transcript filters are text tabs with a selected underline (2dp) and minimum height (48dp). Analytics segments use a subtle container and a white selected segment; segments wrap when needed. Settings links use a trailing chevron, a flexible label, optional supporting detail and minimum height (52dp).
+Transcripts has one list without transcript/recording filters. Analytics segments use a subtle container and a white selected segment; segments wrap when needed. Mobile Insights keeps its range, metrics, trends and activity calendar without an actions drawer, definitions sheet or CSV export. Settings links use a trailing chevron, a flexible label, optional supporting detail and minimum height (52dp). Preference labels and supporting copy stay short.
 
 ### Contextual sheets
 
-Occasional transcript, recording and recovery actions open in bottom sheets. Sheets include a title, an accessible close control, a dismissible backdrop and scrollable content. Their modal transition is instant. The reader modal also opens without animation, and the app configures system reduced-motion support.
+The explicit Actions text trigger on transcript rows and the reader opens a bottom sheet. Copy text, Copy original, Export audio and Delete transcript are contextual command rows with minimum height (52dp), plain labels and pressed feedback, without navigation chevrons or toggle styling. Original/audio commands appear for retained local takes; Delete appears for saved transcripts. Regenerate remains beside the player. Confirmation sheets place Cancel and the confirming action side by side at equal widths and aligned heights, retaining the filled primary action.
+
+Sheets include a title, an accessible close control, a dismissible backdrop and scrollable content. Their modal transition is instant. The reader modal also opens without animation, and the app configures system reduced-motion support.
 
 ### Transcript reader and playback
 
-Transcript rows show three-line previews and open a dedicated reader. There are no expand/collapse controls. The reader keeps the audio strip outside the transcript text scroller and keys its player by recording identity. The text remains selectable.
+The single Transcripts list joins account transcripts with retained local audio and originals by take ID, deduplicates rows and sorts newest first. Search matches cleaned text and retained originals. Unfinished local takes remain recoverable in the same list and carry an Original label. Rows show three-line previews and open a dedicated reader. There are no expand/collapse controls.
+
+Play appears on rows with local audio. The reader mounts its playback strip and visible Regenerate action only when that take has local audio; older text-only takes receive a brief availability explanation. The reader keeps playback outside the transcript text scroller and keys its player by recording identity. The text remains selectable.
 
 Playback exposes play/pause, restart, a progress bar, elapsed/total time, loading or buffering state, and failure copy with retry. It pauses when the app backgrounds or recording becomes active. Missing local audio gets a direct explanation. These are implemented behaviors, not a claim that device playback QA has passed.
 
 Background transcript refresh retains existing rows; refresh failures show a compact footer with retry. A loader is used for an empty initial list. Success feedback uses a transient dismissible message rather than a permanent content banner.
 
-The sidecar contains HTML/CSS translations for design-panel previews of native components. Browser hover/focus treatments and generated tonal ramps in that sidecar are preview aids, not additional implemented Android tokens or proof of native rendering.
+The sidecar contains HTML/CSS translations for design-panel previews of native components. Browser hover/focus treatments and generated tonal ramps in that sidecar are preview aids, not additional implemented Android tokens or proof of native rendering. Isolated browser fixtures can review layout and simulated states; they do not verify Android capture, accessibility access, native sharing or device playback.
 
 ## Do's and Don'ts
 

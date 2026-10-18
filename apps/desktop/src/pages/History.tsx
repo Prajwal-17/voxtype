@@ -34,7 +34,7 @@ import {
 } from '../components/ui/alert-dialog';
 import { api, native, useAuthUser, useHistory, useCopy, useSession } from '../lib/api';
 import { duration, errorMessage, isActive } from '../lib/types';
-import { libraryItems, type LibraryItem, type LibraryView } from '../lib/transcript-library';
+import { libraryItems, type LibraryItem } from '../lib/transcript-library';
 
 export function HistoryPage({
   onRecord,
@@ -43,7 +43,6 @@ export function HistoryPage({
   onRecord: () => void;
   initialId?: string | null;
 }) {
-  const [view, setView] = useState<LibraryView>('transcripts');
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(initialId ?? null);
   const [confirmation, setConfirmation] = useState<{
@@ -52,7 +51,7 @@ export function HistoryPage({
   } | null>(null);
   const query = useDeferredValue(search);
   const auth = useAuthUser(),
-    history = useHistory(view === 'transcripts' ? query : ''),
+    history = useHistory(query),
     copy = useCopy();
   const client = useQueryClient();
   const { data: session } = useSession();
@@ -82,14 +81,16 @@ export function HistoryPage({
   const items = libraryItems(
     history.data?.pages.flatMap((page) => page.items) ?? [],
     recordings.data ?? [],
-    view,
     query,
   );
   const selected = items.find((item) => item.id === selectedId);
-  const searching = search !== query || (view === 'transcripts' && history.isPlaceholderData);
-  const loading = view === 'transcripts' ? history.isPending : recordings.isPending;
-  const failed = view === 'transcripts' ? history.isError : recordings.isError;
-  const refresh = () => void (view === 'transcripts' ? history.refetch() : recordings.refetch());
+  const searching = search !== query || history.isPlaceholderData;
+  const loading = history.isPending || recordings.isPending;
+  const failed = history.isError || recordings.isError;
+  const refresh = () => {
+    void history.refetch();
+    void recordings.refetch();
+  };
   const select = (item: LibraryItem, button: HTMLButtonElement) => {
     selectedButton.current = button;
     setSelectedId(item.id);
@@ -111,20 +112,6 @@ export function HistoryPage({
         }
       />
       <div className="library-toolbar">
-        <div className="compact-tabs" role="group" aria-label="Library view">
-          {(['transcripts', 'recordings'] as const).map((kind) => (
-            <button
-              key={kind}
-              aria-pressed={view === kind}
-              onClick={() => {
-                setView(kind);
-                setSelectedId(null);
-              }}
-            >
-              {kind === 'transcripts' ? 'Transcripts' : 'Recordings'}
-            </button>
-          ))}
-        </div>
         <div className="relative min-w-0 flex-1 sm:max-w-xs">
           <MagnifyingGlassIcon
             size={16}
@@ -134,7 +121,7 @@ export function HistoryPage({
           <Input
             ref={searchInput}
             type="search"
-            placeholder={view === 'transcripts' ? 'Search transcripts' : 'Search recordings'}
+            placeholder="Search transcripts"
             aria-label="Search library"
             value={search}
             onChange={(e) => {
@@ -148,22 +135,17 @@ export function HistoryPage({
       <span className="sr-only" role="status">
         {searching ? 'Searching…' : ''}
       </span>
-      {view === 'recordings' && (
-        <p className="mb-3 text-caption text-muted">
-          Latest 10 takes on this device. Audio stays on this device.
-        </p>
-      )}
       <div className="transcript-workspace" data-selected={!!selected} data-empty={!items.length}>
         <section
           className="transcript-list"
-          aria-label={view === 'transcripts' ? 'Transcript list' : 'Recording list'}
+          aria-label="Transcript list"
           aria-busy={searching || loading}
         >
-          {loading ? (
+          {loading && !items.length ? (
             <Loader />
           ) : failed && !items.length ? (
             <div className="library-empty" role="alert">
-              <p>Couldn’t load {view}.</p>
+              <p>Couldn’t load transcripts.</p>
               <Button onClick={refresh}>Retry</Button>
             </div>
           ) : searching && !items.length ? (
@@ -174,11 +156,7 @@ export function HistoryPage({
             <div className="library-empty">
               <FileTextIcon size={26} className="text-muted" aria-hidden="true" />
               <h2 className="text-title font-medium">
-                {search
-                  ? 'No matches'
-                  : view === 'transcripts'
-                    ? 'No transcripts yet'
-                    : 'No saved recordings'}
+                {search ? 'No matches' : 'No transcripts yet'}
               </h2>
               <p className="text-ui text-muted">
                 {search ? 'Try another word or phrase.' : 'Your next recording will appear here.'}
@@ -194,7 +172,7 @@ export function HistoryPage({
                   className="flex items-center justify-between gap-2 px-4 py-2 text-caption text-muted"
                   role="status"
                 >
-                  Couldn’t refresh. Showing saved {view}.
+                  Couldn’t refresh everything. Showing saved transcripts.
                   <Button size="sm" variant="ghost" onClick={refresh}>
                     Retry
                   </Button>
@@ -220,6 +198,7 @@ export function HistoryPage({
                         </time>
                         <span>·</span>
                         <span>{duration(item.durationMs)}</span>
+                        {!item.transcript && <span>Original</span>}
                         <span className="ml-auto">
                           {item.recording?.audioFile ? (
                             <MicrophoneIcon size={14} aria-label="Audio available" />
@@ -232,7 +211,7 @@ export function HistoryPage({
                   </li>
                 ))}
               </ul>
-              {view === 'transcripts' && (history.hasNextPage || history.isFetchNextPageError) && (
+              {(history.hasNextPage || history.isFetchNextPageError) && (
                 <div className="p-3">
                   <Button
                     className="w-full"
@@ -303,42 +282,39 @@ export function HistoryPage({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      disabled={!selected.recording?.originalText || copy.isPending}
-                      onSelect={() => copy.mutate(selected.recording!.originalText)}
-                    >
-                      <CopyIcon />
-                      Copy original text
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      disabled={!native || !selected.recording?.audioFile}
-                      onSelect={() =>
-                        void api
-                          .exportRecording(selected.id)
-                          .catch((e) => toast.error(errorMessage(e)))
-                      }
-                    >
-                      <DownloadSimpleIcon />
-                      Export audio
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      disabled={
-                        !native || !selected.recording?.audioFile || active || mutation.isPending
-                      }
-                      onSelect={() => showConfirmation('regenerate', selected)}
-                    >
-                      <ArrowsClockwiseIcon />
-                      Regenerate transcript
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      className="text-danger focus:text-danger"
-                      disabled={!native || !selected.transcript || mutation.isPending}
-                      onSelect={() => showConfirmation('delete', selected)}
-                    >
-                      <TrashSimpleIcon />
-                      Delete transcript
-                    </DropdownMenuItem>
+                    {selected.recording?.originalText && (
+                      <DropdownMenuItem
+                        disabled={copy.isPending}
+                        onSelect={() => copy.mutate(selected.recording!.originalText)}
+                      >
+                        <CopyIcon />
+                        Copy original text
+                      </DropdownMenuItem>
+                    )}
+                    {selected.recording?.audioFile && (
+                      <DropdownMenuItem
+                        disabled={!native}
+                        onSelect={() =>
+                          void api
+                            .exportRecording(selected.id)
+                            .catch((e) => toast.error(errorMessage(e)))
+                        }
+                      >
+                        <DownloadSimpleIcon />
+                        Export audio
+                      </DropdownMenuItem>
+                    )}
+                    {selected.recording && selected.transcript && <DropdownMenuSeparator />}
+                    {selected.transcript && (
+                      <DropdownMenuItem
+                        className="text-danger focus:text-danger"
+                        disabled={!native || !selected.transcript || mutation.isPending}
+                        onSelect={() => showConfirmation('delete', selected)}
+                      >
+                        <TrashSimpleIcon />
+                        Delete transcript
+                      </DropdownMenuItem>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -351,12 +327,22 @@ export function HistoryPage({
                     disabled={active || mutation.isPending}
                     durationMs={selected.durationMs}
                   />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="mt-1"
+                    disabled={!native || active || mutation.isPending}
+                    onClick={() => showConfirmation('regenerate', selected)}
+                  >
+                    <ArrowsClockwiseIcon size={16} />
+                    Regenerate
+                  </Button>
                 </div>
               )}
               <div className="reader-content">
                 <p className="select-text whitespace-pre-wrap text-transcript [overflow-wrap:anywhere]">
                   {selected.text ||
-                    'No text was received. Play the recording or regenerate its transcript from the menu.'}
+                    'No text was received. Play the recording or regenerate its transcript above.'}
                 </p>
               </div>
             </>

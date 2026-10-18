@@ -71,7 +71,7 @@ export function FieldRow({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-8 border-b border-line py-3 last:border-b-0 last:pb-0 max-md:flex-wrap max-md:gap-3">
+    <div className="flex items-center justify-between gap-8 py-3 max-md:flex-wrap max-md:gap-3">
       <div className="min-w-0">
         {typeof label === 'string' ? (
           <label htmlFor={htmlFor} className="text-ui font-medium text-ink">

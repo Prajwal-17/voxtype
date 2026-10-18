@@ -34,6 +34,7 @@ VoxType combines an app-level recording workspace with a system-wide Right Alt s
 - Provider API keys stay on the server. Desktop requests a fresh temporary Deepgram token for each connection; optional cleanup uses the authenticated server endpoint.
 - Production defaults to Right Alt and development defaults to Ctrl Shift Space; each can be changed independently.
 - All transcripts are stored locally. The newest 10 audio recordings are retained on the device.
+- Transcripts is one searchable list joining saved text and retained local takes by ID, including unfinished takes without duplicating rows. Playback and regeneration require that take's local audio.
 - New transcripts upload with a desktop source tag. Sign-in restores account history into the local cache, background retries synchronize pending uploads, and cloud deletion precedes local removal. Audio files are not stored by the account API.
 - The browser build is a preview and cannot record.
 - Personal dictionary words sync with the account across desktop and Android. Recording and regeneration read account-scoped native caches; edits require a successful backend save.

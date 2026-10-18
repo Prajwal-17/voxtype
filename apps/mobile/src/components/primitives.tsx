@@ -8,6 +8,8 @@ import {
   Text as NativeText,
   View,
   type TextProps,
+  type StyleProp,
+  type ViewStyle,
   type ViewProps,
 } from 'react-native';
 import { nativeTheme as theme } from '@voxtype/shared';
@@ -30,12 +32,14 @@ export function Action({
   disabled,
   secondary,
   icon,
+  style,
 }: {
   label: string;
   onPress: () => void;
   disabled?: boolean;
   secondary?: boolean;
   icon?: ReactNode;
+  style?: StyleProp<ViewStyle>;
 }) {
   return (
     <Pressable
@@ -48,6 +52,7 @@ export function Action({
       style={({ pressed }) => [
         styles.action,
         secondary && styles.secondary,
+        style,
         disabled && { opacity: 0.45 },
         pressed && { opacity: 0.7 },
       ]}
@@ -78,18 +83,23 @@ export function Loader({ label = 'Loading' }: { label?: string }) {
 }
 export function Setting({
   label,
+  detail,
   value,
   onChange,
   disabled,
 }: {
   label: string;
+  detail?: string;
   value: boolean;
   onChange: (value: boolean) => void;
   disabled?: boolean;
 }) {
   return (
     <View style={styles.setting}>
-      <Text style={{ flexShrink: 1 }}>{label}</Text>
+      <View style={{ flex: 1, gap: 2, paddingVertical: 8 }}>
+        <Text>{label}</Text>
+        {!!detail && <Text style={styles.muted}>{detail}</Text>}
+      </View>
       <Switch
         accessibilityLabel={label}
         value={value}
@@ -170,6 +180,37 @@ export function SettingLink({
         {!!detail && <Text style={styles.muted}>{detail}</Text>}
       </View>
       <CaretRightIcon size={16} color={c.textMuted} />
+    </Pressable>
+  );
+}
+
+export function Command({
+  label,
+  onPress,
+  disabled,
+  destructive,
+}: {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  destructive?: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !!disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => ({
+        minHeight: 52,
+        paddingVertical: 14,
+        justifyContent: 'center',
+        opacity: disabled ? 0.4 : 1,
+        backgroundColor: pressed ? c.surfaceSubtle : 'transparent',
+      })}
+    >
+      <Text style={{ color: destructive ? c.danger : c.text }}>{label}</Text>
     </Pressable>
   );
 }

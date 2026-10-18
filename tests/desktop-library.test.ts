@@ -19,25 +19,35 @@ const recording: LocalRecording = {
 };
 
 test('the library joins audio and original text to the matching transcript once', () => {
-  const rows = libraryItems([transcript, transcript], [recording], 'transcripts');
+  const rows = libraryItems([transcript, transcript], [recording]);
   assert.equal(rows.length, 1);
   assert.equal(rows[0]?.text, transcript.text);
   assert.equal(rows[0]?.recording?.audioFile, recording.audioFile);
   assert.equal(rows[0]?.recording?.originalText, recording.originalText);
 });
-test('recordings include failed takes without creating duplicate transcript rows', () => {
+test('one transcript list includes recoverable takes without duplicating saved transcripts', () => {
   const failed = { ...recording, id: 'failed', originalText: 'An unfinished thought' };
-  assert.equal(libraryItems([transcript], [recording, failed], 'transcripts').length, 1);
-  const rows = libraryItems([transcript], [recording, failed], 'recordings');
+  const rows = libraryItems([transcript], [recording, failed]);
   assert.equal(rows.length, 2);
-  assert.equal(rows[1]?.text, 'An unfinished thought');
-  assert.equal(rows[1]?.words, 3);
-  assert.equal(rows[1]?.transcript, undefined);
+  const recovered = rows.find((row) => row.id === 'failed');
+  assert.equal(recovered?.text, 'An unfinished thought');
+  assert.equal(recovered?.words, 3);
+  assert.equal(recovered?.transcript, undefined);
 });
 test('recordings search includes originals and cleaned text while keeping audio with its own take', () => {
-  assert.equal(libraryItems([transcript], [recording], 'recordings', 'RAW')[0]?.id, 'take-1');
-  assert.equal(libraryItems([transcript], [recording], 'recordings', 'cleaned')[0]?.id, 'take-1');
-  assert.equal(libraryItems([transcript], [recording], 'transcripts', 'raw').length, 0);
-  const missing = libraryItems([{ ...transcript, id: 'cloud-only' }], [recording], 'transcripts');
-  assert.equal(missing[0]?.recording, undefined);
+  assert.equal(libraryItems([transcript], [recording], 'RAW')[0]?.id, 'take-1');
+  assert.equal(libraryItems([transcript], [recording], 'cleaned')[0]?.id, 'take-1');
+  const missing = libraryItems([{ ...transcript, id: 'cloud-only' }], [recording]);
+  assert.equal(missing.find((row) => row.id === 'cloud-only')?.recording, undefined);
+});
+
+test('the combined list is newest first across transcripts and recording-only takes', () => {
+  const rows = libraryItems(
+    [{ ...transcript, id: 'old-transcript', createdAt: 1 }, transcript],
+    [recording, { ...recording, id: 'new-recovery', createdAt: 2000 }],
+  );
+  assert.deepEqual(
+    rows.map((row) => row.id),
+    ['new-recovery', 'take-1', 'old-transcript'],
+  );
 });

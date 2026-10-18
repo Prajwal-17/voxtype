@@ -4,7 +4,7 @@ import * as Clipboard from 'expo-clipboard';
 import { nativeTheme as theme } from '@voxtype/shared';
 import { Dictionary } from '../components/dictionary';
 import { Screen } from '../components/screen';
-import { Card, Setting, SettingLink, Text } from '../components/primitives';
+import { Action, Card, Setting, SettingLink, Text } from '../components/primitives';
 import { styles as ui } from '../components/styles';
 import { useAppState } from '../state/app-state';
 import { accessibilityLabel, bubbleDiagnostics } from '../lib/bubble-health';
@@ -19,11 +19,62 @@ export default function SettingsScreen() {
     ['listening', 'processing'].includes(snapshot?.inApp.status ?? '') ||
     ['listening', 'connecting', 'processing'].includes(snapshot?.status ?? '');
   return (
-    <Screen title="Settings">
+    <Screen title="Settings" showAccount={false}>
+      <Card style={{ gap: 12 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 22,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: c.primaryContainer,
+            }}
+          >
+            <Text style={{ color: c.primary, fontWeight: '600' }}>
+              {(app.user?.name[0] || 'V').toUpperCase()}
+            </Text>
+          </View>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={{ fontSize: 16, fontWeight: '600' }}>{app.user?.name}</Text>
+            {!!app.user?.email && (
+              <Text selectable style={ui.muted}>
+                {app.user.email}
+              </Text>
+            )}
+          </View>
+          <Action
+            label="Sign out"
+            secondary
+            disabled={!app.available || app.busy || active}
+            onPress={() => void app.logout()}
+          />
+        </View>
+        {snapshot?.syncing && (
+          <Text accessibilityLiveRegion="polite" style={ui.muted}>
+            Syncing transcripts…
+          </Text>
+        )}
+        {!!snapshot?.syncError && (
+          <View style={{ gap: 4 }}>
+            <Text accessibilityRole="alert" style={ui.muted}>
+              {snapshot.syncError}
+            </Text>
+            <Action
+              label="Retry sync"
+              secondary
+              disabled={!app.available || app.busy}
+              onPress={() => void app.run(() => Native.syncTranscripts())}
+            />
+          </View>
+        )}
+      </Card>
       <Text style={ui.muted}>Recording</Text>
       <Card>
         <Setting
           label="Voice bubble"
+          detail="Type in other apps"
           value={!!snapshot?.bubbleEnabled}
           disabled={!app.available || app.busy || active}
           onChange={(value) =>
@@ -33,51 +84,41 @@ export default function SettingsScreen() {
             })
           }
         />
-        <Text style={[ui.muted, { paddingBottom: 12 }]}>
-          Dictate into other apps with your keyboard open.
-        </Text>
         {snapshot?.bubbleEnabled && !snapshot.accessibilityEnabled && (
           <SettingLink
-            label="Enable accessibility"
-            detail="Required for the voice bubble"
+            label="Enable voice bubble access"
             disabled={!app.available || app.busy}
             onPress={() => void app.run(() => Native.openAccessibilitySettings())}
           />
         )}
-        <View style={{ borderTopWidth: 1, borderColor: c.border }}>
-          <Setting
-            label="Clean up wording"
-            value={!!snapshot?.cleanupEnabled}
-            disabled={!app.available || app.busy || active}
-            onChange={(value) =>
-              void app.run(async () => {
-                await Native.setCleanupEnabled(value);
-                await app.refresh();
-              })
-            }
-          />
-          <Text style={[ui.muted, { paddingBottom: 8 }]}>
-            Polish your transcript after recording.
-          </Text>
-        </View>
+        <Setting
+          label="Clean up wording"
+          value={!!snapshot?.cleanupEnabled}
+          disabled={!app.available || app.busy || active}
+          onChange={(value) =>
+            void app.run(async () => {
+              await Native.setCleanupEnabled(value);
+              await app.refresh();
+            })
+          }
+        />
         <SettingLink
           label="Personal dictionary"
-          detail={`${snapshot?.dictionaryUserId === app.user?.id ? (snapshot?.vocabulary?.length ?? 0) : 0} saved terms`}
+          detail={`${snapshot?.dictionaryUserId === app.user?.id ? (snapshot?.vocabulary?.length ?? 0) : 0} words`}
           onPress={() => open('dictionary')}
         />
       </Card>
-      <Text style={ui.muted}>App & access</Text>
+      <Text style={ui.muted}>App</Text>
       <Card>
         <SettingLink
           label="Permissions"
-          detail={snapshot?.microphoneGranted ? 'Microphone allowed' : 'Microphone access needed'}
+          detail={snapshot?.microphoneGranted ? undefined : 'Microphone access needed'}
           onPress={() => open('permissions')}
         />
         {snapshot?.accessibilityEnabled && (
           <SettingLink
-            label="Pause for payments"
-            detail="Turn off accessibility access before paying"
-            disabled={!app.available || app.busy}
+            label="Pause bubble for payments"
+            disabled={!app.available || app.busy || active}
             onPress={() =>
               void app.run(async () => {
                 await Native.pauseForPayments();
@@ -86,16 +127,7 @@ export default function SettingsScreen() {
             }
           />
         )}
-        <SettingLink
-          label="Account & storage"
-          detail={app.user?.email || 'Sync and sign-in'}
-          onPress={() => router.push('/account')}
-        />
-        <SettingLink
-          label="Help & diagnostics"
-          detail="Background access and troubleshooting"
-          onPress={() => open('diagnostics')}
-        />
+        <SettingLink label="Help & diagnostics" onPress={() => open('diagnostics')} />
       </Card>
       <Text style={[ui.muted, { textAlign: 'center', paddingVertical: 8 }]}>
         {snapshot?.appHealth?.appName ?? 'VoxType'} ·{' '}
@@ -133,11 +165,7 @@ export function SettingsDetails() {
           <Card>
             <SettingLink
               label="Microphone"
-              detail={
-                snapshot?.microphoneGranted
-                  ? 'Allowed · Open app permissions'
-                  : 'Tap to allow microphone access'
-              }
+              detail={snapshot?.microphoneGranted ? 'Allowed' : 'Tap to allow microphone access'}
               disabled={disabled || active}
               onPress={() =>
                 void app.run(async () => {
@@ -161,16 +189,14 @@ export function SettingsDetails() {
             />
             {snapshot?.accessibilityEnabled && !snapshot.accessibilityConnected && (
               <Text style={[ui.muted, { color: c.danger }]}>
-                Waiting for Android to reconnect. Check accessibility and background access if this
-                continues.
+                Not connected. Re-enable VoxType in accessibility settings.
               </Text>
             )}
           </Card>
           <Text style={ui.title}>Using payment apps</Text>
           <Text style={ui.muted}>
-            Some payment apps, including Paytm, require accessibility access to be off. Pause
-            VoxType before paying, then re-enable it in Android accessibility settings. Hiding the
-            voice bubble does not turn off this access.
+            Payment app blocking you? Pause accessibility access, then re-enable VoxType after
+            paying. Turning off the bubble alone won’t pause this access.
           </Text>
           {snapshot?.accessibilityEnabled && (
             <SettingLink
@@ -187,9 +213,9 @@ export function SettingsDetails() {
         </>
       ) : (
         <>
-          <Text style={ui.title}>Keep the bubble available</Text>
+          <Text style={ui.title}>Bubble not appearing?</Text>
           <Text style={ui.muted}>
-            On iQOO or vivo, allow Autostart and background power usage for VoxType.
+            Allow background access for VoxType. On iQOO or vivo, also enable Autostart.
           </Text>
           {!!snapshot?.bubbleHealth?.foregroundError && (
             <Text accessibilityRole="alert" style={{ color: c.danger }}>
@@ -205,8 +231,7 @@ export function SettingsDetails() {
           </Card>
           <Text style={ui.title}>Diagnostics</Text>
           <Text style={ui.muted}>
-            Recording and delivery events stay on this device for 14 days, up to 500 events. Text,
-            credentials and target app details are excluded.
+            Share these logs when asking for help. Your text and sign-in details are excluded.
           </Text>
           <Card>
             <SettingLink

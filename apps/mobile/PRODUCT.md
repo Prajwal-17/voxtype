@@ -12,7 +12,9 @@ VoxType focuses on recording, reading transcripts, and dictating into other Andr
 
 ## Capabilities and Constraints
 
-Existing implementation: Expo / React Native with a Kotlin accessibility and recording module. Cleaned transcripts and personal dictionary terms sync to an account across desktop and mobile. Dictionary caches remain available for recording offline. The latest ten recordings and originals remain on the device. Preserve recovery, export, dictionary, analytics, account controls, and payment-related accessibility pause.
+Existing implementation: Expo / React Native with a Kotlin accessibility and recording module. Cleaned transcripts and personal dictionary terms sync to an account across desktop and mobile. Dictionary caches remain available for recording offline. The latest ten recordings and originals remain on the device. Preserve recording, recovery, audio export, dictionary sync, analytics, account controls, and payment-related accessibility pause. Mobile Insights has no actions drawer or CSV export.
+
+Transcripts is one searchable list combining account transcripts and retained local takes by ID, including unfinished takes. Playback and regeneration require audio on this device. Profile, sign-out and transcript sync status live in Settings; existing account links redirect there.
 
 ## Brand Commitments
 

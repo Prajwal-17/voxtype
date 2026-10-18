@@ -51,10 +51,7 @@ export function Dictionary({ terms, disabled }: { terms: string[]; disabled: boo
   };
   return (
     <View style={{ gap: 16 }}>
-      <Text style={styles.muted}>
-        Help VoxType recognize names and words you use. Synced with your account across desktop and
-        mobile, including the voice bubble.
-      </Text>
+      <Text style={styles.muted}>Your words sync across desktop and mobile.</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <TextInput
           accessibilityLabel="Word or phrase to add"
@@ -128,7 +125,7 @@ export function Dictionary({ terms, disabled }: { terms: string[]; disabled: boo
             ))}
           </View>
         ) : (
-          <Text style={styles.muted}>Add a name, brand, or specialist term to get started.</Text>
+          <Text style={styles.muted}>Add names or words VoxType should recognize.</Text>
         )}
       </View>
     </View>
