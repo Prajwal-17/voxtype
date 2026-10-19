@@ -9,7 +9,7 @@ Screenshots from the local desktop browser preview with a fictional account, see
 transcripts, and sample activity. Microphone capture and automatic paste run in the installed
 app.
 
-![VoxType transcript library with a sample transcript open for reading](https://github.com/Prajwal-17/voxtype/releases/download/readme-screenshots-2026-10-19/voxtype-transcripts.png)
+![VoxType transcript list with sample dictations and inline copy actions](https://github.com/Prajwal-17/voxtype/releases/download/readme-screenshots-2026-10-19/voxtype-transcripts-cfd4fc1.png)
 
 <details>
 <summary>More screenshots</summary>
@@ -18,13 +18,13 @@ app.
 
 The recording workspace, recent transcripts, and activity at a glance.
 
-![Dictation workspace](https://github.com/Prajwal-17/voxtype/releases/download/readme-screenshots-2026-10-19/voxtype-home.png)
+![Dictation workspace](https://github.com/Prajwal-17/voxtype/releases/download/readme-screenshots-2026-10-19/voxtype-home-cfd4fc1.png)
 
 ### Insights
 
 Word counts, dictation speed, activity history, and daily trends.
 
-![Insights](https://github.com/Prajwal-17/voxtype/releases/download/readme-screenshots-2026-10-19/voxtype-insights.png)
+![Insights](https://github.com/Prajwal-17/voxtype/releases/download/readme-screenshots-2026-10-19/voxtype-insights-cfd4fc1.png)
 
 </details>
 
