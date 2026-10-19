@@ -4,7 +4,7 @@ import { duration, errorMessage } from '../lib/types';
 import { Button, IconButton } from './ui';
 import { ArrowCounterClockwiseIcon, PauseIcon, PlayIcon } from './icons';
 
-/** A single player lives in the reader, never in each list row. */
+/** The library mounts one player at a time, inline with its transcript. */
 export function RecordingPlayer({
   id,
   userId,
