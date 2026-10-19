@@ -3,6 +3,31 @@
 VoxType is a dictation app for Linux and Android. It turns speech into text
 in the app you're using, with Google sign-in and shared transcript history.
 
+## Product preview
+
+Screenshots from the local desktop browser preview with a fictional account, seeded
+transcripts, and sample activity. Microphone capture and automatic paste run in the installed
+app.
+
+![VoxType transcript library with a sample transcript open for reading](https://github.com/Prajwal-17/voxtype/releases/download/readme-screenshots-2026-10-19/voxtype-transcripts.png)
+
+<details>
+<summary>More screenshots</summary>
+
+### Dictation workspace
+
+The recording workspace, recent transcripts, and activity at a glance.
+
+![Dictation workspace](https://github.com/Prajwal-17/voxtype/releases/download/readme-screenshots-2026-10-19/voxtype-home.png)
+
+### Insights
+
+Word counts, dictation speed, activity history, and daily trends.
+
+![Insights](https://github.com/Prajwal-17/voxtype/releases/download/readme-screenshots-2026-10-19/voxtype-insights.png)
+
+</details>
+
 ## Capabilities
 
 - Desktop dictation with a global shortcut and automatic paste
