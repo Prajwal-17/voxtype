@@ -5,6 +5,7 @@ import {
   CircleNotchIcon,
   StopIcon,
   XIcon,
+  SignInIcon,
 } from './icons';
 import { cn } from '../lib/utils';
 import { toast } from 'sonner';
@@ -20,6 +21,7 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
   const active = isActive(session.phase);
   const finishing = session.phase === 'finishing' || session.phase === 'cleaning';
   const failed = session.phase === 'error';
+  const authRequired = failed && session.authRequired;
   const done = session.phase === 'done';
   const status = failed
     ? session.message
@@ -37,6 +39,7 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
   const recover = () => {
     void api
       .openMain()
+      .then(() => (authRequired ? api.dismiss() : undefined))
       .catch(() =>
         toast.error('VoxType couldn’t open the main window. Try again from the app icon.'),
       );
@@ -82,6 +85,11 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
               aria-hidden="true"
             />
           </>
+        ) : authRequired ? (
+          <>
+            <SignInIcon size={18} aria-hidden="true" />
+            <span className="ml-2 text-caption">Sign in to dictate</span>
+          </>
         ) : failed ? (
           <>
             <WarningCircleIcon size={16} aria-hidden="true" />
@@ -98,12 +106,26 @@ export function VoiceOverlay({ preview }: { preview?: Session }) {
       </div>
       <button
         className="order-first inline-flex size-9 items-center justify-center rounded-full border-0 bg-overlay-text p-0 text-overlay transition-[transform,background-color] duration-150 ease-out enabled:active:scale-[.97] enabled:hover:bg-inverse-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-overlay-text disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100"
-        title={failed || done ? 'Open transcript' : 'Finish dictation'}
-        aria-label={failed || done ? 'Open VoxType to recover transcript' : 'Finish dictation'}
+        title={
+          authRequired
+            ? 'Sign in to VoxType'
+            : failed || done
+              ? 'Open transcript'
+              : 'Finish dictation'
+        }
+        aria-label={
+          authRequired
+            ? 'Open VoxType to sign in'
+            : failed || done
+              ? 'Open VoxType to recover transcript'
+              : 'Finish dictation'
+        }
         disabled={!!preview || finishing || stop.isPending || (!active && !failed && !done)}
         onClick={() => (failed || done ? recover() : stop.mutate())}
       >
-        {failed || done ? (
+        {authRequired ? (
+          <SignInIcon size={18} aria-hidden="true" />
+        ) : failed || done ? (
           <ArrowUpRightIcon size={16} aria-hidden="true" />
         ) : (
           <StopIcon size={14} weight="fill" aria-hidden="true" />

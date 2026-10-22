@@ -80,6 +80,7 @@ pub struct Snapshot {
     pub speech_active: bool,
     pub elapsed_ms: u64,
     pub message: String,
+    pub auth_required: bool,
     pub delivery: String,
     pub is_test: bool,
     pub external: bool,

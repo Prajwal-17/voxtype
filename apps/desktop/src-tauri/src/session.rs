@@ -48,7 +48,10 @@ pub async fn toggle(app: AppHandle) -> Result<(), String> {
     } else {
         // A shortcut can cold-start the process before either webview restores auth.
         if crate::require_authenticated(&app).is_err() {
-            crate::get_auth_user(app.clone()).await?;
+            if crate::get_auth_user(app.clone()).await?.is_none() {
+                show_start_error(&app, sign_in_required_snapshot());
+                return Ok(());
+            }
             crate::require_authenticated(&app)?;
         }
         start(app, false, true).await
@@ -245,6 +248,15 @@ pub async fn start(app: AppHandle, test: bool, external: bool) -> Result<(), Str
             Err(e) => {
                 crate::local::record(&app, &user_id, crate::local::Event::TranscriptionFailed);
                 snapshot.phase = Phase::Error;
+                if e == speech::SESSION_EXPIRED {
+                    snapshot.auth_required = true;
+                    app.state::<AppState>()
+                        .authenticated
+                        .store(false, std::sync::atomic::Ordering::Release);
+                    if let Ok(mut user) = app.state::<AppState>().user.lock() {
+                        *user = None;
+                    }
+                }
                 snapshot.message = e;
             }
         }
@@ -393,6 +405,28 @@ fn overlay_is_positioned(w: &tauri::WebviewWindow, expected: tauri::PhysicalPosi
 }
 
 pub fn show_error(app: &AppHandle, message: String) {
+    show_start_error(
+        app,
+        Snapshot {
+            phase: Phase::Error,
+            external: true,
+            message,
+            ..Snapshot::default()
+        },
+    );
+}
+
+fn sign_in_required_snapshot() -> Snapshot {
+    Snapshot {
+        phase: Phase::Error,
+        external: true,
+        auth_required: true,
+        message: "Sign in with Google to use VoxType dictation.".into(),
+        ..Snapshot::default()
+    }
+}
+
+fn show_start_error(app: &AppHandle, snapshot: Snapshot) {
     // Leave a recording owned by another caller intact.
     if app
         .state::<AppState>()
@@ -400,15 +434,7 @@ pub fn show_error(app: &AppHandle, message: String) {
         .lock()
         .is_ok_and(|c| c.is_none())
     {
-        publish(
-            app,
-            &Snapshot {
-                phase: Phase::Error,
-                external: true,
-                message,
-                ..Snapshot::default()
-            },
-        );
+        publish(app, &snapshot);
         show_overlay(app);
     }
 }
