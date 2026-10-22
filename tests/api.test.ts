@@ -12,6 +12,8 @@ import {
 import { wordsPerMinute, startOfRange } from '../apps/api/src/modules/analytics/analytics.utils';
 import { createDictationService } from '../apps/api/src/modules/dictations/dictation.service';
 import { cleanTranscript } from '../apps/api/src/modules/speech/speech.service';
+import { createAuthService } from '../apps/api/src/modules/auth/auth.service';
+import { createHmac } from 'node:crypto';
 
 const worker = new Miniflare(
   convertV4MiniflareOptions({
@@ -43,6 +45,56 @@ before(async () => {
       .run();
 });
 after(() => worker.dispose());
+test('sessions last 90 days, renew with activity, and still honor expiry and sign-out', async () => {
+  const secret = 'voxtype-session-test-secret-with-at-least-32-characters';
+  const auth = createAuthService({
+    DB: db,
+    API_URL: 'http://localhost:8787',
+    AUTH_URL: 'https://voxtype-dev-tunnel.prajwal.sh',
+    CLIENT_ORIGINS: 'tauri://localhost',
+    BETTER_AUTH_SECRET: secret,
+    GOOGLE_CLIENT_ID: 'test-client',
+    GOOGLE_CLIENT_SECRET: 'test-secret',
+    ALLOWED_EMAIL: 'prajwalreddy.dev@gmail.com',
+    DEEPGRAM_API_KEY: 'unused-test-key',
+    DEEPSEEK_API_KEY: 'unused-test-key',
+  });
+  const context = await auth.$context;
+  const created = await context.internalAdapter.createSession('alice');
+  assert.ok(created);
+  const lifetime = 90 * 24 * 60 * 60 * 1000;
+  assert.ok(Math.abs(created.expiresAt.getTime() - Date.now() - lifetime) < 5000);
+  const signature = createHmac('sha256', secret).update(created.token).digest('base64');
+  const headers = new Headers({ authorization: `Bearer ${created.token}.${signature}` });
+
+  // An old but unexpired persisted bearer renews without requiring another OAuth flow.
+  await db
+    .prepare('UPDATE session SET expires_at = ? WHERE id = ?')
+    .bind(Date.now() + 2 * 24 * 60 * 60 * 1000, created.id)
+    .run();
+  const renewed = await auth.api.getSession({ headers });
+  assert.equal(renewed?.session.token, created.token);
+  assert.ok(Math.abs(renewed!.session.expiresAt.getTime() - Date.now() - lifetime) < 5000);
+  const sameDay = await auth.api.getSession({ headers });
+  assert.equal(sameDay?.session.expiresAt.getTime(), renewed!.session.expiresAt.getTime());
+
+  await auth.api.signOut({ headers });
+  assert.equal(await auth.api.getSession({ headers }), null);
+
+  const expired = await context.internalAdapter.createSession('alice');
+  assert.ok(expired);
+  await db
+    .prepare('UPDATE session SET expires_at = ? WHERE id = ?')
+    .bind(Date.now() - 1000, expired.id)
+    .run();
+  const expiredSignature = createHmac('sha256', secret).update(expired.token).digest('base64');
+  assert.equal(
+    await auth.api.getSession({
+      headers: new Headers({ authorization: `Bearer ${expired.token}.${expiredSignature}` }),
+    }),
+    null,
+  );
+});
 test('costs use duration and provider token usage, never word count', () => {
   assert.deepEqual(speechCost(60000), { min: 0.0048, max: 0.0071 });
   assert.deepEqual(speechCost(-1), { min: 0, max: 0 });

@@ -25,6 +25,10 @@ pnpm exec turbo run dev --filter=@voxtype/desktop
 Starts **VoxType Dev** with separate settings and sign-in, using `http://localhost:8787`.
 The default shortcut is `Ctrl Shift Space`.
 
+The production shortcut defaults to `Right Alt`. When signed out, it shows a
+“Sign in to dictate” overlay instead of opening the microphone. Its sign-in button
+opens the main app and dismisses the overlay.
+
 ## Build
 
 ```sh

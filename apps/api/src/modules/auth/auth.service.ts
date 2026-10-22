@@ -17,6 +17,11 @@ export function createAuthService(env: Env, executionContext?: BackgroundContext
     secret: env.BETTER_AUTH_SECRET,
     database: createAuthRepository(env.DB),
     trustedOrigins: [authUrl, env.API_URL, ...parseCommaSeparated(env.CLIENT_ORIGINS)],
+    session: {
+      // Active accounts keep the same persisted bearer; renew its server-side expiry daily.
+      expiresIn: 60 * 60 * 24 * 90,
+      updateAge: 60 * 60 * 24,
+    },
     user: {
       changeEmail: { enabled: false },
       deleteUser: { enabled: false },

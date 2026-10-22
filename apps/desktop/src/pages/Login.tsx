@@ -30,11 +30,13 @@ export function LoginPage({
   checking,
   pending,
   error,
+  onRetry,
   onSignIn,
 }: {
   checking: boolean;
   pending: boolean;
   error?: string;
+  onRetry?: () => void;
   onSignIn: () => void;
 }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -71,6 +73,17 @@ export function LoginPage({
                 <WarningCircleIcon size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
                 <span>{error}</span>
               </div>
+            )}
+
+            {onRetry && (
+              <Button
+                className="mt-4 w-full"
+                onClick={onRetry}
+                loading={checking}
+                disabled={pending}
+              >
+                {checking ? 'Checking your account' : 'Retry connection'}
+              </Button>
             )}
 
             <Button

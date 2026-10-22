@@ -21,6 +21,7 @@ export { MicrophoneIcon } from '@phosphor-icons/react/dist/csr/Microphone';
 export { PaletteIcon } from '@phosphor-icons/react/dist/csr/Palette';
 export { ShieldCheckIcon } from '@phosphor-icons/react/dist/csr/ShieldCheck';
 export { SignOutIcon } from '@phosphor-icons/react/dist/csr/SignOut';
+export { SignInIcon } from '@phosphor-icons/react/dist/csr/SignIn';
 export { SlidersHorizontalIcon } from '@phosphor-icons/react/dist/csr/SlidersHorizontal';
 export { StopIcon } from '@phosphor-icons/react/dist/csr/Stop';
 export { TrashSimpleIcon } from '@phosphor-icons/react/dist/csr/TrashSimple';

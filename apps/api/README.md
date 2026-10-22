@@ -25,6 +25,10 @@ pnpm exec turbo run dev --filter=@voxtype/api
 Starts the API at `http://localhost:8787` with local D1 data. Reapply migrations
 after schema changes. Google sign-in and speech services require internet access.
 
+Account sessions last 90 days. Authenticated API activity renews an unexpired session
+at most once per day, so regular use keeps the existing desktop/mobile bearer valid.
+Expired or revoked sessions require Google sign-in again.
+
 ## Production
 
 Configure the `production` environment in `wrangler.jsonc` with your D1 database,

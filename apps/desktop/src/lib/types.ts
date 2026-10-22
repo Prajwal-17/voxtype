@@ -29,6 +29,7 @@ export interface Session {
   speechActive?: boolean;
   elapsedMs: number;
   message: string;
+  authRequired?: boolean;
   delivery: string;
   isTest: boolean;
   external?: boolean;

@@ -3,6 +3,8 @@ use crate::auth;
 use serde::{de::DeserializeOwned, Deserialize};
 use std::time::Duration;
 
+pub(crate) const SESSION_EXPIRED: &str = "Your VoxType session expired. Sign in again to dictate.";
+
 #[derive(Deserialize)]
 struct Envelope<T> {
     data: T,
@@ -63,7 +65,7 @@ pub(crate) async fn send(request: reqwest::RequestBuilder) -> Result<reqwest::Re
         .map_err(|_| "Could not reach the VoxType server. Check your connection and try again.")?;
     match response.status().as_u16() {
         200..=299 => Ok(response),
-        401 | 403 => Err("Your VoxType session expired. Sign out and sign in again.".into()),
+        401 | 403 => Err(SESSION_EXPIRED.into()),
         429 => Err("Too many speech requests. Try again shortly.".into()),
         _ => Err("The VoxType speech service is unavailable. Try again shortly.".into()),
     }

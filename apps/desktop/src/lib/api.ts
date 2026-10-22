@@ -157,7 +157,10 @@ export const useAuthUser = () =>
   useQuery({
     queryKey: ['auth-user'],
     queryFn: api.authUser,
-    retry: false,
+    retry: 2,
+    refetchOnWindowFocus: (query) => query.state.status === 'error',
+    refetchOnReconnect: (query) => query.state.status === 'error',
+    refetchInterval: (query) => (query.state.status === 'error' ? 30_000 : false),
     staleTime: Infinity,
   });
 export const useBootstrap = () =>
@@ -225,6 +228,7 @@ export function useNativeEvents() {
           (data: unknown) => {
             const session = data as Session;
             client.setQueryData<Session>(['session'], session);
+            if (session.authRequired) client.setQueryData(['auth-user'], null);
             if (!session.external && !session.isTest)
               client.setQueryData<Session>(['app-session'], session);
           },

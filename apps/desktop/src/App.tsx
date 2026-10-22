@@ -70,9 +70,10 @@ export function App() {
   if (!auth.data)
     return (
       <LoginPage
-        checking={false}
+        checking={auth.isFetching}
         pending={signIn.isPending}
         error={signIn.error || auth.error ? errorMessage(signIn.error ?? auth.error) : undefined}
+        onRetry={auth.isError ? () => void auth.refetch() : undefined}
         onSignIn={() => signIn.mutate()}
       />
     );
