@@ -3,6 +3,10 @@ import { ApiError } from '../../shared/errors/api-error';
 import { CLEANUP_SYSTEM_PROMPT } from '../../constants/prompts';
 
 const TRANSCRIPTION_UNAVAILABLE = 'Could not start transcription. Try again.';
+const OPENCODE_CHAT_URL = 'https://opencode.ai/inference/go/openai/v1/chat/completions';
+// OpenCode Go exposes this ID as "DeepSeek V4.1 Flash 1017"
+// (canonical deepseek/deepseek-v4.1-flash-1017). Reasoning is disabled per request.
+const CLEANUP_MODEL = 'deepseek-v4.1-flash';
 
 /** Provider errors are logged (never the key) so a misconfigured secret is diagnosable. */
 async function logDeepgramFailure(reason: string, response?: Response) {
@@ -60,21 +64,31 @@ export async function grantDeepgramToken(apiKey: string, fetcher: typeof fetch =
 export async function cleanTranscript(
   originalText: string,
   apiKey: string,
+  sessionId = 'voxtype-cleanup',
   fetcher: typeof fetch = fetch,
 ): Promise<{ text: string; cleaned: boolean; usage?: TokenUsage | null; metered?: boolean }> {
   if (!originalText.trim()) return { text: originalText, cleaned: false };
+  if (!apiKey?.trim()) {
+    logCleanupFailure('missing_api_key');
+    return { text: originalText, cleaned: false };
+  }
   // Long dictations need headroom: cleaned output runs ~input length, so
   // budget ~2x input tokens plus margin instead of a fixed 1024 cap.
   const maxTokens = Math.min(8000, Math.max(1024, Math.ceil(originalText.length / 2) + 256));
   try {
-    const response = await fetcher('https://api.deepseek.com/chat/completions', {
+    const response = await fetcher(OPENCODE_CHAT_URL, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'User-Agent': 'VoxType/1.0',
+        'x-opencode-session': sessionId,
+      },
       body: JSON.stringify({
-        model: 'deepseek-flash',
+        model: CLEANUP_MODEL,
         stream: false,
         temperature: 0,
-        thinking: { type: 'disabled' },
+        reasoning_effort: 'none',
         max_tokens: maxTokens,
         messages: [
           { role: 'system', content: CLEANUP_SYSTEM_PROMPT },
@@ -82,7 +96,10 @@ export async function cleanTranscript(
         ],
       }),
     });
-    if (!response.ok) return { text: originalText, cleaned: false };
+    if (!response.ok) {
+      logCleanupFailure('provider_rejected', response);
+      return { text: originalText, cleaned: false };
+    }
     const body: unknown = await response.json();
     const usage = parseUsage((body as { usage?: unknown })?.usage);
     const content = (body as { choices?: { message?: { content?: unknown } }[] })?.choices?.[0]
@@ -93,4 +110,16 @@ export async function cleanTranscript(
   } catch {
     return { text: originalText, cleaned: false };
   }
+}
+
+/** OpenCode errors are logged (never the key or transcript) so a misconfigured secret is diagnosable. */
+function logCleanupFailure(reason: string, response?: Response) {
+  console.error(
+    JSON.stringify({
+      level: 'error',
+      scope: 'opencode.cleanup',
+      reason,
+      status: response?.status,
+    }),
+  );
 }

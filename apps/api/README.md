@@ -7,7 +7,15 @@ sign-in, transcript sync, analytics, and speech credentials. Provider keys stay 
 
 Install dependencies using the [workspace setup](../../README.md#quick-start).
 Copy [`.dev.vars.example`](.dev.vars.example) to `apps/api/.dev.vars` and fill in
-the Google, Better Auth, Deepgram, and DeepSeek secrets.
+the Google, Better Auth, Deepgram, and OpenCode secrets. Transcript cleanup uses
+OpenCode Go's DeepSeek V4.1 Flash 1017 (`deepseek-v4.1-flash`) with reasoning
+disabled via `reasoning_effort: "none"`.
+
+Cleanup calls OpenCode at
+`https://opencode.ai/inference/go/openai/v1/chat/completions`. Set
+`OPENCODE_API_KEY` to an OpenCode Console API key (`oc_sk_...`) from a workspace
+on a Go plan. Requests send a stable `x-opencode-session` header, which Go
+requires.
 
 In `apps/api/wrangler.jsonc`, set `ALLOWED_EMAIL` and `AUTH_URL`. Register
 `<AUTH_URL>/api/auth/callback/google` in your Google OAuth client. The auth URL must

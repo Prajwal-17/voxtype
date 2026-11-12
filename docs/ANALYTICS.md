@@ -15,16 +15,24 @@ Costs are **USD estimates, not invoices**:
   send less audio than the recorded duration. Failed, canceled and unsaved takes,
   provider credits, discounts and taxes are excluded. Deleting a synced transcript
   removes its duration from this estimate.
-- DeepSeek: actual prompt/cache/output token counts from successful cleanup API
-  responses, priced at Flash peak rates ($0.30/$0.006/$1.20 per million tokens).
-  Off-peak rates and public holidays may make the bill lower. Missing usage is
+- Cleanup (DeepSeek V4.1 Flash 1017 via OpenCode Go): actual prompt/cache/output
+  token counts and the provider-reported `usage.opencode.list_cost` (falling
+  back to `usage.opencode.allowance`, then `usage.cost`) from successful cleanup
+  responses. Cleanup uses the `deepseek-v4.1-flash` alias with
+  `reasoning_effort: "none"`. On Go, `usage.cost` is 0 because usage is included
+  in the plan, so the list cost is recorded instead. When a response omits all
+  cost fields, the ledger falls back to conservative Flash peak rates
+  ($0.30/$0.006/$1.20 per million tokens). Provider routing, off-peak rates,
+  credits, discounts and taxes may make the actual bill lower. Missing usage is
   recorded as unknown and returned as `unmeteredRequests`, never fabricated from
   word count. Tracking begins with this migration; older cleanup calls cannot be
   reconstructed. Each provider call counts, including a repeated cleanup request.
+  The response keeps the historical `costs.deepseek` field name for released
+  client compatibility.
 
-Rates verified on 2026-10-02 against [Deepgram pricing](https://deepgram.com/pricing)
-and [DeepSeek pricing](https://api-docs.deepseek.com/quick_start/pricing).
-Update `analytics.costs.ts` when these change. DeepSeek cost is stored with each
+Rates verified on 2026-11-12 against [Deepgram pricing](https://deepgram.com/pricing)
+and [OpenCode Go pricing](https://opencode.ai/docs/console/go/).
+Update `analytics.costs.ts` when these change. Cleanup cost is stored with each
 usage row so future rate changes do not rewrite those historical estimates.
 
 The `speech_usage` ledger stores no transcript or audio. It is independent of

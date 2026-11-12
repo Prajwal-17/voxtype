@@ -57,7 +57,7 @@ test('sessions last 90 days, renew with activity, and still honor expiry and sig
     GOOGLE_CLIENT_SECRET: 'test-secret',
     ALLOWED_EMAIL: 'prajwalreddy.dev@gmail.com',
     DEEPGRAM_API_KEY: 'unused-test-key',
-    DEEPSEEK_API_KEY: 'unused-test-key',
+    OPENCODE_API_KEY: 'unused-test-key',
   });
   const context = await auth.$context;
   const created = await context.internalAdapter.createSession('alice');
@@ -101,10 +101,34 @@ test('costs use duration and provider token usage, never word count', () => {
   assert.equal(
     cleanupCost({
       prompt_tokens: 1_000_000,
-      prompt_cache_hit_tokens: 500_000,
+      cached_tokens: 500_000,
       completion_tokens: 100_000,
     }),
     0.273,
+  );
+  assert.equal(
+    cleanupCost({
+      prompt_tokens: 1_000_000,
+      cached_tokens: 500_000,
+      completion_tokens: 100_000,
+      cost_usd: 0.0123,
+    }),
+    0.0123,
+  );
+  assert.deepEqual(
+    parseUsage({
+      prompt_tokens: 100,
+      completion_tokens: 2,
+      prompt_tokens_details: { cached_tokens: 20 },
+      cost: 0,
+      opencode: { list_cost: 0.00042, allowance: 0.0004 },
+    }),
+    {
+      prompt_tokens: 100,
+      completion_tokens: 2,
+      cached_tokens: 20,
+      cost_usd: 0.00042,
+    },
   );
   for (const invalid of [
     null,
@@ -189,27 +213,52 @@ test('analytics deduplicate retried uploads, aggregate both clients and isolate 
   await transcripts.remove('alice', 'page-00');
   assert.equal((await analytics.get('alice', 'all')).costs.cleanupRequests, 1);
 });
-test('cleanup preserves original on failure and returns real usage on success', async () => {
+test('cleanup uses OpenCode Go DeepSeek V4.1 Flash 1017 with reasoning off', async () => {
+  const requests: { url: string; init?: RequestInit }[] = [];
   const mock = (body: unknown, status = 200) =>
-    (async () => Response.json(body, { status })) as typeof fetch;
+    (async (url: RequestInfo | URL, init?: RequestInit) => {
+      requests.push({ url: String(url), init });
+      return Response.json(body, { status });
+    }) as typeof fetch;
   const result = await cleanTranscript(
     'hello',
     'test',
+    'test-session',
     mock({
       choices: [{ message: { content: 'Hello.' } }],
-      usage: { prompt_tokens: 100, completion_tokens: 2, prompt_cache_hit_tokens: 20 },
+      usage: {
+        prompt_tokens: 100,
+        completion_tokens: 2,
+        prompt_tokens_details: { cached_tokens: 20 },
+        cost: 0,
+        opencode: { list_cost: 0.00042, allowance: 0.0004 },
+      },
     }),
   );
   assert.equal(result.text, 'Hello.');
   assert.equal(result.usage?.prompt_tokens, 100);
-  assert.equal((await cleanTranscript('hello', 'test', mock({}, 503))).text, 'hello');
+  assert.equal(result.usage?.cached_tokens, 20);
+  assert.equal(result.usage?.cost_usd, 0.00042);
+  assert.equal(requests[0]?.url, 'https://opencode.ai/inference/go/openai/v1/chat/completions');
+  assert.equal(new Headers(requests[0]?.init?.headers).get('authorization'), 'Bearer test');
+  assert.equal(new Headers(requests[0]?.init?.headers).get('x-opencode-session'), 'test-session');
+  const requestBody = JSON.parse(String(requests[0]?.init?.body));
+  assert.equal(requestBody.model, 'deepseek-v4.1-flash');
+  assert.equal(requestBody.reasoning_effort, 'none');
+  assert.equal(requestBody.stream, false);
+  assert.equal(
+    (await cleanTranscript('hello', 'test', 'test-session', mock({}, 503))).text,
+    'hello',
+  );
   const missing = await cleanTranscript(
     'hello',
     'test',
+    'test-session',
     mock({ choices: [{ message: { content: 'Hello.' } }] }),
   );
   assert.equal(missing.usage, null);
   assert.equal(missing.metered, true);
+  assert.equal((await cleanTranscript('hello', '', 'test-session', mock({}))).text, 'hello');
 });
 
 test('local calendar ranges handle fractional offsets, midnight and DST without losing records', async () => {

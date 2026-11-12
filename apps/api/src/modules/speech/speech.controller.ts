@@ -17,7 +17,11 @@ speechController.post('/cleanup', async (context) => {
   const parsed = cleanupBody.safeParse(await context.req.json().catch(() => null));
   if (!parsed.success)
     return context.json({ error: { code: 'invalid_input', message: 'Invalid transcript.' } }, 400);
-  const result = await cleanTranscript(parsed.data.text, context.env.DEEPSEEK_API_KEY);
+  const result = await cleanTranscript(
+    parsed.data.text,
+    context.env.OPENCODE_API_KEY,
+    `voxtype-${context.get('session').user.id}`,
+  );
   if (result.metered) {
     const userId = context.get('session').user.id;
     await context.env.DB.prepare(
@@ -28,7 +32,7 @@ speechController.post('/cleanup', async (context) => {
         userId,
         Date.now(),
         result.usage?.prompt_tokens ?? null,
-        result.usage?.prompt_cache_hit_tokens ?? null,
+        result.usage?.cached_tokens ?? null,
         result.usage?.completion_tokens ?? null,
         result.usage ? cleanupCost(result.usage) : null,
       )

@@ -24,7 +24,7 @@
       "GOOGLE_CLIENT_ID",
       "GOOGLE_CLIENT_SECRET",
       "DEEPGRAM_API_KEY",
-      "DEEPSEEK_API_KEY",
+      "OPENCODE_API_KEY",
     ],
   },
   "d1_databases": [
@@ -57,7 +57,7 @@
           "GOOGLE_CLIENT_ID",
           "GOOGLE_CLIENT_SECRET",
           "DEEPGRAM_API_KEY",
-          "DEEPSEEK_API_KEY",
+          "OPENCODE_API_KEY",
         ],
       },
       "d1_databases": [

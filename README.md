@@ -59,7 +59,7 @@ Run all commands from the repository root.
    GOOGLE_CLIENT_ID=<google-client-id>
    GOOGLE_CLIENT_SECRET=<google-client-secret>
    DEEPGRAM_API_KEY=<deepgram-api-key>
-   DEEPSEEK_API_KEY=<deepseek-api-key>
+   OPENCODE_API_KEY=<opencode-api-key>
    ```
 
 3. In the local `vars` section of `apps/api/wrangler.jsonc`, set `ALLOWED_EMAIL`
