@@ -88,7 +88,9 @@ pub async fn start(app: AppHandle, test: bool, external: bool) -> Result<(), Str
     let capture = match audio::start_recording(
         &settings.microphone,
         recording.as_ref().map(|r| r.writer.clone()),
-    ) {
+    )
+    .await
+    {
         Ok(capture) => capture,
         Err(error) => {
             if let Ok(mut control) = app.state::<AppState>().control.lock() {

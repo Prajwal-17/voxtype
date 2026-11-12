@@ -117,7 +117,7 @@ export function HomePage({
         </div>
         <div className="recorder-context">
           <span>
-            {boot.data?.settings.microphone || 'System microphone'} ·{' '}
+            {boot.data?.settings.microphone || 'Automatic (prefer headset)'} ·{' '}
             {boot.data?.settings.language === 'multi'
               ? 'Multilingual'
               : boot.data?.settings.language.toUpperCase()}

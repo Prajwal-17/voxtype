@@ -241,6 +241,13 @@ export function useNativeEvents() {
           },
         ],
         ['local-recordings-changed', () => events.changed('history')],
+        [
+          'settings-changed',
+          () => {
+            void client.invalidateQueries({ queryKey: ['bootstrap'] });
+            void client.invalidateQueries({ queryKey: ['microphones'] });
+          },
+        ],
         ['app-error', (data: unknown) => toast.error(String(data))],
       ] as const) {
         const unlisten = await listen(event, (e) => handler(e.payload));

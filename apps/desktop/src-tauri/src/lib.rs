@@ -20,7 +20,10 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Mutex,
 };
-use tauri::{Emitter, Manager};
+use tauri::{
+    menu::{CheckMenuItem, Menu, MenuItem, Submenu},
+    Emitter, Manager,
+};
 
 pub struct AppState {
     pub snapshot: Mutex<Snapshot>,
@@ -175,8 +178,129 @@ fn update_settings(app: tauri::AppHandle, settings: Settings) -> Result<(), Stri
         return Err("Finish your dictation before changing settings.".into());
     }
     startup::configure(&app, settings.launch_at_login)?;
-    storage::save_settings(&app, &settings)
+    storage::save_settings(&app, &settings)?;
+    let tray_app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let _ = refresh_tray_menu(&tray_app).await;
+    });
+    Ok(())
 }
+
+fn menu_label(text: &str) -> String {
+    let escaped = text.replace('&', "&&");
+    if escaped.chars().count() > 80 {
+        let mut label: String = escaped.chars().take(77).collect();
+        label.push('…');
+        label
+    } else {
+        escaped
+    }
+}
+
+fn tray_menu(
+    app: &tauri::AppHandle,
+    settings: &Settings,
+    microphones: &[Microphone],
+) -> Result<Menu<tauri::Wry>, String> {
+    let microphone_menu = Submenu::new(app, "Microphone", true).map_err(|e| e.to_string())?;
+    let automatic = CheckMenuItem::with_id(
+        app,
+        "microphone:auto",
+        "Automatic (prefer headset)",
+        true,
+        settings.microphone.is_empty(),
+        None::<&str>,
+    )
+    .map_err(|e| e.to_string())?;
+    microphone_menu
+        .append(&automatic)
+        .map_err(|e| e.to_string())?;
+    for microphone in microphones {
+        let item = CheckMenuItem::with_id(
+            app,
+            format!("microphone:device:{}", microphone.id),
+            menu_label(&microphone.name),
+            true,
+            settings.microphone == microphone.id,
+            None::<&str>,
+        )
+        .map_err(|e| e.to_string())?;
+        microphone_menu.append(&item).map_err(|e| e.to_string())?;
+    }
+    let refresh = MenuItem::with_id(
+        app,
+        "microphone:refresh",
+        "Refresh microphones",
+        true,
+        None::<&str>,
+    )
+    .map_err(|e| e.to_string())?;
+    microphone_menu
+        .append(&refresh)
+        .map_err(|e| e.to_string())?;
+
+    let toggle = MenuItem::with_id(app, "toggle", "Start / stop dictation", true, None::<&str>)
+        .map_err(|e| e.to_string())?;
+    let cancel = MenuItem::with_id(app, "cancel", "Cancel dictation", true, None::<&str>)
+        .map_err(|e| e.to_string())?;
+    let open = MenuItem::with_id(
+        app,
+        "settings",
+        format!("Open {}", environment::app_name()),
+        true,
+        None::<&str>,
+    )
+    .map_err(|e| e.to_string())?;
+    let quit = MenuItem::with_id(
+        app,
+        "quit",
+        format!("Quit {}", environment::app_name()),
+        true,
+        None::<&str>,
+    )
+    .map_err(|e| e.to_string())?;
+    Menu::with_items(app, &[&toggle, &cancel, &microphone_menu, &open, &quit])
+        .map_err(|e| e.to_string())
+}
+
+async fn refresh_tray_menu(app: &tauri::AppHandle) -> Result<(), String> {
+    let settings = storage::settings(app)?;
+    let microphones = desktop::microphones().await.unwrap_or_default();
+    let menu = tray_menu(app, &settings, &microphones)?;
+    if let Some(tray) = app.tray_by_id("main") {
+        tray.set_menu(Some(menu)).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+async fn handle_microphone_event(app: &tauri::AppHandle, id: &str) -> Result<(), String> {
+    if id == "microphone:refresh" {
+        return refresh_tray_menu(app).await;
+    }
+    if app
+        .state::<AppState>()
+        .control
+        .lock()
+        .map_err(|_| "Session unavailable.")?
+        .is_some()
+    {
+        return Err("Finish your dictation before changing microphones.".into());
+    }
+    let mut settings = storage::settings(app)?;
+    if id == "microphone:auto" {
+        settings.microphone.clear();
+    } else if let Some(device) = id.strip_prefix("microphone:device:") {
+        settings.microphone = device.to_string();
+    } else {
+        return Ok(());
+    }
+    settings.validate()?;
+    storage::save_settings(app, &settings)?;
+    refresh_tray_menu(app).await?;
+    let _ = app.emit("settings-changed", ());
+    Ok(())
+}
+
 #[tauri::command]
 fn get_history(
     app: tauri::AppHandle,
@@ -623,35 +747,9 @@ pub fn run() {
                 .state::<AppState>()
                 .shortcut_registered
                 .store(shortcut_ready, Ordering::Relaxed);
-            use tauri::menu::{Menu, MenuItem};
-            let menu = Menu::with_items(
-                handle,
-                &[
-                    &MenuItem::with_id(
-                        handle,
-                        "toggle",
-                        "Start / stop dictation",
-                        true,
-                        None::<&str>,
-                    )?,
-                    &MenuItem::with_id(handle, "cancel", "Cancel dictation", true, None::<&str>)?,
-                    &MenuItem::with_id(
-                        handle,
-                        "settings",
-                        format!("Open {}", environment::app_name()),
-                        true,
-                        None::<&str>,
-                    )?,
-                    &MenuItem::with_id(
-                        handle,
-                        "quit",
-                        format!("Quit {}", environment::app_name()),
-                        true,
-                        None::<&str>,
-                    )?,
-                ],
-            )?;
-            let tray = tauri::tray::TrayIconBuilder::new()
+            let initial_settings = storage::settings(handle).unwrap_or_default();
+            let menu = tray_menu(handle, &initial_settings, &[]).map_err(std::io::Error::other)?;
+            let tray = tauri::tray::TrayIconBuilder::with_id("main")
                 .icon(tauri::image::Image::from_bytes(include_bytes!(
                     "../icons/tray.png"
                 ))?)
@@ -659,14 +757,28 @@ pub fn run() {
                 .tooltip(format!("{} · voice dictation", environment::app_name()))
                 .menu(&menu)
                 .on_menu_event(|app, event| {
-                    if event.id.as_ref() == "quit" {
+                    let id = event.id.as_ref().to_string();
+                    if id == "quit" {
                         app.exit(0);
+                    } else if id.starts_with("microphone:") {
+                        let app = app.clone();
+                        tauri::async_runtime::spawn(async move {
+                            if let Err(error) = handle_microphone_event(&app, &id).await {
+                                eprintln!("{error}");
+                                let _ = app.emit("app-error", error);
+                            }
+                        });
                     } else {
-                        dispatch(app, event.id.as_ref());
+                        dispatch(app, &id);
                     }
                 });
             // A missing GNOME tray extension must not prevent the main app from opening.
-            let _ = tray.build(app);
+            if tray.build(app).is_ok() {
+                let app = handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    let _ = refresh_tray_menu(&app).await;
+                });
+            }
             let initial = std::env::args().nth(1).unwrap_or_default();
             dispatch(handle, &initial);
             Ok(())

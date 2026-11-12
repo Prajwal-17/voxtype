@@ -4,6 +4,7 @@ use crate::{
     model::{Diagnostic, Microphone, ShortcutOption},
 };
 use gio::prelude::*;
+use serde::Deserialize;
 use std::time::Duration;
 use tokio::{process::Command, time::timeout};
 
@@ -216,23 +217,270 @@ pub async fn output(program: &str, args: &[&str]) -> Result<std::process::Output
     .map_err(|_| format!("{program} took too long to respond."))?
     .map_err(|_| format!("{program} is unavailable. Check desktop setup in Settings."))
 }
-pub async fn microphones() -> Result<Vec<Microphone>, String> {
+#[derive(Clone, Debug, PartialEq, Deserialize)]
+pub struct AudioSource {
+    pub name: String,
+    #[serde(default)]
+    pub description: String,
+}
+
+fn parse_sources(bytes: &[u8]) -> Result<Vec<AudioSource>, String> {
+    let sources: Vec<AudioSource> =
+        serde_json::from_slice(bytes).map_err(|_| "Could not read the microphone list.")?;
+    Ok(sources
+        .into_iter()
+        .filter(|source| !source.name.ends_with(".monitor"))
+        .collect())
+}
+
+pub async fn audio_sources() -> Result<Vec<AudioSource>, String> {
     let out = output("pactl", &["--format=json", "list", "sources"]).await?;
     if !out.status.success() {
         return Err("Cannot reach the desktop audio service. Check Sound settings.".into());
     }
-    let data: Vec<serde_json::Value> =
-        serde_json::from_slice(&out.stdout).map_err(|_| "Could not read the microphone list.")?;
-    Ok(data
-        .iter()
-        .filter(|v| !v["name"].as_str().unwrap_or_default().ends_with(".monitor"))
-        .filter_map(|v| {
-            Some(Microphone {
-                id: v["name"].as_str()?.into(),
-                name: v["description"].as_str().unwrap_or("Microphone").into(),
-            })
+    parse_sources(&out.stdout)
+}
+
+async fn pactl_text(args: &[&str]) -> Option<String> {
+    let out = output("pactl", args).await.ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let value = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    (!value.is_empty()).then_some(value)
+}
+
+async fn default_source() -> Option<String> {
+    pactl_text(&["get-default-source"]).await
+}
+
+async fn default_sink() -> Option<String> {
+    pactl_text(&["get-default-sink"]).await
+}
+
+pub async fn microphones() -> Result<Vec<Microphone>, String> {
+    Ok(audio_sources()
+        .await?
+        .into_iter()
+        .map(|source| Microphone {
+            id: source.name,
+            name: if source.description.is_empty() {
+                "Microphone".into()
+            } else {
+                source.description
+            },
         })
         .collect())
+}
+
+fn bluez_identity(name: &str, prefix: &str) -> Option<String> {
+    let identity = name.strip_prefix(prefix)?.split('.').next()?;
+    if identity.is_empty() {
+        None
+    } else {
+        Some(identity.to_ascii_lowercase())
+    }
+}
+
+fn is_headset_source(source: &AudioSource) -> bool {
+    let name = source.name.to_ascii_lowercase();
+    let description = source.description.to_ascii_lowercase();
+    name.starts_with("bluez_input.")
+        || name.starts_with("alsa_input.usb-")
+        || [
+            "headset",
+            "headphone",
+            "earbud",
+            "buds",
+            "airpods",
+            "bluetooth",
+            "phone",
+            "handsfree",
+            "hands-free",
+        ]
+        .iter()
+        .any(|word| description.contains(word))
+}
+
+pub fn preferred_source(
+    sources: &[AudioSource],
+    default_source: Option<&str>,
+    default_sink: Option<&str>,
+) -> Option<String> {
+    let sources: Vec<&AudioSource> = sources
+        .iter()
+        .filter(|source| !source.name.ends_with(".monitor"))
+        .collect();
+    if let Some(identity) = default_sink.and_then(|sink| bluez_identity(sink, "bluez_output.")) {
+        if let Some(source) = sources.iter().find(|source| {
+            bluez_identity(&source.name, "bluez_input.").as_deref() == Some(identity.as_str())
+        }) {
+            return Some(source.name.clone());
+        }
+    }
+    if let Some(source) = sources.iter().find(|source| is_headset_source(source)) {
+        return Some(source.name.clone());
+    }
+    if let Some(default) = default_source {
+        if let Some(source) = sources.iter().find(|source| source.name == default) {
+            return Some(source.name.clone());
+        }
+    }
+    sources.first().map(|source| source.name.clone())
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct BluetoothSwitch {
+    pub card: String,
+    pub profile: String,
+    pub previous_profile: String,
+}
+
+pub fn find_bluetooth_switch(
+    cards: &[serde_json::Value],
+    identity: Option<&str>,
+) -> Option<BluetoothSwitch> {
+    let mut fallback = None;
+    for card in cards {
+        let Some(name) = card["name"].as_str() else {
+            continue;
+        };
+        if !name.starts_with("bluez_card.") {
+            continue;
+        }
+        let active = card["active_profile"].as_str().unwrap_or_default();
+        if active.is_empty() || active.starts_with("headset-head-unit") {
+            continue;
+        }
+        let Some(profiles) = card["profiles"].as_object() else {
+            continue;
+        };
+        let mut selected = None;
+        for candidate in [
+            "headset-head-unit-msbc",
+            "headset-head-unit-cvsd",
+            "headset-head-unit",
+        ] {
+            if profiles
+                .get(candidate)
+                .map(|profile| {
+                    profile["sources"].as_u64().unwrap_or(0) > 0
+                        && profile["available"].as_bool().unwrap_or(false)
+                })
+                .unwrap_or(false)
+            {
+                selected = Some(candidate);
+                break;
+            }
+        }
+        let Some(profile) = selected else {
+            continue;
+        };
+        let switch = BluetoothSwitch {
+            card: name.to_string(),
+            profile: profile.to_string(),
+            previous_profile: active.to_string(),
+        };
+        if identity
+            .is_some_and(|identity| name.eq_ignore_ascii_case(&format!("bluez_card.{identity}")))
+        {
+            return Some(switch);
+        }
+        if fallback.is_none() {
+            fallback = Some(switch);
+        }
+    }
+    fallback
+}
+
+async fn bluetooth_switch_for(identity: Option<&str>) -> Option<BluetoothSwitch> {
+    let out = output("pactl", &["--format=json", "list", "cards"])
+        .await
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let cards: Vec<serde_json::Value> = serde_json::from_slice(&out.stdout).ok()?;
+    find_bluetooth_switch(&cards, identity)
+}
+
+async fn switch_card_profile(card: &str, profile: &str) -> bool {
+    output("pactl", &["set-card-profile", card, profile])
+        .await
+        .is_ok_and(|out| out.status.success())
+}
+
+async fn wait_for_bluetooth_source(identity: Option<&str>) -> Option<String> {
+    for _ in 0..30 {
+        if let Ok(sources) = audio_sources().await {
+            if let Some(source) = sources.iter().find(|source| {
+                source.name.starts_with("bluez_input.")
+                    && identity.is_none_or(|identity| {
+                        bluez_identity(&source.name, "bluez_input.").as_deref() == Some(identity)
+                    })
+            }) {
+                return Some(source.name.clone());
+            }
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    None
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PreparedInput {
+    pub device: Option<String>,
+    pub restore_profile: Option<(String, String)>,
+}
+
+pub async fn prepare_input(requested: &str) -> PreparedInput {
+    let sources = audio_sources().await.unwrap_or_default();
+    let default = default_source().await;
+    let sink = default_sink().await;
+
+    if !requested.is_empty() && sources.iter().any(|source| source.name == requested) {
+        return PreparedInput {
+            device: Some(requested.to_string()),
+            restore_profile: None,
+        };
+    }
+
+    let preferred = preferred_source(&sources, default.as_deref(), sink.as_deref());
+    let preferred_is_headset = preferred
+        .as_deref()
+        .and_then(|name| sources.iter().find(|source| source.name == name))
+        .is_some_and(is_headset_source);
+    if requested.is_empty() && preferred_is_headset {
+        return PreparedInput {
+            device: preferred,
+            restore_profile: None,
+        };
+    }
+
+    let explicit_bluetooth = (!requested.is_empty())
+        .then(|| bluez_identity(requested, "bluez_input."))
+        .flatten();
+    let identity = explicit_bluetooth.or_else(|| {
+        sink.as_deref()
+            .and_then(|sink| bluez_identity(sink, "bluez_output."))
+    });
+
+    if let Some(switch) = bluetooth_switch_for(identity.as_deref()).await {
+        if switch_card_profile(&switch.card, &switch.profile).await {
+            if let Some(source) = wait_for_bluetooth_source(identity.as_deref()).await {
+                return PreparedInput {
+                    device: Some(source),
+                    restore_profile: Some((switch.card, switch.previous_profile)),
+                };
+            }
+            switch_card_profile(&switch.card, &switch.previous_profile).await;
+        }
+    }
+
+    PreparedInput {
+        device: preferred,
+        restore_profile: None,
+    }
 }
 pub async fn focused_window() -> Option<String> {
     if wayland() {
@@ -390,6 +638,100 @@ pub async fn diagnostics(shortcut_registered: bool, shortcut: &str) -> Vec<Diagn
         },
     });
     checks
+}
+
+#[cfg(test)]
+mod microphone_tests {
+    use super::*;
+
+    fn source(name: &str, description: &str) -> AudioSource {
+        AudioSource {
+            name: name.into(),
+            description: description.into(),
+        }
+    }
+
+    #[test]
+    fn prefers_bluetooth_input_that_matches_the_default_output() {
+        let sources = vec![
+            source(
+                "alsa_input.pci-0000_00_1f.3.analog-stereo",
+                "Built-in Audio Analog Stereo",
+            ),
+            source("bluez_input.AA_BB_CC_DD_EE_FF.0", "OPPO Enco Buds2"),
+        ];
+        assert_eq!(
+            preferred_source(
+                &sources,
+                Some("alsa_input.pci-0000_00_1f.3.analog-stereo"),
+                Some("bluez_output.AA_BB_CC_DD_EE_FF.1"),
+            ),
+            Some("bluez_input.AA_BB_CC_DD_EE_FF.0".into())
+        );
+    }
+
+    #[test]
+    fn falls_back_to_the_default_when_no_headset_is_connected() {
+        let sources = vec![source(
+            "alsa_input.pci-0000_00_1f.3.analog-stereo",
+            "Built-in Audio Analog Stereo",
+        )];
+        assert_eq!(
+            preferred_source(
+                &sources,
+                Some("alsa_input.pci-0000_00_1f.3.analog-stereo"),
+                Some("alsa_output.pci-0000_00_1f.3.analog-stereo"),
+            ),
+            Some("alsa_input.pci-0000_00_1f.3.analog-stereo".into())
+        );
+    }
+
+    #[test]
+    fn ignores_monitor_sources() {
+        let sources = vec![
+            source(
+                "bluez_output.AA_BB_CC_DD_EE_FF.1.monitor",
+                "Monitor of Buds",
+            ),
+            source(
+                "alsa_input.pci-0000_00_1f.3.analog-stereo",
+                "Built-in Audio Analog Stereo",
+            ),
+        ];
+        assert_eq!(
+            preferred_source(&sources, None, None),
+            Some("alsa_input.pci-0000_00_1f.3.analog-stereo".into())
+        );
+    }
+
+    #[test]
+    fn finds_a_connected_bluetooth_card_and_prefers_msbc() {
+        let cards = vec![serde_json::json!({
+            "name": "bluez_card.AA_BB_CC_DD_EE_FF",
+            "active_profile": "a2dp-sink",
+            "profiles": {
+                "a2dp-sink": { "sources": 0, "available": true },
+                "headset-head-unit-cvsd": { "sources": 1, "available": true },
+                "headset-head-unit-msbc": { "sources": 1, "available": true }
+            }
+        })];
+        let switch = find_bluetooth_switch(&cards, Some("aa_bb_cc_dd_ee_ff")).unwrap();
+        assert_eq!(switch.card, "bluez_card.AA_BB_CC_DD_EE_FF");
+        assert_eq!(switch.profile, "headset-head-unit-msbc");
+        assert_eq!(switch.previous_profile, "a2dp-sink");
+    }
+
+    #[test]
+    fn does_not_switch_a_card_already_in_headset_mode() {
+        let cards = vec![serde_json::json!({
+            "name": "bluez_card.AA_BB_CC_DD_EE_FF",
+            "active_profile": "headset-head-unit-msbc",
+            "profiles": {
+                "headset-head-unit-msbc": { "sources": 1, "available": true }
+            }
+        })];
+        assert!(find_bluetooth_switch(&cards, None).is_none());
+    }
 }
 
 #[cfg(test)]

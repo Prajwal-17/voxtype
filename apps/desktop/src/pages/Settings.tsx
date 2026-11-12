@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MicrophoneIcon, ArrowsClockwiseIcon, StopIcon } from '../components/icons';
 import { toast } from 'sonner';
@@ -134,6 +134,14 @@ function Preferences({
   onDirtyChange: (dirty: boolean) => void;
 }) {
   const [draft, setDraft] = useState(settings);
+  const previousSettings = useRef(settings);
+  useEffect(() => {
+    const previous = previousSettings.current;
+    previousSettings.current = settings;
+    setDraft((current) =>
+      JSON.stringify(current) === JSON.stringify(previous) ? settings : current,
+    );
+  }, [settings]);
   const client = useQueryClient();
   const recording = useRecording();
   const { data: session } = useSession();
@@ -181,10 +189,10 @@ function Preferences({
               disabled={active}
             >
               <SelectTrigger id="microphone" aria-label="Microphone">
-                <SelectValue placeholder="System default" />
+                <SelectValue placeholder="Automatic (prefer headset)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__default">System default</SelectItem>
+                <SelectItem value="__default">Automatic (prefer headset)</SelectItem>
                 {microphones.data?.map((m) => (
                   <SelectItem key={m.id} value={m.id}>
                     {m.name}
@@ -209,6 +217,10 @@ function Preferences({
             </IconButton>
           </div>
         </FieldRow>
+        <p className="mt-2 text-caption text-muted">
+          Automatic uses a connected headset, earbuds, or phone microphone and falls back to the
+          laptop microphone.
+        </p>
         {microphones.isError && (
           <p className="mt-2 text-ui text-danger">
             VoxType couldn’t list microphones. Check that one is connected, then refresh.

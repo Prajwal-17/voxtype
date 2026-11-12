@@ -14,6 +14,16 @@ Microphone access uses `pulseaudio-utils`; account storage needs `gnome-keyring`
 Automatic paste uses `xdotool` on X11 or `ydotool` with a running `ydotoold` and
 access to `/dev/uinput` on Wayland.
 
+## Microphone selection
+
+The default **Automatic (prefer headset)** mode uses a connected Bluetooth, USB,
+or headset microphone when one is available and falls back to the laptop
+microphone otherwise. If Bluetooth earbuds are in high-quality A2DP mode, VoxType
+switches the card to its headset/HFP profile for the duration of a dictation so
+the microphone becomes available, then restores the previous profile. The tray
+menu on Ubuntu also lists **Microphone** choices, including Automatic and any
+currently available inputs.
+
 ## Development
 
 With the local API running, start from the repository root:

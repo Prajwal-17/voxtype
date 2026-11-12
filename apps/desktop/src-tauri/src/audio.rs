@@ -1,6 +1,6 @@
 //! parec handles Ubuntu's PulseAudio/PipeWire capture and resampling.
 //! A bounded Tokio channel caps audio buffering. Dropping the task kills its child.
-use crate::environment;
+use crate::{desktop, environment};
 use std::{collections::VecDeque, process::Stdio, time::Duration};
 use tokio::{
     io::AsyncReadExt,
@@ -13,6 +13,7 @@ pub struct Capture {
     pub frames: mpsc::Receiver<Result<Vec<u8>, String>>,
     stop: Option<oneshot::Sender<()>>,
     task: tokio::task::JoinHandle<()>,
+    restore_profile: Option<(String, String)>,
 }
 impl Capture {
     pub fn stop(&mut self) {
@@ -24,13 +25,26 @@ impl Capture {
 impl Drop for Capture {
     fn drop(&mut self) {
         self.task.abort();
+        restore_card_profile(self.restore_profile.take());
     }
 }
 
-pub fn start_recording(
+fn restore_card_profile(restore: Option<(String, String)>) {
+    if let Some((card, profile)) = restore {
+        let _ = std::process::Command::new("pactl")
+            .args(["set-card-profile", &card, &profile])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    }
+}
+
+pub async fn start_recording(
     device: &str,
     recording: Option<crate::recordings::SharedWriter>,
 ) -> Result<Capture, String> {
+    let prepared = desktop::prepare_input(device).await;
+    let restore_profile = prepared.restore_profile;
     let mut cmd = Command::new("parec");
     cmd.args([
         "--raw",
@@ -44,19 +58,28 @@ pub fn start_recording(
         environment::audio_client_name()
     ))
     .arg("--stream-name=Dictation");
-    if !device.is_empty() {
+    if let Some(device) = prepared.device.as_deref() {
         cmd.arg(format!("--device={device}"));
     }
-    let mut child = cmd
+    let mut child = match cmd
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .kill_on_drop(true)
         .spawn()
-        .map_err(|_| "Microphone capture is unavailable. Install pulseaudio-utils.")?;
-    let mut stdout = child
-        .stdout
-        .take()
-        .ok_or("Could not open the microphone stream.")?;
+    {
+        Ok(child) => child,
+        Err(_) => {
+            restore_card_profile(restore_profile);
+            return Err("Microphone capture is unavailable. Install pulseaudio-utils.".into());
+        }
+    };
+    let mut stdout = match child.stdout.take() {
+        Some(stdout) => stdout,
+        None => {
+            restore_card_profile(restore_profile);
+            return Err("Could not open the microphone stream.".into());
+        }
+    };
     // 96ms packets: six native 16ms VAD frames, even when pipe reads are fragmented.
     let (sender, frames) = mpsc::channel(32);
     let (stop, mut stopping) = oneshot::channel();
@@ -121,6 +144,7 @@ pub fn start_recording(
         frames,
         stop: Some(stop),
         task,
+        restore_profile,
     })
 }
 
