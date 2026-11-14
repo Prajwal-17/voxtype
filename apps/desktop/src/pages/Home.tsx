@@ -35,6 +35,14 @@ export function HomePage({
   const take = ownedId === appSession.sessionId ? appSession : null;
   const recording = useRecording(),
     copy = useCopy();
+  const microphone = boot.data?.settings.microphone;
+  const microphoneLabel = !microphone
+    ? 'Automatic'
+    : microphone.startsWith('bluetooth:') ||
+        microphone.startsWith('bluez_input.') ||
+        microphone.startsWith('bluez_source.')
+      ? 'Bluetooth microphone (call mode)'
+      : microphone;
   const owns =
     ownedId === globalSession.sessionId && !globalSession.external && !globalSession.isTest;
   const active = owns && isActive(globalSession.phase);
@@ -117,7 +125,7 @@ export function HomePage({
         </div>
         <div className="recorder-context">
           <span>
-            {boot.data?.settings.microphone || 'Automatic (prefer headset)'} ·{' '}
+            {microphoneLabel} ·{' '}
             {boot.data?.settings.language === 'multi'
               ? 'Multilingual'
               : boot.data?.settings.language.toUpperCase()}

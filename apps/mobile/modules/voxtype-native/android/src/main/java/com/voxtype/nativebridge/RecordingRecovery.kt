@@ -24,6 +24,7 @@ internal class RecordingRecovery(private val context: Context, val userId: Strin
     if (text.isNotBlank()) raw = text
     checkpoint()
   }
+  @Synchronized fun hasContent(): Boolean = audio != null || raw.isNotBlank()
   @Synchronized fun commit() { committed = true }
   @Synchronized fun discard() {
     if (committed) return
