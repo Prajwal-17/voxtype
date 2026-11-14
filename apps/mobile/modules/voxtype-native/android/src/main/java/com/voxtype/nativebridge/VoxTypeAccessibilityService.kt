@@ -115,6 +115,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
   private var recordingUserId: String? = null
   private var recordingFile: File? = null
   private var recordingDuration = 0L
+  private var healthFailure = false
   private var lastSavedId: String? = null
   private var lastDelivered = false
   private var lastCopied = false
@@ -905,7 +906,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       connectionFailed()
       return
     }
-    bubbleError = ""; connectionError = false
+    bubbleError = ""; connectionError = false; healthFailure = false
     retainTarget(node)
     recordingUserId = session.userId
     if (recordingUserId == null) {
@@ -931,6 +932,16 @@ class VoxTypeAccessibilityService : AccessibilityService() {
           if (generation != lifecycleGeneration) return@post
           capture = null
           audioLevel = 0f
+          if (healthFailure) {
+            healthFailure = false
+            recordingFile = file
+            recordingDuration = duration
+            take.received(engine?.partialTranscript().orEmpty())
+            failRecording(
+              "Bluetooth microphone signal became unstable. Switch to Automatic or your phone microphone and try again.",
+              recovered = file != null || take.hasContent())
+            return@post
+          }
           if (discardNext || recordingUserId == null) {
             discardNext = false
             try { file?.delete() } catch (e: Exception) { VoxLog.w("discarded audio delete failed", e) }
@@ -954,7 +965,16 @@ class VoxTypeAccessibilityService : AccessibilityService() {
       }, {
         main.post {
           android.widget.Toast.makeText(this, "Microphone is in use by another app", android.widget.Toast.LENGTH_SHORT).show()
-          failRecording("Microphone interrupted. Audio is saved in Transcripts.")
+          failRecording("Microphone interrupted.")
+        }
+      }, {
+        main.post {
+          if (generation == lifecycleGeneration && status == DictationStatus.LISTENING.bridge) {
+            // Let AudioCapture finalize the take before claiming it was saved.
+            healthFailure = true
+            setStatus(DictationStatus.PROCESSING)
+            try { capture?.stop() } catch (e: Exception) { VoxLog.w("capture stop failed", e) }
+          }
         }
       }).also { it.start() }
       setStatus(DictationStatus.LISTENING)
@@ -1082,9 +1102,11 @@ class VoxTypeAccessibilityService : AccessibilityService() {
 
   private fun connectionFailed() = failRecording("Connection unavailable. Check your internet and try again.", true)
 
-  private fun failRecording(message: String, network: Boolean = false) {
+  private fun failRecording(message: String, network: Boolean = false, recovered: Boolean = true) {
     LocalDiagnostics.record(this, LocalDiagnostics.Event.transcription_failed)
-    bubbleError = "$message Audio is saved in Transcripts."; connectionError = network
+    bubbleError = if (recovered) "$message Saved in Transcripts."
+      else "$message Nothing was saved; try again."
+    connectionError = network
     resetRecording(DictationStatus.ERROR)
     BubbleHealth.record(this, if (network) "dictation_error:connection" else "dictation_error:recording")
     android.widget.Toast.makeText(this, message, android.widget.Toast.LENGTH_SHORT).show()
@@ -1092,6 +1114,7 @@ class VoxTypeAccessibilityService : AccessibilityService() {
 
   private fun resetRecording(next: DictationStatus) {
     lifecycleGeneration++
+    healthFailure = false
     processingJob?.cancel(); processingJob = null
     cleanupCall?.cancel(); cleanupCall = null
     if (next == DictationStatus.ERROR) {

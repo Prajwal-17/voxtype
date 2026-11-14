@@ -81,5 +81,6 @@ Run all commands from the repository root.
 
 - [Desktop setup and build](apps/desktop/README.md)
 - [Android setup and build](apps/mobile/README.md)
+- [Audio capture and recovery](docs/AUDIO.md)
 - [API configuration](apps/api/README.md)
 - [Shared package](packages/shared/README.md) and [design system](DESIGN_SYSTEM.md)

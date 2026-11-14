@@ -16,13 +16,23 @@ access to `/dev/uinput` on Wayland.
 
 ## Microphone selection
 
-The default **Automatic (prefer headset)** mode uses a connected Bluetooth, USB,
-or headset microphone when one is available and falls back to the laptop
-microphone otherwise. If Bluetooth earbuds are in high-quality A2DP mode, VoxType
-switches the card to its headset/HFP profile for the duration of a dictation so
-the microphone becomes available, then restores the previous profile. The tray
-menu on Ubuntu also lists **Microphone** choices, including Automatic and any
-currently available inputs.
+The default **Automatic (best available)** mode uses a connected USB or wired
+headset microphone and otherwise the laptop microphone. It never changes a
+Bluetooth card's profile: earbuds stay in high-quality A2DP playback mode.
+
+The tray menu and Settings also list a **microphone (call mode)** entry for each
+connected Bluetooth card that offers a usable headset profile, including a card
+currently switched off. Choosing it switches that card to HFP for the dictation
+and restores the previous profile (A2DP or off) as soon as capture drains, before
+remote finalization. An explicit choice that cannot be used fails with an
+actionable message instead of silently using another microphone. HFP capture is
+narrowband, and some Linux adapters/kernels corrupt SCO packets or deliver
+digital bursts instead of speech. VoxType asks for the more compatible CVSD
+codec first, waits for the card and source to settle, buffers Bluetooth capture
+more deeply, and ends a take with a clear message if the captured stream
+degrades. If that happens, choose Automatic or the laptop microphone; the
+platform defect cannot be repaired from the application. See
+[audio capture and recovery](../../docs/AUDIO.md).
 
 ## Development
 

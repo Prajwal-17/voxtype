@@ -11,31 +11,116 @@ use tokio::{
 
 pub struct Capture {
     pub frames: mpsc::Receiver<Result<Vec<u8>, String>>,
+    pub bluetooth: bool,
     stop: Option<oneshot::Sender<()>>,
-    task: tokio::task::JoinHandle<()>,
+    child: Option<tokio::process::Child>,
+    task: Option<tokio::task::JoinHandle<()>>,
     restore_profile: Option<(String, String)>,
+    restore_warning: Option<String>,
 }
 impl Capture {
     pub fn stop(&mut self) {
         if let Some(stop) = self.stop.take() {
             let _ = stop.send(());
         }
+        // Ask parec to flush and exit. The reader task drains its stdout tail.
+        if let Some(child) = self.child.as_mut() {
+            if child.try_wait().ok().flatten().is_none() {
+                if let Some(id) = child.id() {
+                    let _ = nix::sys::signal::kill(
+                        nix::unistd::Pid::from_raw(id as i32),
+                        nix::sys::signal::Signal::SIGINT,
+                    );
+                }
+            }
+        }
+    }
+
+    /// A Bluetooth card must not return to A2DP while parec still owns the
+    /// SCO source. Tear the child down first, then restore the profile.
+    /// Cancellation skips the drain so the UI does not wait for discarded audio.
+    /// Safe to call more than once; the first completed call restores the card.
+    pub async fn shutdown(&mut self, graceful: bool) -> Option<String> {
+        self.stop();
+        // Unblock a task waiting to enqueue audio that nobody will consume.
+        self.frames.close();
+        if let Some(mut task) = self.task.take() {
+            let finished = if graceful {
+                tokio::time::timeout(Duration::from_secs(2), &mut task)
+                    .await
+                    .is_ok()
+            } else {
+                false
+            };
+            if !finished {
+                task.abort();
+            }
+        }
+        if let Some(mut child) = self.child.take() {
+            if child.try_wait().ok().flatten().is_none() {
+                let _ = child.start_kill();
+                let _ = timeout(Duration::from_secs(1), child.wait()).await;
+            }
+        }
+        if let Some(warning) = desktop::restore_card_profile(self.restore_profile.take()).await {
+            self.restore_warning = Some(warning.clone());
+            return Some(warning);
+        }
+        None
+    }
+
+    pub fn take_restore_warning(&mut self) -> Option<String> {
+        self.restore_warning.take()
     }
 }
 impl Drop for Capture {
     fn drop(&mut self) {
-        self.task.abort();
-        restore_card_profile(self.restore_profile.take());
+        self.stop();
+        if let Some(child) = self.child.as_mut() {
+            let _ = child.start_kill();
+            // Drop cannot await, but the profile must not change underneath a
+            // process that still has the Bluetooth source open.
+            for _ in 0..20 {
+                if child.try_wait().ok().flatten().is_some() {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(10));
+            }
+        }
+        if let Some(task) = self.task.take() {
+            task.abort();
+        }
+        if let Some((card, profile)) = self.restore_profile.take() {
+            restore_card_profile_blocking(&card, &profile);
+        }
     }
 }
 
-fn restore_card_profile(restore: Option<(String, String)>) {
-    if let Some((card, profile)) = restore {
-        let _ = std::process::Command::new("pactl")
-            .args(["set-card-profile", &card, &profile])
+fn restore_card_profile_blocking(card: &str, profile: &str) {
+    for attempt in 0..2 {
+        match std::process::Command::new("pactl")
+            .args(["set-card-profile", card, profile])
             .stdout(Stdio::null())
             .stderr(Stdio::null())
-            .status();
+            .status()
+        {
+            Ok(status) if status.success() => return,
+            Ok(status) => eprintln!("pactl set-card-profile {card} {profile} exited with {status}"),
+            Err(error) => eprintln!("pactl set-card-profile {card} {profile} failed: {error}"),
+        }
+        if attempt == 0 {
+            std::thread::sleep(Duration::from_millis(150));
+        }
+    }
+}
+
+/// Bluetooth SCO transports need more buffering than a local analog source;
+/// a 40ms hint can underrun after the transport's initial buffers drain.
+pub fn capture_latency_ms(bluetooth: bool) -> u32 {
+    if bluetooth {
+        160
+    } else {
+        40
     }
 }
 
@@ -43,7 +128,8 @@ pub async fn start_recording(
     device: &str,
     recording: Option<crate::recordings::SharedWriter>,
 ) -> Result<Capture, String> {
-    let prepared = desktop::prepare_input(device).await;
+    let prepared = desktop::prepare_input(device).await?;
+    let bluetooth = prepared.bluetooth;
     let restore_profile = prepared.restore_profile;
     let mut cmd = Command::new("parec");
     cmd.args([
@@ -51,7 +137,7 @@ pub async fn start_recording(
         "--format=s16le",
         "--rate=16000",
         "--channels=1",
-        "--latency-msec=40",
+        &format!("--latency-msec={}", capture_latency_ms(bluetooth)),
     ])
     .arg(format!(
         "--client-name={}",
@@ -69,14 +155,20 @@ pub async fn start_recording(
     {
         Ok(child) => child,
         Err(_) => {
-            restore_card_profile(restore_profile);
+            if let Some((card, profile)) = restore_profile {
+                restore_card_profile_blocking(&card, &profile);
+            }
             return Err("Microphone capture is unavailable. Install pulseaudio-utils.".into());
         }
     };
     let mut stdout = match child.stdout.take() {
         Some(stdout) => stdout,
         None => {
-            restore_card_profile(restore_profile);
+            let _ = child.kill().await;
+            let _ = child.wait().await;
+            if let Some((card, profile)) = restore_profile {
+                restore_card_profile_blocking(&card, &profile);
+            }
             return Err("Could not open the microphone stream.".into());
         }
     };
@@ -91,9 +183,10 @@ pub async fn start_recording(
         loop {
             tokio::select! {
                 _ = &mut stopping, if !finishing => {
+                    // Capture::stop sent SIGINT; keep draining the tail until
+                    // parec closes stdout or the bounded deadline expires.
                     finishing = true;
                     drain_deadline = tokio::time::Instant::now() + Duration::from_secs(1);
-                    if let Some(id) = child.id() { let _ = nix::sys::signal::kill(nix::unistd::Pid::from_raw(id as i32), nix::sys::signal::Signal::SIGINT); }
                 }
                 _ = tokio::time::sleep_until(drain_deadline), if finishing => break,
                 result = stdout.read(&mut buffer[filled..]) => match result {
@@ -137,14 +230,15 @@ pub async fn start_recording(
             )
             .await;
         }
-        let _ = child.kill().await;
-        let _ = child.wait().await;
     });
     Ok(Capture {
         frames,
+        bluetooth,
         stop: Some(stop),
-        task,
+        child: Some(child),
+        task: Some(task),
         restore_profile,
+        restore_warning: None,
     })
 }
 
@@ -259,4 +353,134 @@ pub fn level(bytes: &[u8]) -> f32 {
         })
         .sum();
     ((sum / count as f32).sqrt() * 5.0).clamp(0.0, 1.0)
+}
+
+/// Some Bluetooth HFP transports degrade into long runs of exact digital
+/// silence interleaved with packet bursts. The pattern is distinguishable from
+/// real silence because the zero-heavy packets still carry energy. It is not
+/// recoverable by parsing the PCM, so the session ends with the captured audio
+/// instead of confidently transcribing noise.
+pub struct CaptureHealth {
+    window: VecDeque<bool>,
+    reported: bool,
+}
+impl Default for CaptureHealth {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+impl CaptureHealth {
+    const WINDOW: usize = 16;
+    const UNSTABLE: usize = 12;
+    const ZERO_RATIO: f64 = 0.5;
+    const MIN_RMS: f64 = 0.004;
+
+    pub fn new() -> Self {
+        Self {
+            window: VecDeque::with_capacity(Self::WINDOW),
+            reported: false,
+        }
+    }
+
+    pub fn push(&mut self, bytes: &[u8]) -> bool {
+        let samples = bytes.len() / 2;
+        if samples == 0 || self.reported {
+            return false;
+        }
+        let mut zeros = 0usize;
+        let mut energy = 0f64;
+        for bytes in bytes.chunks_exact(2) {
+            let sample = i16::from_le_bytes([bytes[0], bytes[1]]);
+            if sample == 0 {
+                zeros += 1;
+            }
+            let normalized = sample as f64 / 32768.0;
+            energy += normalized * normalized;
+        }
+        let zero_ratio = zeros as f64 / samples as f64;
+        let rms = (energy / samples as f64).sqrt();
+        let suspicious = zero_ratio >= Self::ZERO_RATIO && rms >= Self::MIN_RMS;
+        self.window.push_back(suspicious);
+        if self.window.len() > Self::WINDOW {
+            self.window.pop_front();
+        }
+        let unstable = self.window.len() >= Self::UNSTABLE
+            && self.window.iter().filter(|suspicious| **suspicious).count() >= Self::UNSTABLE;
+        if unstable {
+            self.reported = true;
+        }
+        unstable
+    }
+}
+
+#[cfg(test)]
+mod health_tests {
+    use super::CaptureHealth;
+
+    fn packet(samples: usize, amplitude: i16, zero_every: usize) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(samples * 2);
+        for index in 0..samples {
+            let value = if zero_every > 0 && index % zero_every != 0 {
+                0
+            } else if index % 2 == 0 {
+                amplitude
+            } else {
+                -amplitude
+            };
+            bytes.extend_from_slice(&value.to_le_bytes());
+        }
+        bytes
+    }
+
+    #[test]
+    fn bluetooth_capture_uses_a_larger_buffer_hint() {
+        assert_eq!(super::capture_latency_ms(true), 160);
+        assert_eq!(super::capture_latency_ms(false), 40);
+    }
+
+    #[test]
+    fn ordinary_speech_and_real_silence_are_not_reported() {
+        let mut health = CaptureHealth::new();
+        for _ in 0..40 {
+            assert!(!health.push(&packet(1536, 8000, 0)));
+            assert!(!health.push(&packet(1536, 0, 1)));
+        }
+    }
+
+    #[test]
+    fn an_isolated_loud_or_zero_packet_does_not_trigger() {
+        let mut health = CaptureHealth::new();
+        for index in 0..40 {
+            if index == 12 {
+                assert!(!health.push(&packet(1536, 9000, 3)));
+            } else {
+                assert!(!health.push(&packet(1536, 8000, 0)));
+            }
+        }
+    }
+
+    #[test]
+    fn corrupt_bluetooth_bursts_trigger_once_after_about_a_second() {
+        let mut health = CaptureHealth::new();
+        for _ in 0..11 {
+            assert!(!health.push(&packet(1536, 8000, 3)));
+        }
+        assert!(health.push(&packet(1536, 8000, 3)));
+        assert!(!health.push(&packet(1536, 8000, 3)));
+    }
+
+    #[test]
+    fn a_rolling_window_tolerates_occasional_healthy_packets() {
+        let mut health = CaptureHealth::new();
+        let mut reported = false;
+        for index in 0..16 {
+            let bytes = if index % 4 == 0 {
+                packet(1536, 8000, 0)
+            } else {
+                packet(1536, 8000, 3)
+            };
+            reported |= health.push(&bytes);
+        }
+        assert!(reported);
+    }
 }

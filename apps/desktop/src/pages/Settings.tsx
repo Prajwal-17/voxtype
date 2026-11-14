@@ -189,10 +189,10 @@ function Preferences({
               disabled={active}
             >
               <SelectTrigger id="microphone" aria-label="Microphone">
-                <SelectValue placeholder="Automatic (prefer headset)" />
+                <SelectValue placeholder="Automatic (best available)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__default">Automatic (prefer headset)</SelectItem>
+                <SelectItem value="__default">Automatic (best available)</SelectItem>
                 {microphones.data?.map((m) => (
                   <SelectItem key={m.id} value={m.id}>
                     {m.name}
@@ -218,8 +218,10 @@ function Preferences({
           </div>
         </FieldRow>
         <p className="mt-2 text-caption text-muted">
-          Automatic uses a connected headset, earbuds, or phone microphone and falls back to the
-          laptop microphone.
+          Automatic uses a connected USB or wired headset microphone and otherwise the laptop
+          microphone. Bluetooth earbuds stay in high-quality playback mode; choose a Bluetooth
+          microphone to switch them to call mode for dictation. Call mode is narrowband and may be
+          unreliable on some Linux adapters.
         </p>
         {microphones.isError && (
           <p className="mt-2 text-ui text-danger">
