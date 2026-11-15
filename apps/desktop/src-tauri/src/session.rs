@@ -20,6 +20,8 @@ pub enum Control {
     Cancel,
 }
 
+const BLUETOOTH_UNSTABLE: &str = "The Bluetooth microphone signal became unstable. Your partial text and recording are saved; choose Automatic or your laptop microphone and try again.";
+
 pub async fn signal(app: &AppHandle, control: Control) -> Result<(), String> {
     let sender = app
         .state::<AppState>()
@@ -567,6 +569,24 @@ async fn run(
     mut capture: audio::Capture,
     test: bool,
 ) -> Result<bool, String> {
+    let result = run_inner(app, settings, snapshot, control, &mut capture, test).await;
+    // Cancellation must not wait for a tail that will be discarded.
+    let graceful = !matches!(&result, Ok(false));
+    capture.shutdown(graceful).await;
+    if let Some(warning) = capture.take_restore_warning() {
+        let _ = app.emit("app-error", &warning);
+    }
+    result
+}
+
+async fn run_inner(
+    app: &AppHandle,
+    settings: &Settings,
+    snapshot: &mut Snapshot,
+    control: &mut mpsc::Receiver<Control>,
+    capture: &mut audio::Capture,
+    test: bool,
+) -> Result<bool, String> {
     let started = Instant::now();
     if test {
         snapshot.phase = Phase::Listening;
@@ -585,22 +605,33 @@ async fn run(
             }
         }
     }
+    let bluetooth = capture.bluetooth;
+    let mut health = audio::CaptureHealth::new();
     let prepared = prepare_stream(
         snapshot,
         control,
-        &mut capture,
+        capture,
         started,
         connect(settings),
         audio::SpeechGate::new(settings.voice_detection),
+        bluetooth,
+        &mut health,
         |s| publish(app, s),
     )
     .await?;
     let Some(prepared) = prepared else {
         return Ok(false);
     };
-    let completed = pump(snapshot, control, capture, prepared, started, |s| {
-        publish(app, s)
-    })
+    let completed = pump(
+        snapshot,
+        control,
+        capture,
+        prepared,
+        started,
+        bluetooth,
+        &mut health,
+        |s| publish(app, s),
+    )
     .await?;
     if !completed || !settings.cleanup_enabled || snapshot.text.trim().is_empty() {
         return Ok(completed);
@@ -701,6 +732,7 @@ struct PreparedStream {
     gate: audio::SpeechGate,
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn prepare_stream(
     snapshot: &mut Snapshot,
     control: &mut mpsc::Receiver<Control>,
@@ -708,12 +740,15 @@ async fn prepare_stream(
     started: Instant,
     connection: impl Future<Output = Result<SpeechSocket, String>>,
     mut gate: audio::SpeechGate,
+    bluetooth: bool,
+    health: &mut audio::CaptureHealth,
     publish: impl Fn(&Snapshot),
 ) -> Result<Option<PreparedStream>, String> {
     tokio::pin!(connection);
     let mut buffer = AudioBuffer::default();
     let mut stopping = false;
     let mut audio_done = false;
+    let mut capture_released = false;
     let mut last_audio = tokio::time::Instant::now();
     loop {
         tokio::select! {
@@ -724,6 +759,7 @@ async fn prepare_stream(
             },
             frame = capture.frames.recv(), if !audio_done => match frame {
                 Some(Ok(bytes)) => {
+                    if bluetooth && !stopping && health.push(&bytes) { return Err(BLUETOOTH_UNSTABLE.into()); }
                     last_audio = tokio::time::Instant::now();
                     if !stopping { snapshot.level = audio::level(&bytes); snapshot.elapsed_ms = started.elapsed().as_millis() as u64; }
                     for packet in gate.push(bytes) { buffer.push(packet)?; }
@@ -739,16 +775,25 @@ async fn prepare_stream(
             },
             _ = tokio::time::sleep_until(last_audio + Duration::from_secs(5)), if !audio_done => return Err("No audio arrived. Check the selected microphone.".into()),
         }
+        // Reap parec and restore A2DP as soon as the queue is drained, before
+        // waiting for the remote socket to finish or for cleanup.
+        if audio_done && !capture_released {
+            capture_released = true;
+            capture.shutdown(true).await;
+        }
     }
 }
 
 // Separate the wire protocol from desktop side effects so finalization is testable without a microphone or provider credentials.
+#[allow(clippy::too_many_arguments)]
 async fn pump(
     snapshot: &mut Snapshot,
     control: &mut mpsc::Receiver<Control>,
-    mut capture: audio::Capture,
+    capture: &mut audio::Capture,
     prepared: PreparedStream,
     started: Instant,
+    bluetooth: bool,
+    health: &mut audio::CaptureHealth,
     publish: impl Fn(&Snapshot),
 ) -> Result<bool, String> {
     let PreparedStream {
@@ -812,6 +857,7 @@ async fn pump(
     let mut audio_done = false;
     let mut close_queued = false;
     let mut close_sent = false;
+    let mut capture_released = false;
     let mut final_deadline = tokio::time::Instant::now() + Duration::from_secs(3600);
     let mut last_audio = tokio::time::Instant::now();
     let mut meter_updated = Instant::now();
@@ -859,6 +905,7 @@ async fn pump(
             frame = capture.frames.recv(), if !audio_done => {
                 match frame {
                     Some(Ok(bytes)) => {
+                        if bluetooth && !stopping && health.push(&bytes) { return Err(BLUETOOTH_UNSTABLE.into()); }
                         last_audio = tokio::time::Instant::now();
                         if !stopping { snapshot.level = audio::level(&bytes); snapshot.elapsed_ms = started.elapsed().as_millis() as u64; }
                         for packet in gate.push(bytes) { buffer.push(packet)?; }
@@ -879,6 +926,12 @@ async fn pump(
                 stopping = true; capture.stop(); snapshot.phase = Phase::Finishing;
                 snapshot.level = 0.0; snapshot.speech_active = false; publish(snapshot);
             },
+        }
+        // The capture queue (and the HFP route) must not stay alive through
+        // remote finalization or transcript cleanup after Stop.
+        if audio_done && !capture_released {
+            capture_released = true;
+            capture.shutdown(true).await;
         }
     }
 }

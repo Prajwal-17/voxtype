@@ -258,9 +258,71 @@ async fn default_sink() -> Option<String> {
     pactl_text(&["get-default-sink"]).await
 }
 
+async fn bluetooth_cards() -> Result<Vec<serde_json::Value>, String> {
+    let out = output("pactl", &["--format=json", "list", "cards"]).await?;
+    if !out.status.success() {
+        return Err("Cannot reach the desktop audio service. Check Sound settings.".into());
+    }
+    serde_json::from_slice(&out.stdout)
+        .map_err(|_| "Could not read the Bluetooth device list.".into())
+}
+
+// CVSD is narrower but far more widely compatible than mSBC. Several widely
+// reported BlueZ/PipeWire adapter combinations corrupt mSBC SCO packets while
+// CVSD keeps working, so explicit call mode starts with the compatibility
+// codec. The quality tradeoff is documented in the desktop README.
+const HEADSET_PROFILES: [&str; 3] = [
+    "headset-head-unit-cvsd",
+    "headset-head-unit-msbc",
+    "headset-head-unit",
+];
+
+fn headset_profile(card: &serde_json::Value) -> Option<&str> {
+    let profiles = card["profiles"].as_object()?;
+    HEADSET_PROFILES.iter().copied().find(|candidate| {
+        profiles.get(*candidate).is_some_and(|profile| {
+            profile["sources"].as_u64().unwrap_or(0) > 0
+                && profile["available"].as_bool().unwrap_or(false)
+        })
+    })
+}
+
+/// A2DP carries playback only. A Bluetooth microphone exists only after the
+/// card is switched to a headset profile, which is an explicit, disruptive
+/// choice on many adapters. Automatic mode therefore never makes that switch.
+pub fn bluetooth_card_microphones(cards: &[serde_json::Value]) -> Vec<Microphone> {
+    let mut entries = Vec::new();
+    for card in cards {
+        let Some(name) = card["name"].as_str() else {
+            continue;
+        };
+        if !name.starts_with("bluez_card.") {
+            continue;
+        }
+        let active = card["active_profile"].as_str().unwrap_or_default();
+        // An off card can still be a connected headset. Offer call mode so the
+        // explicit choice can turn it back on; automatic mode does not.
+        if active.is_empty() || active.starts_with("headset-head-unit") {
+            continue;
+        }
+        if headset_profile(card).is_none() {
+            continue;
+        }
+        let description = card["properties"]["device.description"]
+            .as_str()
+            .or_else(|| card["properties"]["device.product.name"].as_str())
+            .unwrap_or(name);
+        entries.push(Microphone {
+            id: format!("bluetooth:{name}"),
+            name: format!("{description} microphone (call mode)"),
+        });
+    }
+    entries
+}
+
 pub async fn microphones() -> Result<Vec<Microphone>, String> {
-    Ok(audio_sources()
-        .await?
+    let (sources, cards) = tokio::join!(audio_sources(), bluetooth_cards());
+    let mut entries: Vec<Microphone> = sources?
         .into_iter()
         .map(|source| Microphone {
             id: source.name,
@@ -270,7 +332,11 @@ pub async fn microphones() -> Result<Vec<Microphone>, String> {
                 source.description
             },
         })
-        .collect())
+        .collect();
+    if let Ok(cards) = cards {
+        entries.extend(bluetooth_card_microphones(&cards));
+    }
+    Ok(entries)
 }
 
 fn bluez_identity(name: &str, prefix: &str) -> Option<String> {
@@ -282,10 +348,18 @@ fn bluez_identity(name: &str, prefix: &str) -> Option<String> {
     }
 }
 
+fn bluetooth_source_identity(name: &str) -> Option<String> {
+    bluez_identity(name, "bluez_input.").or_else(|| bluez_identity(name, "bluez_source."))
+}
+
+fn is_bluetooth_source(source: &AudioSource) -> bool {
+    bluetooth_source_identity(&source.name).is_some()
+}
+
 fn is_headset_source(source: &AudioSource) -> bool {
     let name = source.name.to_ascii_lowercase();
     let description = source.description.to_ascii_lowercase();
-    name.starts_with("bluez_input.")
+    bluetooth_source_identity(&source.name).is_some()
         || name.starts_with("alsa_input.usb-")
         || [
             "headset",
@@ -329,6 +403,19 @@ pub fn preferred_source(
     sources.first().map(|source| source.name.clone())
 }
 
+pub fn automatic_source(
+    sources: &[AudioSource],
+    default_source: Option<&str>,
+    default_sink: Option<&str>,
+) -> Option<String> {
+    let candidates: Vec<AudioSource> = sources
+        .iter()
+        .filter(|source| !is_bluetooth_source(source))
+        .cloned()
+        .collect();
+    preferred_source(&candidates, default_source, default_sink)
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct BluetoothSwitch {
     pub card: String,
@@ -349,31 +436,12 @@ pub fn find_bluetooth_switch(
             continue;
         }
         let active = card["active_profile"].as_str().unwrap_or_default();
+        // "off" is a valid connected state; remember it so restore turns the
+        // card back off after an explicit take.
         if active.is_empty() || active.starts_with("headset-head-unit") {
             continue;
         }
-        let Some(profiles) = card["profiles"].as_object() else {
-            continue;
-        };
-        let mut selected = None;
-        for candidate in [
-            "headset-head-unit-msbc",
-            "headset-head-unit-cvsd",
-            "headset-head-unit",
-        ] {
-            if profiles
-                .get(candidate)
-                .map(|profile| {
-                    profile["sources"].as_u64().unwrap_or(0) > 0
-                        && profile["available"].as_bool().unwrap_or(false)
-                })
-                .unwrap_or(false)
-            {
-                selected = Some(candidate);
-                break;
-            }
-        }
-        let Some(profile) = selected else {
+        let Some(profile) = headset_profile(card) else {
             continue;
         };
         let switch = BluetoothSwitch {
@@ -386,100 +454,284 @@ pub fn find_bluetooth_switch(
         {
             return Some(switch);
         }
-        if fallback.is_none() {
+        // A missing explicitly selected card must not silently switch a
+        // different connected headset.
+        if identity.is_none() && fallback.is_none() {
             fallback = Some(switch);
         }
     }
     fallback
 }
 
-async fn bluetooth_switch_for(identity: Option<&str>) -> Option<BluetoothSwitch> {
-    let out = output("pactl", &["--format=json", "list", "cards"])
-        .await
-        .ok()?;
-    if !out.status.success() {
-        return None;
+/// Both the synthetic tray id and a saved `bluez_input.<id>.<suffix>` name
+/// identify the same Bluetooth card.
+fn bluetooth_identity(value: &str) -> Option<String> {
+    let rest = value
+        .strip_prefix("bluetooth:")
+        .and_then(|card| card.strip_prefix("bluez_card."))
+        .or_else(|| value.strip_prefix("bluez_input."))
+        .or_else(|| value.strip_prefix("bluez_source."))?;
+    let identity = rest.split('.').next()?;
+    if identity.is_empty() {
+        None
+    } else {
+        Some(identity.to_ascii_lowercase())
     }
-    let cards: Vec<serde_json::Value> = serde_json::from_slice(&out.stdout).ok()?;
-    find_bluetooth_switch(&cards, identity)
 }
 
-async fn switch_card_profile(card: &str, profile: &str) -> bool {
-    output("pactl", &["set-card-profile", card, profile])
+fn bluetooth_source(sources: &[AudioSource], identity: &str) -> Option<String> {
+    sources
+        .iter()
+        .find(|source| bluetooth_source_identity(&source.name).as_deref() == Some(identity))
+        .map(|source| source.name.clone())
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum InputPlan {
+    Use(String),
+    Switch {
+        identity: String,
+        switch: BluetoothSwitch,
+    },
+    Unavailable,
+}
+
+pub fn plan_input(
+    requested: &str,
+    sources: &[AudioSource],
+    cards: &[serde_json::Value],
+    default_source: Option<&str>,
+    default_sink: Option<&str>,
+) -> InputPlan {
+    if requested.is_empty() {
+        return match automatic_source(sources, default_source, default_sink) {
+            Some(source) => InputPlan::Use(source),
+            None => InputPlan::Unavailable,
+        };
+    }
+    if sources.iter().any(|source| source.name == requested) {
+        return InputPlan::Use(requested.to_string());
+    }
+    // An explicit selection that is gone must fail visibly. Silently using a
+    // different microphone makes the Home screen's selected device a lie.
+    let Some(identity) = bluetooth_identity(requested) else {
+        return InputPlan::Unavailable;
+    };
+    if let Some(source) = bluetooth_source(sources, &identity) {
+        return InputPlan::Use(source);
+    }
+    match find_bluetooth_switch(cards, Some(&identity)) {
+        Some(switch) => InputPlan::Switch { identity, switch },
+        None => InputPlan::Unavailable,
+    }
+}
+
+async fn switch_card_profile(card: &str, profile: &str) -> Result<(), String> {
+    let out = output("pactl", &["set-card-profile", card, profile]).await?;
+    if out.status.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "pactl set-card-profile {card} {profile} exited with {}",
+            out.status
+        ))
+    }
+}
+
+/// A source node appearing in `pactl list sources` is not proof that the new
+/// HFP transport has settled. Wait for the card to report a headset profile
+/// and keep the same source visible for a short quiet period before opening
+/// parec. Otherwise the first seconds can be captured during codec setup.
+fn bluetooth_profile_active(cards: &[serde_json::Value], card: &str, profile: &str) -> bool {
+    cards.iter().any(|candidate| {
+        candidate["name"].as_str() == Some(card)
+            && candidate["active_profile"]
+                .as_str()
+                .is_some_and(|active| active == profile || active.starts_with("headset-head-unit"))
+    })
+}
+
+const BLUETOOTH_READY_BUDGET: Duration = Duration::from_secs(4);
+const BLUETOOTH_READY_STABLE: Duration = Duration::from_millis(250);
+const BLUETOOTH_READY_POLL: Duration = Duration::from_millis(100);
+
+async fn probe_bluetooth_ready(
+    card: &str,
+    profile: &str,
+    identity: &str,
+) -> (bool, Option<String>) {
+    let cards = bluetooth_cards().await.unwrap_or_default();
+    let profile_ready = bluetooth_profile_active(&cards, card, profile);
+    let source = audio_sources()
         .await
-        .is_ok_and(|out| out.status.success())
+        .ok()
+        .and_then(|sources| bluetooth_source(&sources, identity));
+    (profile_ready, source)
 }
 
-async fn wait_for_bluetooth_source(identity: Option<&str>) -> Option<String> {
-    for _ in 0..30 {
-        if let Ok(sources) = audio_sources().await {
-            if let Some(source) = sources.iter().find(|source| {
-                source.name.starts_with("bluez_input.")
-                    && identity.is_none_or(|identity| {
-                        bluez_identity(&source.name, "bluez_input.").as_deref() == Some(identity)
-                    })
-            }) {
-                return Some(source.name.clone());
-            }
+async fn wait_for_bluetooth_ready(card: &str, profile: &str, identity: &str) -> Option<String> {
+    wait_for_bluetooth_ready_with(BLUETOOTH_READY_BUDGET, || {
+        probe_bluetooth_ready(card, profile, identity)
+    })
+    .await
+}
+
+/// Both probes are bounded by one overall budget. Sequential per-command timeouts
+/// must not turn a slow audio service into minutes of waiting before a take.
+async fn wait_for_bluetooth_ready_with<F, Fut>(budget: Duration, mut probe: F) -> Option<String>
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = (bool, Option<String>)>,
+{
+    let deadline = tokio::time::Instant::now() + budget;
+    let mut ready_since: Option<tokio::time::Instant> = None;
+    loop {
+        let now = tokio::time::Instant::now();
+        if now >= deadline {
+            return None;
         }
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        // Dropping a timed-out probe also kills its bounded pactl child.
+        let (profile_ready, source) = match timeout(deadline - now, probe()).await {
+            Ok(result) => result,
+            Err(_) => return None,
+        };
+        if profile_ready && source.is_some() {
+            match ready_since {
+                Some(since) if since.elapsed() >= BLUETOOTH_READY_STABLE => return source,
+                Some(_) => {}
+                None => ready_since = Some(tokio::time::Instant::now()),
+            }
+        } else {
+            ready_since = None;
+        }
+        let now = tokio::time::Instant::now();
+        if now >= deadline {
+            return None;
+        }
+        tokio::time::sleep(BLUETOOTH_READY_POLL.min(deadline - now)).await;
     }
-    None
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PreparedInput {
     pub device: Option<String>,
     pub restore_profile: Option<(String, String)>,
+    pub bluetooth: bool,
 }
 
-pub async fn prepare_input(requested: &str) -> PreparedInput {
-    let sources = audio_sources().await.unwrap_or_default();
-    let default = default_source().await;
-    let sink = default_sink().await;
-
-    if !requested.is_empty() && sources.iter().any(|source| source.name == requested) {
-        return PreparedInput {
-            device: Some(requested.to_string()),
-            restore_profile: None,
-        };
-    }
-
-    let preferred = preferred_source(&sources, default.as_deref(), sink.as_deref());
-    let preferred_is_headset = preferred
+fn prepared(device: Option<String>, restore_profile: Option<(String, String)>) -> PreparedInput {
+    let bluetooth = device
         .as_deref()
-        .and_then(|name| sources.iter().find(|source| source.name == name))
-        .is_some_and(is_headset_source);
-    if requested.is_empty() && preferred_is_headset {
-        return PreparedInput {
-            device: preferred,
-            restore_profile: None,
-        };
+        .is_some_and(|device| bluetooth_source_identity(device).is_some());
+    PreparedInput {
+        device,
+        restore_profile,
+        bluetooth,
     }
+}
 
-    let explicit_bluetooth = (!requested.is_empty())
-        .then(|| bluez_identity(requested, "bluez_input."))
-        .flatten();
-    let identity = explicit_bluetooth.or_else(|| {
-        sink.as_deref()
-            .and_then(|sink| bluez_identity(sink, "bluez_output."))
-    });
+fn has_usable_headset(cards: &[serde_json::Value]) -> bool {
+    cards.iter().any(|card| {
+        card["name"]
+            .as_str()
+            .is_some_and(|name| name.starts_with("bluez_card.") && headset_profile(card).is_some())
+    })
+}
 
-    if let Some(switch) = bluetooth_switch_for(identity.as_deref()).await {
-        if switch_card_profile(&switch.card, &switch.profile).await {
-            if let Some(source) = wait_for_bluetooth_source(identity.as_deref()).await {
-                return PreparedInput {
-                    device: Some(source),
-                    restore_profile: Some((switch.card, switch.previous_profile)),
-                };
-            }
-            switch_card_profile(&switch.card, &switch.previous_profile).await;
+fn unavailable_microphone(
+    requested: &str,
+    sources: &[AudioSource],
+    cards: &[serde_json::Value],
+) -> String {
+    if !requested.is_empty() {
+        if bluetooth_identity(requested).is_some() {
+            "The selected Bluetooth microphone is unavailable. Reconnect the headset, or choose Automatic or another microphone in Settings.".into()
+        } else {
+            "The selected microphone is unavailable. Choose another microphone in Settings.".into()
+        }
+    } else if (!sources.is_empty() && sources.iter().all(is_bluetooth_source))
+        || has_usable_headset(cards)
+    {
+        "Automatic mode does not start Bluetooth call mode. Choose a microphone in Settings.".into()
+    } else {
+        "No microphone is available. Check that one is connected, then try again.".into()
+    }
+}
+
+fn bluetooth_switch_failed() -> String {
+    "The Bluetooth headset did not switch to call mode. Reconnect it, or choose Automatic or another microphone in Settings.".into()
+}
+
+pub(crate) async fn restore_card_profile(restore: Option<(String, String)>) -> Option<String> {
+    let (card, profile) = restore?;
+    for attempt in 0..2 {
+        match tokio::time::timeout(
+            Duration::from_secs(1),
+            output("pactl", &["set-card-profile", &card, &profile]),
+        )
+        .await
+        {
+            Ok(Ok(out)) if out.status.success() => return None,
+            Ok(Ok(out)) => eprintln!(
+                "pactl set-card-profile {card} {profile} exited with {}",
+                out.status
+            ),
+            Ok(Err(error)) => eprintln!("pactl set-card-profile {card} {profile} failed: {error}"),
+            Err(_) => eprintln!("pactl set-card-profile {card} {profile} timed out"),
+        }
+        if attempt == 0 {
+            tokio::time::sleep(Duration::from_millis(150)).await;
         }
     }
+    Some("Could not restore the Bluetooth headset's playback profile. Reconnect it or set it in Sound settings.".into())
+}
 
-    PreparedInput {
-        device: preferred,
-        restore_profile: None,
+pub async fn prepare_input(requested: &str) -> Result<PreparedInput, String> {
+    let (sources, default, sink, cards) = tokio::join!(
+        audio_sources(),
+        default_source(),
+        default_sink(),
+        bluetooth_cards()
+    );
+    let sources = sources?;
+    let cards = cards.unwrap_or_default();
+
+    match plan_input(
+        requested,
+        &sources,
+        &cards,
+        default.as_deref(),
+        sink.as_deref(),
+    ) {
+        InputPlan::Use(device) => Ok(prepared(Some(device), None)),
+        InputPlan::Unavailable => Err(unavailable_microphone(requested, &sources, &cards)),
+        InputPlan::Switch { identity, switch } => {
+            if switch_card_profile(&switch.card, &switch.profile)
+                .await
+                .is_ok()
+            {
+                if let Some(source) =
+                    wait_for_bluetooth_ready(&switch.card, &switch.profile, &identity).await
+                {
+                    return Ok(prepared(
+                        Some(source),
+                        Some((switch.card, switch.previous_profile)),
+                    ));
+                }
+                let restore = restore_card_profile(Some((
+                    switch.card.clone(),
+                    switch.previous_profile.clone(),
+                )))
+                .await;
+                let mut message = bluetooth_switch_failed();
+                if let Some(warning) = restore {
+                    message.push(' ');
+                    message.push_str(&warning);
+                }
+                return Err(message);
+            }
+            Err(bluetooth_switch_failed())
+        }
     }
 }
 pub async fn focused_window() -> Option<String> {
@@ -705,7 +957,7 @@ mod microphone_tests {
     }
 
     #[test]
-    fn finds_a_connected_bluetooth_card_and_prefers_msbc() {
+    fn finds_a_connected_bluetooth_card_and_prefers_the_compatible_codec() {
         let cards = vec![serde_json::json!({
             "name": "bluez_card.AA_BB_CC_DD_EE_FF",
             "active_profile": "a2dp-sink",
@@ -717,7 +969,7 @@ mod microphone_tests {
         })];
         let switch = find_bluetooth_switch(&cards, Some("aa_bb_cc_dd_ee_ff")).unwrap();
         assert_eq!(switch.card, "bluez_card.AA_BB_CC_DD_EE_FF");
-        assert_eq!(switch.profile, "headset-head-unit-msbc");
+        assert_eq!(switch.profile, "headset-head-unit-cvsd");
         assert_eq!(switch.previous_profile, "a2dp-sink");
     }
 
@@ -731,6 +983,319 @@ mod microphone_tests {
             }
         })];
         assert!(find_bluetooth_switch(&cards, None).is_none());
+    }
+
+    fn a2dp_card() -> serde_json::Value {
+        serde_json::json!({
+            "name": "bluez_card.AA_BB_CC_DD_EE_FF",
+            "active_profile": "a2dp-sink",
+            "properties": { "device.description": "OPPO Enco Buds2" },
+            "profiles": {
+                "a2dp-sink": { "sources": 0, "available": true },
+                "headset-head-unit-cvsd": { "sources": 1, "available": true },
+                "headset-head-unit-msbc": { "sources": 1, "available": true }
+            }
+        })
+    }
+
+    #[test]
+    fn readiness_requires_the_requested_card_to_report_a_headset_profile() {
+        let mut card = a2dp_card();
+        assert!(!bluetooth_profile_active(
+            &[card.clone()],
+            "bluez_card.AA_BB_CC_DD_EE_FF",
+            "headset-head-unit-cvsd",
+        ));
+        card["active_profile"] = serde_json::Value::String("headset-head-unit-cvsd".into());
+        assert!(bluetooth_profile_active(
+            &[card.clone()],
+            "bluez_card.AA_BB_CC_DD_EE_FF",
+            "headset-head-unit-cvsd",
+        ));
+        card["active_profile"] = serde_json::Value::String("headset-head-unit-msbc".into());
+        assert!(bluetooth_profile_active(
+            &[card],
+            "bluez_card.AA_BB_CC_DD_EE_FF",
+            "headset-head-unit-cvsd",
+        ));
+    }
+
+    #[test]
+    fn an_explicit_missing_card_never_switches_a_different_bluetooth_headset() {
+        let cards = vec![a2dp_card()];
+        assert!(find_bluetooth_switch(&cards, Some("00_11_22_33_44_55")).is_none());
+        let plan = plan_input(
+            "bluetooth:bluez_card.00_11_22_33_44_55",
+            &[source(
+                "alsa_input.pci-0000_00_1f.3.analog-stereo",
+                "Built-in Audio Analog Stereo",
+            )],
+            &cards,
+            Some("alsa_input.pci-0000_00_1f.3.analog-stereo"),
+            None,
+        );
+        assert_eq!(plan, InputPlan::Unavailable);
+    }
+
+    #[test]
+    fn automatic_never_switches_an_a2dp_card_into_call_mode() {
+        let sources = vec![
+            source(
+                "alsa_input.pci-0000_00_1f.3.analog-stereo",
+                "Built-in Audio Analog Stereo",
+            ),
+            source("bluez_input.AA_BB_CC_DD_EE_FF.0", "OPPO Enco Buds2"),
+        ];
+        let cards = vec![a2dp_card()];
+        let automatic = automatic_source(
+            &sources,
+            Some("bluez_input.AA_BB_CC_DD_EE_FF.0"),
+            Some("bluez_output.AA_BB_CC_DD_EE_FF.1"),
+        );
+        assert_eq!(
+            automatic,
+            Some("alsa_input.pci-0000_00_1f.3.analog-stereo".into())
+        );
+        assert_eq!(
+            plan_input(
+                "",
+                &sources,
+                &cards,
+                Some("bluez_input.AA_BB_CC_DD_EE_FF.0"),
+                Some("bluez_output.AA_BB_CC_DD_EE_FF.1"),
+            ),
+            InputPlan::Use("alsa_input.pci-0000_00_1f.3.analog-stereo".into())
+        );
+    }
+
+    #[test]
+    fn automatic_excludes_pulseaudio_bluetooth_source_names_too() {
+        let sources = vec![
+            source(
+                "alsa_input.pci-0000_00_1f.3.analog-stereo",
+                "Built-in Audio Analog Stereo",
+            ),
+            source("bluez_source.AA_BB_CC_DD_EE_FF", "OPPO Enco Buds2"),
+        ];
+        assert_eq!(
+            automatic_source(&sources, Some("bluez_source.AA_BB_CC_DD_EE_FF"), None),
+            Some("alsa_input.pci-0000_00_1f.3.analog-stereo".into())
+        );
+        assert_eq!(
+            plan_input(
+                "bluez_source.AA_BB_CC_DD_EE_FF",
+                &sources,
+                &[a2dp_card()],
+                Some("alsa_input.pci-0000_00_1f.3.analog-stereo"),
+                None,
+            ),
+            InputPlan::Use("bluez_source.AA_BB_CC_DD_EE_FF".into())
+        );
+    }
+
+    #[test]
+    fn automatic_still_uses_a_wired_or_usb_headset() {
+        let sources = vec![
+            source(
+                "alsa_input.pci-0000_00_1f.3.analog-stereo",
+                "Built-in Audio Analog Stereo",
+            ),
+            source("alsa_input.usb-Jabra_Headset-00", "Jabra Headset"),
+        ];
+        assert_eq!(
+            automatic_source(
+                &sources,
+                Some("alsa_input.pci-0000_00_1f.3.analog-stereo"),
+                None,
+            ),
+            Some("alsa_input.usb-Jabra_Headset-00".into())
+        );
+    }
+
+    #[test]
+    fn explicit_bluetooth_card_microphone_switches_call_mode() {
+        let sources = vec![source(
+            "alsa_input.pci-0000_00_1f.3.analog-stereo",
+            "Built-in Audio Analog Stereo",
+        )];
+        let plan = plan_input(
+            "bluetooth:bluez_card.AA_BB_CC_DD_EE_FF",
+            &sources,
+            &[a2dp_card()],
+            Some("alsa_input.pci-0000_00_1f.3.analog-stereo"),
+            Some("bluez_output.AA_BB_CC_DD_EE_FF.1"),
+        );
+        assert_eq!(
+            plan,
+            InputPlan::Switch {
+                identity: "aa_bb_cc_dd_ee_ff".into(),
+                switch: BluetoothSwitch {
+                    card: "bluez_card.AA_BB_CC_DD_EE_FF".into(),
+                    profile: "headset-head-unit-cvsd".into(),
+                    previous_profile: "a2dp-sink".into(),
+                },
+            }
+        );
+    }
+
+    #[test]
+    fn a_saved_bluetooth_input_can_still_be_reopened_explicitly() {
+        let sources = vec![source(
+            "alsa_input.pci-0000_00_1f.3.analog-stereo",
+            "Built-in Audio Analog Stereo",
+        )];
+        let plan = plan_input(
+            "bluez_input.AA_BB_CC_DD_EE_FF.0",
+            &sources,
+            &[a2dp_card()],
+            Some("alsa_input.pci-0000_00_1f.3.analog-stereo"),
+            None,
+        );
+        assert!(matches!(plan, InputPlan::Switch { .. }));
+    }
+
+    #[test]
+    fn an_explicit_available_bluetooth_source_is_used_without_a_switch() {
+        let sources = vec![source("bluez_input.AA_BB_CC_DD_EE_FF.0", "OPPO Enco Buds2")];
+        assert_eq!(
+            plan_input(
+                "bluez_input.AA_BB_CC_DD_EE_FF.0",
+                &sources,
+                &[serde_json::json!({
+                    "name": "bluez_card.AA_BB_CC_DD_EE_FF",
+                    "active_profile": "headset-head-unit-msbc",
+                    "profiles": { "headset-head-unit-msbc": { "sources": 1, "available": true } }
+                })],
+                None,
+                None,
+            ),
+            InputPlan::Use("bluez_input.AA_BB_CC_DD_EE_FF.0".into())
+        );
+    }
+
+    #[test]
+    fn a_missing_selected_microphone_fails_instead_of_switching_silently() {
+        let sources = vec![source(
+            "alsa_input.pci-0000_00_1f.3.analog-stereo",
+            "Built-in Audio Analog Stereo",
+        )];
+        assert_eq!(
+            plan_input(
+                "alsa_input.disconnected",
+                &sources,
+                &[],
+                Some("alsa_input.pci-0000_00_1f.3.analog-stereo"),
+                None,
+            ),
+            InputPlan::Unavailable
+        );
+        assert!(
+            unavailable_microphone("alsa_input.disconnected", &sources, &[])
+                .contains("selected microphone is unavailable")
+        );
+    }
+
+    #[test]
+    fn automatic_with_only_bluetooth_inputs_reports_an_actionable_error() {
+        let sources = vec![source("bluez_input.AA_BB_CC_DD_EE_FF.0", "OPPO Enco Buds2")];
+        assert_eq!(
+            plan_input(
+                "",
+                &sources,
+                &[a2dp_card()],
+                Some("bluez_input.AA_BB_CC_DD_EE_FF.0"),
+                Some("bluez_output.AA_BB_CC_DD_EE_FF.1"),
+            ),
+            InputPlan::Unavailable
+        );
+        assert!(unavailable_microphone("", &sources, &[a2dp_card()])
+            .contains("does not start Bluetooth call mode"));
+    }
+
+    #[test]
+    fn automatic_with_no_sources_but_an_a2dp_card_reports_call_mode() {
+        assert!(unavailable_microphone("", &[], &[a2dp_card()])
+            .contains("does not start Bluetooth call mode"));
+        assert_eq!(
+            unavailable_microphone("", &[], &[]),
+            "No microphone is available. Check that one is connected, then try again."
+        );
+    }
+
+    #[test]
+    fn a_connected_off_card_can_be_selected_and_restores_off() {
+        let mut card = a2dp_card();
+        card["active_profile"] = serde_json::Value::String("off".into());
+        assert_eq!(
+            bluetooth_card_microphones(&[card.clone()]),
+            vec![Microphone {
+                id: "bluetooth:bluez_card.AA_BB_CC_DD_EE_FF".into(),
+                name: "OPPO Enco Buds2 microphone (call mode)".into(),
+            }]
+        );
+        let switch = find_bluetooth_switch(&[card], Some("aa_bb_cc_dd_ee_ff")).unwrap();
+        assert_eq!(switch.previous_profile, "off");
+        assert_eq!(switch.profile, "headset-head-unit-cvsd");
+    }
+
+    #[tokio::test]
+    async fn bluetooth_readiness_returns_once_stable_within_the_budget() {
+        let started = std::time::Instant::now();
+        let source = wait_for_bluetooth_ready_with(Duration::from_secs(2), || async {
+            (true, Some("bluez_input.AA_BB_CC_DD_EE_FF.0".into()))
+        })
+        .await;
+        assert_eq!(source.as_deref(), Some("bluez_input.AA_BB_CC_DD_EE_FF.0"));
+        assert!(started.elapsed() >= Duration::from_millis(250));
+        assert!(started.elapsed() < Duration::from_secs(2));
+    }
+
+    #[tokio::test]
+    async fn bluetooth_readiness_has_one_overall_deadline() {
+        let started = std::time::Instant::now();
+        let source = wait_for_bluetooth_ready_with(Duration::from_millis(120), || async {
+            (true, Some("bluez_input.AA_BB_CC_DD_EE_FF.0".into()))
+        })
+        .await;
+        assert!(source.is_none());
+        assert!(started.elapsed() < Duration::from_secs(2));
+    }
+
+    #[tokio::test]
+    async fn bluetooth_readiness_cancels_a_stalled_probe_at_the_deadline() {
+        let started = std::time::Instant::now();
+        let source = wait_for_bluetooth_ready_with(Duration::from_millis(80), || async {
+            tokio::time::sleep(Duration::from_secs(30)).await;
+            (true, Some("bluez_input.AA_BB_CC_DD_EE_FF.0".into()))
+        })
+        .await;
+        assert!(source.is_none());
+        assert!(started.elapsed() < Duration::from_secs(2));
+    }
+
+    #[test]
+    fn bluetooth_cards_offer_an_explicit_call_mode_microphone() {
+        let microphones = bluetooth_card_microphones(&[a2dp_card()]);
+        assert_eq!(
+            microphones,
+            vec![Microphone {
+                id: "bluetooth:bluez_card.AA_BB_CC_DD_EE_FF".into(),
+                name: "OPPO Enco Buds2 microphone (call mode)".into(),
+            }]
+        );
+        let already_call_mode = serde_json::json!({
+            "name": "bluez_card.AA_BB_CC_DD_EE_FF",
+            "active_profile": "headset-head-unit-msbc",
+            "properties": { "device.description": "OPPO Enco Buds2" },
+            "profiles": { "headset-head-unit-msbc": { "sources": 1, "available": true } }
+        });
+        assert!(bluetooth_card_microphones(&[already_call_mode]).is_empty());
+        let no_microphone = serde_json::json!({
+            "name": "bluez_card.AA_BB_CC_DD_EE_FF",
+            "active_profile": "a2dp-sink",
+            "profiles": { "a2dp-sink": { "sources": 0, "available": true } }
+        });
+        assert!(bluetooth_card_microphones(&[no_microphone]).is_empty());
     }
 }
 

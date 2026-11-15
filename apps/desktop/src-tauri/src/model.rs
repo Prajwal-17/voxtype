@@ -129,7 +129,7 @@ pub struct AuthUser {
     pub image: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct Microphone {
     pub id: String,
     pub name: String,

@@ -206,7 +206,7 @@ fn tray_menu(
     let automatic = CheckMenuItem::with_id(
         app,
         "microphone:auto",
-        "Automatic (prefer headset)",
+        "Automatic (best available)",
         true,
         settings.microphone.is_empty(),
         None::<&str>,

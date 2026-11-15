@@ -26,6 +26,7 @@ object InAppRecorder {
   @Volatile var durationMs = 0L; private set
   @Volatile var level = 0f; private set
   private var lastLevelAt = 0L
+  private var healthFailure = false
   private var processingJob: Job? = null
   private var pendingFile: java.io.File? = null
   @Volatile private var cleanupCall: Call? = null
@@ -48,7 +49,7 @@ object InAppRecorder {
     val take = RecordingRecovery(context.applicationContext, userId, apiUrl)
     recovery = take
     val current = ++generation
-    text = ""; error = ""; durationMs = 0L; level = 0f; lastLevelAt = 0L
+    text = ""; error = ""; durationMs = 0L; level = 0f; lastLevelAt = 0L; healthFailure = false
     val stream = DeepgramSession({ session.token }, { session.apiUrl }, {
       main.post {
         if (current == generation && busy) {
@@ -71,8 +72,25 @@ object InAppRecorder {
         main.post {
           take.stopped(file, duration)
           if (current != generation) return@post
-          if (status == "error") { pendingFile = null; return@post }
           capture = null
+          if (healthFailure) {
+            healthFailure = false
+            take.received(engine?.partialTranscript().orEmpty())
+            val recovered = file != null || take.hasContent()
+            pendingFile = null
+            durationMs = duration
+            level = 0f
+            recovery = null
+            engine?.close(); engine = null
+            error = if (recovered) {
+              "Bluetooth microphone signal became unstable. Your partial take is in Local recordings. Switch to Automatic or your phone microphone and try again."
+            } else {
+              "Bluetooth microphone signal became unstable. Nothing was saved. Switch to Automatic or your phone microphone and try again."
+            }
+            status = "error"; changed()
+            return@post
+          }
+          if (status == "error") { pendingFile = null; return@post }
           pendingFile = file
           durationMs = duration
           status = "processing"; level = 0f; changed()
@@ -109,6 +127,16 @@ object InAppRecorder {
         }
       }, {
         main.post { if (current == generation) fail("Microphone interrupted. Audio is kept in Local recordings.") }
+      }, {
+        main.post {
+          if (current == generation && status == "listening") {
+            // Wait for AudioCapture to finalize the take before promising
+            // recovery; a short burst may end with no usable audio at all.
+            healthFailure = true
+            status = "processing"; level = 0f; changed()
+            capture?.stop()
+          }
+        }
       }).also { it.start() }
       changed()
     } catch (exception: Exception) {
@@ -121,6 +149,7 @@ object InAppRecorder {
     capture?.stop(); capture = null
   }
   fun fail(message: String) {
+    healthFailure = false
     recovery?.received(engine?.partialTranscript().orEmpty())
     recovery = null
     capture?.stop(); capture = null
@@ -136,6 +165,7 @@ object InAppRecorder {
   }
   fun cancel() {
     if (busy) recorderContext?.let { LocalDiagnostics.record(it, LocalDiagnostics.Event.cancelled) }
+    healthFailure = false
     recovery?.discard(); recovery = null
     generation++
     processingJob?.cancel(); processingJob = null

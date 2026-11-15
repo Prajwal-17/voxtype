@@ -26,6 +26,19 @@ reachable from the phone for Google sign-in.
 Sign in, grant microphone permission, and enable **VoxType Dev voice bubble** in
 Android accessibility settings.
 
+## Microphone routing
+
+Recording prefers a wired or USB headset microphone and otherwise the built-in
+microphone. Bluetooth earbuds stay on their media route, so opening the
+microphone does not force them into narrowband HFP/SCO call mode. If Android
+still routes capture to a Bluetooth input, the recorder watches the routed
+device and ends a take with a clear recovery message when the transport
+degrades into digital bursts. Short `AudioRecord.read` results are aggregated
+into fixed 100 ms frames, so partial reads cannot trigger the detector early.
+If the take finalized audio or partial text, it remains in **Transcripts →
+Local recordings**; when nothing was captured, the message says so and directs
+you to Automatic or the phone microphone instead of promising a saved file.
+
 ## App compatibility
 
 The bubble supports ordinary text fields, including chat editors that disable
